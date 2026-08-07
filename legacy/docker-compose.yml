@@ -1,0 +1,35 @@
+# InvestStudio — chạy tool phân tích cổ phiếu hoàn toàn trong Docker.
+#
+#   1) Build ảnh 1 lần:            docker compose build
+#   2) Phân tích 1 mã:             docker compose run --rm analyzer FPT
+#      Nhiều mã + cờ:              docker compose run --rm analyzer VCB HPG --pe-sec 9 --pos 2
+#      CafeF thuần (không cơ bản): docker compose run --rm analyzer FPT --source cafef
+#   3) Mở báo cáo trên web:        docker compose up -d web
+#      → http://localhost:8080/phan-tich-ma.html  (gõ mã đã crawl để xem đầy đủ)
+#
+# Volume "." → /app: du-lieu-thuc.js do tool sinh ra ghi thẳng về thư mục host,
+# nên trang web (host hoặc service web) đọc được ngay.
+
+services:
+  analyzer:
+    build: .
+    image: investstudio-analyzer
+    profiles: ["tools"]          # không tự chạy khi `up`; chỉ gọi qua `run`
+    working_dir: /app
+    volumes:
+      - .:/app                   # ghi du-lieu-thuc.js về host
+      - vnstock-cache:/root/.vnstock   # giữ cache/cfg vnstock giữa các lần chạy
+    # tham số truyền qua CLI: docker compose run --rm analyzer <MÃ> [cờ...]
+
+  web:
+    image: investstudio-analyzer
+    build: .
+    working_dir: /app
+    entrypoint: ["python", "-m", "http.server", "8080"]   # ghi đè ENTRYPOINT tool
+    volumes:
+      - .:/app
+    ports:
+      - "8080:8080"
+
+volumes:
+  vnstock-cache:

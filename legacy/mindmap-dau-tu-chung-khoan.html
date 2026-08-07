@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mindmap Đầu Tư Chứng Khoán — Lộ trình cho người mới (F0)</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --line:#2a3550; --text:#eaf0fb; --muted:#93a0bd;
+    --c1:#ff8a5c; --c2:#c792ff; --c3:#5ce6a0; --c4:#ff6b7d; --c5:#ffc24b; --c6:#5ac8ff; --c7:#ff9ecd;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;gap:14px;
+    padding:12px 18px;background:linear-gradient(180deg,rgba(11,16,32,.96),rgba(11,16,32,.72));border-bottom:1px solid var(--line);backdrop-filter:blur(8px);}
+  header h1{margin:0;font-size:17px;white-space:nowrap;
+    background:linear-gradient(92deg,var(--c6),var(--c2),var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  header .sub{color:var(--muted);font-size:12px;white-space:nowrap;}
+  .spacer{flex:1;}
+  .tools{display:flex;gap:6px;flex-wrap:wrap;}
+  .tools input{min-width:200px;}
+  .tools button,.tools input{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;transition:.15s;}
+  .tools input{cursor:text;}
+  .tools button:hover{border-color:var(--c6);color:var(--c6);}
+  .legend{position:fixed;left:14px;bottom:14px;z-index:20;display:flex;flex-direction:column;gap:5px;
+    background:rgba(18,26,46,.85);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:11.5px;color:var(--muted);}
+  .legend b{display:flex;align-items:center;gap:7px;font-weight:500;}
+  .dot{width:9px;height:9px;border-radius:50%;}
+
+  #viewport{position:absolute;inset:0;top:0;cursor:grab;overflow:hidden;transition:right .25s ease;}
+  body.gloss-open #viewport{right:400px;}
+  @media(max-width:600px){ body.gloss-open #viewport{right:0;} }
+  #viewport.grabbing{cursor:grabbing;}
+  #world{position:absolute;top:0;left:0;transform-origin:0 0;}
+  svg#links{position:absolute;top:0;left:0;overflow:visible;pointer-events:none;}
+  .mnode{position:absolute;width:210px;border:1px solid var(--line);background:var(--panel);
+    border-radius:12px;padding:9px 12px;box-shadow:0 6px 20px rgba(0,0,0,.35);transition:border-color .15s,box-shadow .15s,transform .15s;}
+  .mnode:hover{border-color:var(--c6);box-shadow:0 8px 26px rgba(90,200,255,.25);}
+  .mnode .lab{font-weight:650;font-size:13.5px;line-height:1.3;}
+  .mnode .desc{color:var(--muted);font-size:12px;margin-top:4px;line-height:1.45;}
+  .mnode .desc b{color:var(--text);font-weight:600;}
+  .mnode .ex{margin-top:6px;font-size:11.5px;line-height:1.45;color:#dfe7f5;
+    background:rgba(255,194,75,.10);border-left:3px solid var(--c5);border-radius:6px;padding:5px 8px;}
+  .mnode .ex b{color:#fff;font-weight:700;}
+  .mroot{width:230px;text-align:center;border:2px solid var(--c6);
+    background:linear-gradient(150deg,#16233f,#1d2b4a);box-shadow:0 10px 34px rgba(90,200,255,.3);}
+  .mroot .lab{font-size:18px;background:linear-gradient(92deg,var(--c6),var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .mroot .desc{font-size:12px;}
+  .toggle{position:absolute;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);
+    background:var(--bg);color:var(--text);font-size:13px;line-height:20px;text-align:center;cursor:pointer;z-index:2;user-select:none;}
+  .toggle:hover{border-color:var(--c6);color:var(--c6);}
+  .mnode.b1{border-left:4px solid var(--c1);} .mnode.b2{border-left:4px solid var(--c2);}
+  .mnode.b3{border-left:4px solid var(--c3);} .mnode.b4{border-left:4px solid var(--c4);}
+  .mnode.b5{border-left:4px solid var(--c5);} .mnode.b6{border-left:4px solid var(--c6);}
+  .mnode.b7{border-left:4px solid var(--c7);}
+  .mnode.dim{opacity:.18;} .mnode.hit{border-color:var(--c5);box-shadow:0 0 0 2px var(--c5);}
+  mark{background:#ffd33d55;color:var(--text);border-radius:3px;padding:0 2px;}
+  /* Bảng chú giải */
+  .gloss-overlay{position:fixed;top:57px;right:0;bottom:0;width:400px;max-width:94vw;z-index:40;
+    transform:translateX(100%);transition:transform .25s ease;pointer-events:none;}
+  .gloss-overlay.open{transform:translateX(0);pointer-events:auto;}
+  .gloss-box{width:100%;height:100%;display:flex;flex-direction:column;
+    background:var(--panel);border-left:1px solid var(--line);box-shadow:-16px 0 44px rgba(0,0,0,.45);overflow:hidden;}
+  .gloss-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);}
+  .gloss-head span{font-weight:650;font-size:15px;
+    background:linear-gradient(92deg,var(--c5),var(--c6));-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .gloss-head button{background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:14px;}
+  .gloss-head button:hover{border-color:var(--c4);color:var(--c4);}
+  #glossSearch{margin:14px 18px 6px;padding:9px 12px;background:var(--bg);border:1px solid var(--line);border-radius:9px;color:var(--text);font-size:13px;}
+  #glossBody{overflow:auto;padding:8px 18px 20px;}
+  .gg-title{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:16px 0 8px;padding-bottom:5px;border-bottom:1px dashed var(--line);}
+  .gg-grid{display:grid;grid-template-columns:1fr;gap:2px 0;}
+  .gg-item{display:flex;gap:9px;padding:5px 0;font-size:13px;line-height:1.4;}
+  .gg-abbr{flex:0 0 84px;font-weight:700;color:var(--c6);}
+  .gg-full{color:var(--text);} .gg-full i{color:var(--muted);font-style:normal;}
+  .gg-item.hide{display:none;} .gg-title.hide{display:none;}
+  /* Công cụ chấm điểm */
+  #scoreBody{overflow:auto;padding:4px 16px 10px;flex:1;}
+  .sc-hint{font-size:11.5px;color:var(--muted);margin:10px 0 4px;line-height:1.5;}
+  .sc-cat{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;text-transform:uppercase;
+    letter-spacing:.5px;color:var(--muted);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px dashed var(--line);}
+  .sc-cat b{color:var(--c6);font-size:12.5px;}
+  .sc-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;}
+  .sc-item label{flex:1;color:var(--text);line-height:1.35;}
+  .sc-item select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:7px;
+    padding:6px 7px;font-size:12px;flex:0 0 160px;max-width:160px;cursor:pointer;}
+  #scoreFoot{border-top:1px solid var(--line);padding:12px 16px 14px;background:var(--bg);}
+  .sc-total{display:flex;align-items:baseline;gap:12px;}
+  .sc-total .num{font-size:36px;font-weight:800;line-height:1;}
+  .sc-total .num small{font-size:15px;color:var(--muted);font-weight:600;}
+  .sc-total .verdict{font-size:13.5px;font-weight:700;}
+  .sc-bars{margin-top:12px;display:flex;flex-direction:column;gap:9px;}
+  .sc-bar .top{display:flex;justify-content:space-between;font-size:12px;}
+  .sc-bar .top b{color:var(--text);font-weight:600;}
+  .sc-bar .top span{color:var(--muted);}
+  .sc-bar .track{height:9px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:4px;}
+  .sc-bar .fill{height:100%;border-radius:6px;transition:width .2s;}
+  .sc-reset{margin-top:12px;width:100%;background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    border-radius:8px;padding:8px;font-size:12px;cursor:pointer;}
+  .sc-reset:hover{border-color:var(--c4);color:var(--c4);}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧠 Mindmap Đầu Tư Chứng Khoán</h1>
+  <span class="sub">Lộ trình F0 · kéo để di chuyển · lăn chuột để zoom</span>
+  <span class="spacer"></span>
+  <div class="tools">
+    <input id="search" placeholder="🔍 Tìm (P/E, CANSLIM, FOMO...)"/>
+    <button onclick="zoomBy(1.2)">＋</button>
+    <button onclick="zoomBy(1/1.2)">－</button>
+    <button onclick="fit()">⤢ Vừa màn hình</button>
+    <button onclick="setAll(false)">Mở hết</button>
+    <button onclick="setAll(true)">Thu gọn</button>
+    <button onclick="toggleScore()">🧮 Chấm điểm cổ phiếu</button>
+    <button onclick="toggleGloss()">📖 Chú giải viết tắt</button>
+  </div>
+</header>
+
+<div id="viewport">
+  <div id="world">
+    <svg id="links"></svg>
+  </div>
+</div>
+
+<div id="score" class="gloss-overlay">
+  <div class="gloss-box">
+    <div class="gloss-head"><span>🧮 Chấm điểm cổ phiếu</span><button onclick="toggleScore()">✕</button></div>
+    <div id="scoreBody"></div>
+    <div id="scoreFoot"></div>
+  </div>
+</div>
+
+<div id="gloss" class="gloss-overlay">
+  <div class="gloss-box">
+    <div class="gloss-head"><span>📖 Bảng chú giải thuật ngữ & viết tắt</span><button onclick="toggleGloss()">✕</button></div>
+    <input id="glossSearch" placeholder="🔍 Lọc thuật ngữ (VD: ROE, margin, T+...)"/>
+    <div id="glossBody"></div>
+  </div>
+</div>
+
+<div class="legend">
+  <b><i class="dot" style="background:var(--c1)"></i>1 · Nền tảng</b>
+  <b><i class="dot" style="background:var(--c2)"></i>2 · Thực hành F0</b>
+  <b><i class="dot" style="background:var(--c3)"></i>3 · Phân tích</b>
+  <b><i class="dot" style="background:var(--c4)"></i>4 · Rủi ro & Tâm lý</b>
+  <b><i class="dot" style="background:var(--c5)"></i>5 · Chiến lược</b>
+  <b><i class="dot" style="background:var(--c6)"></i>6 · Thuật ngữ</b>
+  <b><i class="dot" style="background:var(--c7)"></i>7 · Chấm điểm</b>
+</div>
+
+<script>
+/* ============ DỮ LIỆU ============ */
+const DATA = {
+  label:"ĐẦU TƯ CHỨNG KHOÁN", desc:"Bản đồ tư duy toàn diện cho người mới",
+  children:[
+    { b:1, label:"1 · Kiến thức nền tảng & Thị trường", children:[
+      { label:"Chứng khoán là gì?", desc:"Bằng chứng xác nhận <b>quyền & lợi ích hợp pháp</b> với tài sản/vốn của tổ chức phát hành." },
+      { label:"Các loại chứng khoán", children:[
+        { label:"Cổ phiếu", desc:"Xác nhận <b>quyền sở hữu</b> doanh nghiệp.", ex:"Mua 100 cp HPG = bạn là cổ đông, sở hữu một phần Tập đoàn Hòa Phát." },
+        { label:"Trái phiếu", desc:"Xác nhận <b>quyền chủ nợ</b>, nhận lãi coupon.", ex:"Mua trái phiếu 10 triệu lãi 8%/năm → nhận 800.000đ/năm dù giá cổ phiếu lên hay xuống." },
+        { label:"Chứng chỉ quỹ", desc:"Góp vốn vào <b>quỹ đại chúng</b> (ETF, quỹ mở).", ex:"Mua 1 lô quỹ ETF VN30 = gián tiếp nắm giữ 30 cổ phiếu lớn nhất sàn cùng lúc." },
+        { label:"Phái sinh", desc:"Chứng quyền, <b>hợp đồng tương lai</b> — đòn bẩy cao." },
+      ]},
+      { label:"Nguồn lợi nhuận", children:[
+        { label:"Chênh lệch giá", desc:"Mua thấp — bán cao.", ex:"Mua FPT giá 100.000đ, bán 120.000đ → lãi 20.000đ/cp (chưa trừ phí, thuế)." },
+        { label:"Cổ tức", desc:"Tiền mặt hoặc cổ phiếu.", ex:"VNM trả cổ tức 4.000đ/cp; có 1.000 cp → nhận 4 triệu tiền mặt." },
+        { label:"Lãi trái tức", desc:"Lãi định kỳ từ trái phiếu." },
+      ]},
+      { label:"Lợi ích", children:[
+        { label:"Chống lạm phát", desc:"Tài sản tăng <b>vượt mất giá tiền</b>." },
+        { label:"Thu nhập thụ động", desc:"Dòng tiền cổ tức." },
+        { label:"Tư duy tài chính", desc:"Hiểu vĩ mô & doanh nghiệp." },
+      ]},
+      { label:"Thị trường Việt Nam", children:[
+        { label:"HOSE", desc:"DN lớn — <b>VN-Index / VN30</b>." },
+        { label:"HNX", desc:"Chỉ số <b>HNX-Index</b>." },
+        { label:"UPCoM", desc:"Chưa niêm yết — rủi ro cao hơn." },
+        { label:"Quản lý", desc:"<b>UBCKNN</b> & <b>VSDC</b>." },
+      ]},
+    ]},
+
+    { b:2, label:"2 · Quy trình thực hành F0", children:[
+      { label:"Mở tài khoản", children:[
+        { label:"Online — eKYC", desc:"Định danh điện tử <b>5–10 phút</b>." },
+        { label:"Trực tiếp tại quầy", desc:"Vietcap, DSC, VNDIRECT, SSI, TCBS..." },
+      ]},
+      { label:"Hành trang", children:[
+        { label:"CCCD gắn chip" },
+        { label:"TK ngân hàng chính chủ" },
+        { label:"Thiết bị giao dịch" },
+        { label:"Kiến thức", desc:"<b>Quan trọng nhất.</b>" },
+      ]},
+      { label:"Chi phí & Thuế phí", children:[
+        { label:"Phí giao dịch", desc:"~<b>0.1%–0.35%</b>.", ex:"Mua 100 triệu, phí 0,15% = 150.000đ; mua và bán đều chịu phí này." },
+        { label:"Phí lưu ký", desc:"Giữ hộ tại VSDC." },
+        { label:"Thuế TNCN", desc:"<b>0.1%</b> khi bán (kể cả lỗ).", ex:"Bán 100 triệu → nộp thuế 100.000đ, ngay cả khi lệnh đó đang lỗ." },
+        { label:"Phí duy trì", desc:"Thường <b>miễn phí</b>." },
+      ]},
+      { label:"Cơ chế giao dịch", children:[
+        { label:"Loại lệnh", desc:"<b>LO, ATO/ATC, MP</b>.", ex:"LO: đặt mua HPG đúng 27.000đ, chờ khớp. MP: mua ngay bằng giá thị trường đang có." },
+        { label:"Phiên", desc:"Khớp định kỳ & liên tục." },
+        { label:"Biên độ", desc:"HOSE ±7% · HNX ±10% · UPCoM ±15%.", ex:"HPG tham chiếu 27.000đ trên HOSE → trần ≈ 28.900đ, sàn ≈ 25.100đ trong ngày." },
+        { label:"Chu kỳ T+", desc:"CP về theo <b>T+</b>.", ex:"Mua thứ Hai (ngày T) → chiều thứ Tư (T+2) cổ phiếu mới về, lúc đó mới bán được." },
+      ]},
+    ]},
+
+    { b:3, label:"3 · Phân tích & Lọc cổ phiếu", children:[
+      { label:"FA vs TA", children:[
+        { label:"Cơ bản (FA)", desc:"Giá trị nội tại → <i>mua gì</i>." },
+        { label:"Kỹ thuật (TA)", desc:"Biểu đồ giá/khối lượng → <i>mua khi nào</i>." },
+      ]},
+      { label:"Báo cáo tài chính", children:[
+        { label:"Cân đối kế toán", desc:"Tài sản = Nợ + Vốn CSH." },
+        { label:"Kết quả KD", desc:"Doanh thu → <b>lợi nhuận</b>." },
+        { label:"Lưu chuyển tiền tệ", desc:"Tránh bẫy <b>lãi giả, tiền âm</b>.", ex:"DN báo lãi 500 tỷ nhưng dòng tiền kinh doanh âm → lợi nhuận nằm trên giấy (khoản phải thu), chưa thu được tiền thật." },
+      ]},
+      { label:"Chỉ số tài chính", children:[
+        { label:"EPS", desc:"LN mỗi cổ phiếu.", ex:"Lãi ròng 1.000 tỷ / 500 triệu cp = EPS 2.000đ mỗi cổ phiếu/năm." },
+        { label:"P/E", desc:"Đắt hay rẻ.", ex:"Giá 30.000đ / EPS 2.000đ = P/E 15 lần → bỏ 15 đồng để mua 1 đồng lợi nhuận/năm." },
+        { label:"P/B", desc:"Giá / sổ sách.", ex:"Giá 30.000đ / giá trị sổ sách 15.000đ = P/B 2 lần → trả gấp đôi tài sản ròng." },
+        { label:"ROE", desc:"Hiệu quả vốn CSH.", ex:"Lãi 200 tỷ / vốn chủ 1.000 tỷ = ROE 20% → mỗi 100đ vốn tạo 20đ lãi/năm." },
+        { label:"ROA", desc:"Hiệu quả tài sản.", ex:"Lãi 200 tỷ / tổng tài sản 2.000 tỷ = ROA 10%." },
+        { label:"D/E", desc:"Đòn bẩy nợ.", ex:"Nợ 800 tỷ / vốn chủ 1.000 tỷ = D/E 0,8 → nợ ít hơn vốn tự có, khá an toàn." },
+        { label:"Biên lợi nhuận", desc:"Khả năng sinh lời.", ex:"Lãi ròng 150 tỷ / doanh thu 1.000 tỷ = biên 15% → bán 100đ lời 15đ." },
+      ]},
+      { label:"CANSLIM", desc:"7 tiêu chí siêu cổ phiếu", children:[
+        { label:"C — Current", desc:"LN <b>quý</b> đột biến.", ex:"Lãi quý này tăng ≥25% so với cùng kỳ năm trước mới đạt tiêu chí C." },
+        { label:"A — Annual", desc:"LN <b>năm</b> bền vững." },
+        { label:"N — New", desc:"Sản phẩm/đỉnh giá mới." },
+        { label:"S — Supply/Demand", desc:"Khối lượng đột biến." },
+        { label:"L — Leader", desc:"Dẫn dắt ngành." },
+        { label:"I — Institutional", desc:"Định chế ủng hộ." },
+        { label:"M — Market", desc:"Xu hướng thị trường thuận." },
+      ]},
+      { label:"Công cụ TA", children:[
+        { label:"Xu hướng", desc:"Up / Down / Sideway." },
+        { label:"Hỗ trợ & Kháng cự" },
+        { label:"MA / EMA", desc:"MA20/50/200." },
+        { label:"RSI", desc:"Quá mua >70 / quá bán <30.", ex:"RSI của một mã lên 82 sau chuỗi tăng nóng → cảnh báo quá mua, dễ điều chỉnh." },
+        { label:"MACD", desc:"Động lượng." },
+        { label:"Volume", desc:"Xác nhận xu hướng." },
+        { label:"Mẫu nến & mô hình" },
+      ]},
+    ]},
+
+    { b:4, label:"4 · Rủi ro & Tâm lý", children:[
+      { label:"Sai lầm F0", children:[
+        { label:"Nhầm may mắn ↔ năng lực" },
+        { label:"Lạm dụng Margin", desc:"Cháy tài khoản nhanh.", ex:"Vốn 100tr vay thêm 100tr mua 200tr; cp giảm 30% → mất 60tr trên vốn 100tr = lỗ 60%, lại còn gánh lãi vay." },
+        { label:"FOMO", desc:"Mua đuổi đỉnh.", ex:"Thấy một mã tăng trần 3 phiên liền, sợ lỡ sóng nên mua đuổi ở đỉnh → mua xong quay đầu giảm." },
+        { label:"Overtrading", desc:"Phí chồng phí." },
+        { label:"Không cắt lỗ", desc:"Ôm lỗ vì hy vọng." },
+      ]},
+      { label:"Chiến lược sinh tồn", children:[
+        { label:"Giữ tiền > Kiếm tiền", desc:"<b>Bảo toàn vốn</b> ưu tiên." },
+        { label:"Nguyên tắc tạm dừng", desc:"Chờ <b>1 ngày</b> trước lệnh lớn." },
+        { label:"Hỏi kịch bản xấu nhất" },
+        { label:"Quy tắc cắt lỗ", desc:"Ngưỡng 7–8%, tuân thủ.", ex:"Mua giá 50.000đ, đặt cắt lỗ -8% = 46.000đ; chạm ngưỡng là bán ngay, không chần chừ hy vọng." },
+        { label:"Quản lý vốn", desc:"Không all-in 1 mã.", ex:"Vốn 100tr, giới hạn mỗi mã tối đa 20tr → chọn sai 1 mã cũng không đánh sập cả tài khoản." },
+      ]},
+      { label:"Làm chủ tâm lý", children:[
+        { label:"Tham lam & Sợ hãi" },
+        { label:"Nhật ký giao dịch" },
+        { label:"Kế hoạch trước, cảm xúc sau" },
+      ]},
+      { label:"Cốt lõi", desc:"Bắt đầu <b>vốn nhỏ</b>, học <b>quản trị rủi ro</b> trước." },
+    ]},
+
+    { b:5, label:"5 · Chiến lược & Danh mục", children:[
+      { label:"Trường phái", children:[
+        { label:"Giá trị (Value)", desc:"DN tốt bị định giá thấp." },
+        { label:"Tăng trưởng (Growth)", desc:"Tốc độ tăng cao." },
+        { label:"Cổ tức (Income)", desc:"Trả cổ tức đều & cao." },
+        { label:"Lướt sóng", desc:"Ngắn hạn, dựa TA." },
+      ]},
+      { label:"DCA", desc:"<b>Trung bình giá</b> đều đặn.", ex:"Đều đặn mỗi tháng mua 3 triệu cp VNM bất kể giá cao hay thấp → giá vốn được trung bình hóa, khỏi lo bắt đúng đáy." },
+      { label:"Phân bổ tài sản", children:[
+        { label:"Đa dạng hóa", desc:"Không bỏ trứng 1 giỏ.", ex:"Chia vốn cho 3–4 ngành khác nhau (ngân hàng, bán lẻ, điện) thay vì dồn hết vào 1 ngành." },
+        { label:"Tỷ trọng theo khẩu vị" },
+        { label:"Quỹ dự phòng", desc:"Chỉ đầu tư <b>tiền nhàn rỗi</b>." },
+      ]},
+      { label:"Kỷ luật dài hạn", children:[
+        { label:"Tái cân bằng định kỳ" },
+        { label:"Lãi kép", desc:"Sức mạnh thời gian.", ex:"100 triệu, lãi 12%/năm và tái đầu tư đều → sau 20 năm thành ~965 triệu, gần gấp 10 lần." },
+        { label:"Kỳ vọng thực tế" },
+      ]},
+    ]},
+
+    { b:6, label:"6 · Thuật ngữ nhanh", children:[
+      { label:"Bull / Bear", desc:"Giá lên / xuống." },
+      { label:"Blue-chip", desc:"Vốn hóa lớn, đầu ngành.", ex:"Nhóm VN30 như VCB, FPT, HPG, VNM..." },
+      { label:"Penny", desc:"Thị giá thấp, rủi ro cao.", ex:"Cổ phiếu giá dưới 10.000đ, thanh khoản thất thường, dễ bị 'lái'." },
+      { label:"Room ngoại", desc:"Giới hạn sở hữu NĐT nước ngoài." },
+      { label:"Ngày GDKHQ", desc:"Không hưởng quyền cổ tức." },
+      { label:"Trần/Sàn/Tham chiếu", desc:"Giá max/min/gốc phiên." },
+    ]},
+
+    { b:7, label:"7 · Chấm điểm & Ra quyết định", children:[
+      { label:"Thang điểm tổng hợp (0–100)", desc:"Cộng điểm 4 nhóm theo trọng số.", children:[
+        { label:"Nền tảng & tài chính — 45đ", desc:"Sức khỏe DN.", ex:"Tăng trưởng LN 12đ · ROE 10đ · Biên LN 8đ · D/E 8đ · Dòng tiền 7đ." },
+        { label:"Định giá — 20đ", desc:"Đắt hay rẻ.", ex:"P/E 10đ · P/B 5đ · Cổ tức 5đ — so với ngành & lịch sử." },
+        { label:"Kỹ thuật & xu hướng — 20đ", desc:"Thời điểm.", ex:"Vị trí so MA 8đ · Khối lượng 6đ · RSI/động lượng 6đ." },
+        { label:"Định tính & vĩ mô — 15đ", desc:"Chất lượng.", ex:"Vị thế ngành 6đ · Ban lãnh đạo & cổ đông tổ chức 5đ · Catalyst 4đ." },
+      ]},
+      { label:"Ngưỡng ra quyết định", children:[
+        { label:"≥ 80 — Xuất sắc", desc:"Ưu tiên giải ngân, thường là cổ phiếu đầu ngành." },
+        { label:"65–79 — Tốt", desc:"Có thể đầu tư, kiên nhẫn canh điểm mua đẹp." },
+        { label:"50–64 — Trung bình", desc:"Chỉ theo dõi hoặc mua thăm dò tỷ trọng nhỏ." },
+        { label:"< 50 — Yếu", desc:"Nên tránh — rủi ro lớn hơn cơ hội." },
+      ]},
+      { label:"Chọn khung thời gian", children:[
+        { label:"Ngắn hạn (ngày–tuần)", desc:"Nặng <b>Kỹ thuật</b>: xu hướng, khối lượng, tin tức, thanh khoản cao.", ex:"Điểm TA & động lượng cao nhưng nền tảng chỉ trung bình → chỉ lướt sóng, cắt lỗ thật chặt." },
+        { label:"Trung hạn (tháng–1 năm)", desc:"Kết hợp <b>FA tăng trưởng + TA</b> theo mùa KQKD & câu chuyện ngành.", ex:"Lãi quý tăng tốc + giá vừa vượt nền tích lũy → nắm giữ theo con sóng vài tháng." },
+        { label:"Dài hạn (nhiều năm)", desc:"Nặng <b>Nền tảng</b>: lợi thế cạnh tranh, ROE bền, cổ tức, định giá hợp lý.", ex:"ROE >20% liên tục 5 năm, ít nợ, cổ tức đều → tích lũy đều bất chấp biến động ngắn hạn." },
+      ]},
+      { label:"Dùng công cụ", desc:"Bấm nút <b>🧮 Chấm điểm cổ phiếu</b> trên thanh công cụ để tự tính điểm & xem khung thời gian phù hợp." },
+    ]},
+  ]
+};
+
+/* ============ CHUẨN BỊ ============ */
+const NODE_W=210, ROOT_W=230, H_GAP=64, V_GAP=16, PAD=80;
+const COLORS={1:'--c1',2:'--c2',3:'--c3',4:'--c4',5:'--c5',6:'--c6',7:'--c7'};
+const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+const world=document.getElementById('world');
+const svg=document.getElementById('links');
+let nodes=[]; let uid=0;
+
+function build(node,parent,branch){
+  node.id=uid++; node.parent=parent; node.branch=branch;
+  node.collapsed = parent && parent.parent ? true : false; // mở 2 cấp đầu
+  const el=document.createElement('div');
+  el.className='mnode'+(parent?'':' mroot')+(branch?(' b'+branch):'');
+  el.innerHTML='<div class="lab">'+node.label+'</div>'+(node.desc?'<div class="desc">'+node.desc+'</div>':'')+(node.ex?'<div class="ex">💡 <b>Ví dụ:</b> '+node.ex+'</div>':'');
+  world.appendChild(el); node.el=el;
+  let tog=null;
+  if(node.children&&node.children.length){
+    tog=document.createElement('div'); tog.className='toggle';
+    tog.onclick=e=>{e.stopPropagation();node.collapsed=!node.collapsed;relayout();};
+    world.appendChild(tog); node.tog=tog;
+  }
+  nodes.push(node);
+  (node.children||[]).forEach(c=>build(c,node,branch||c.b));
+}
+build(DATA,null,null);
+// đo kích thước thật
+nodes.forEach(n=>{n.w=n.el.offsetWidth; n.h=n.el.offsetHeight;});
+
+/* ============ LAYOUT TỎA NHÁNH ============ */
+function subH(n){
+  const kids=n.collapsed?[]:(n.children||[]);
+  if(!kids.length){n._sh=n.h;return n.h;}
+  let s=0; kids.forEach(k=>s+=subH(k)); s+=V_GAP*(kids.length-1);
+  n._sh=Math.max(n.h,s); return n._sh;
+}
+function place(n,x,yc,dir){
+  n._x=x; n._y=yc; n._dir=dir; n._vis=true;
+  const kids=n.collapsed?[]:(n.children||[]);
+  if(!kids.length)return;
+  let total=0; kids.forEach(k=>total+=k._sh); total+=V_GAP*(kids.length-1);
+  let cur=yc-total/2;
+  kids.forEach(k=>{const ch=k._sh, cyc=cur+ch/2;
+    const cx=dir>0? x+NODE_W+H_GAP : x-NODE_W-H_GAP;
+    place(k,cx,cyc,dir); cur+=ch+V_GAP;});
+}
+function relayout(){
+  nodes.forEach(n=>n._vis=false);
+  // subH cho các nhánh gốc
+  const tops=DATA.children; tops.forEach(subH);
+  DATA._x=0; DATA._y=0; DATA._vis=true;
+  // một chiều: gốc bên trái, mọi nhánh đổ sang phải, xếp chồng dọc
+  let total=0; tops.forEach(t=>total+=t._sh); total+=V_GAP*(Math.max(tops.length-1,0));
+  let cur=-total/2;
+  tops.forEach(t=>{const ch=t._sh, cyc=cur+ch/2;
+    place(t, ROOT_W+H_GAP, cyc, 1); cur+=ch+V_GAP;});
+  render();
+}
+
+/* ============ VẼ ============ */
+function render(){
+  let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+  nodes.forEach(n=>{ if(!n._vis)return;
+    const w=(n===DATA?ROOT_W:NODE_W);
+    minX=Math.min(minX,n._x); maxX=Math.max(maxX,n._x+w);
+    minY=Math.min(minY,n._y-n.h/2); maxY=Math.max(maxY,n._y+n.h/2);
+  });
+  const offX=PAD-minX, offY=PAD-minY;
+  const W=maxX-minX+PAD*2, H=maxY-minY+PAD*2;
+  world.style.width=W+'px'; world.style.height=H+'px';
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+  let paths='';
+  nodes.forEach(n=>{
+    const w=(n===DATA?ROOT_W:NODE_W);
+    if(!n._vis){ n.el.style.display='none'; if(n.tog)n.tog.style.display='none'; return; }
+    n.el.style.display='block';
+    n.el.style.left=(n._x+offX)+'px';
+    n.el.style.top=(n._y-n.h/2+offY)+'px';
+    // nút toggle
+    if(n.tog){ const kids=n.children||[]; n.tog.style.display='block';
+      const tx=n._dir>=0 ? n._x+w+offX-11 : n._x+offX-11;
+      n.tog.style.left=tx+'px'; n.tog.style.top=(n._y+offY-11)+'px';
+      n.tog.textContent=n.collapsed?'+':'−';
+    }
+    if(n.parent){
+      const p=n.parent, pw=(p===DATA?ROOT_W:NODE_W);
+      const dir=n._dir;
+      const x1=(dir>0? p._x+pw : p._x)+offX, y1=p._y+offY;
+      const x2=(dir>0? n._x : n._x+w)+offX, y2=n._y+offY;
+      const mx=(x1+x2)/2;
+      const col=cssv(COLORS[n.branch]||'--c6');
+      paths+=`<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="2" opacity="0.55"/>`;
+    }
+  });
+  svg.innerHTML=paths;
+}
+
+/* ============ PAN / ZOOM ============ */
+let scale=1, tx=0, ty=0;
+const vp=document.getElementById('viewport');
+function apply(){ world.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`; }
+function zoomBy(f){ const r=vp.getBoundingClientRect(); const cx=r.width/2,cy=r.height/2;
+  tx=cx-(cx-tx)*f; ty=cy-(cy-ty)*f; scale*=f; apply(); }
+vp.addEventListener('wheel',e=>{e.preventDefault(); const f=e.deltaY<0?1.1:1/1.1;
+  const r=vp.getBoundingClientRect(); const mx=e.clientX-r.left,my=e.clientY-r.top;
+  tx=mx-(mx-tx)*f; ty=my-(my-ty)*f; scale*=f; apply();},{passive:false});
+let drag=false,sx,sy;
+vp.addEventListener('mousedown',e=>{drag=true;sx=e.clientX-tx;sy=e.clientY-ty;vp.classList.add('grabbing');});
+window.addEventListener('mousemove',e=>{if(!drag)return;tx=e.clientX-sx;ty=e.clientY-sy;apply();});
+window.addEventListener('mouseup',()=>{drag=false;vp.classList.remove('grabbing');});
+function fit(){ const r=vp.getBoundingClientRect();
+  const W=world.offsetWidth,H=world.offsetHeight;
+  scale=Math.min((r.width-40)/W,(r.height-90)/H,1);
+  tx=(r.width-W*scale)/2; ty=(r.height-90-H*scale)/2+70; apply(); }
+
+/* ============ ĐIỀU KHIỂN ============ */
+function setAll(collapse){ nodes.forEach(n=>{ if(n.parent && n.children && n.children.length) n.collapsed=collapse; }); relayout(); if(!collapse)fit(); }
+
+const search=document.getElementById('search');
+search.addEventListener('input',()=>{
+  const q=search.value.trim().toLowerCase();
+  nodes.forEach(n=>{n.el.querySelectorAll('mark').forEach(m=>{const p=m.parentNode;p.replaceChild(document.createTextNode(m.textContent),m);p.normalize();});});
+  if(!q){nodes.forEach(n=>n.el.classList.remove('dim','hit')); return;}
+  // mở đường tới node khớp
+  nodes.forEach(n=>{ const t=(n.label+' '+(n.desc||'')+' '+(n.ex||'')).toLowerCase();
+    if(t.includes(q)){ let p=n.parent; while(p){p.collapsed=false;p=p.parent;} } });
+  relayout();
+  nodes.forEach(n=>{ const t=(n.label+' '+(n.desc||'')+' '+(n.ex||'')).toLowerCase(); const hit=t.includes(q);
+    n.el.classList.toggle('hit',hit); n.el.classList.toggle('dim',!hit);
+    if(hit)hl(n.el,q);
+  });
+});
+function hl(root,q){ const walk=nd=>{ if(nd.nodeType===3){const i=nd.textContent.toLowerCase().indexOf(q);
+    if(i>=0){const s=document.createElement('span');s.appendChild(document.createTextNode(nd.textContent.slice(0,i)));
+      const m=document.createElement('mark');m.textContent=nd.textContent.slice(i,i+q.length);s.appendChild(m);
+      s.appendChild(document.createTextNode(nd.textContent.slice(i+q.length)));nd.parentNode.replaceChild(s,nd);}}
+    else if(nd.nodeType===1){Array.from(nd.childNodes).forEach(walk);}};
+  walk(root);
+}
+
+/* ============ BẢNG CHÚ GIẢI ============ */
+const GLOSS=[
+  {g:"Chung cho người mới", items:[
+    ["F0","Nhà đầu tư mới, lần đầu tham gia thị trường"],
+    ["NĐT","Nhà đầu tư"],
+    ["DN","Doanh nghiệp"],
+    ["CP","Cổ phiếu"],
+    ["LN","Lợi nhuận"],
+    ["TK","Tài khoản"],
+    ["CCCD","Căn cước công dân (gắn chip)"],
+    ["eKYC","<i>Electronic Know Your Customer</i> — định danh khách hàng điện tử"],
+  ]},
+  {g:"Tài chính & chỉ số định giá", items:[
+    ["CSH","Chủ sở hữu — <i>Vốn CSH = tài sản − nợ = phần vốn thật sự của cổ đông</i>"],
+    ["BCTC","Báo cáo tài chính"],
+    ["KQKD","Kết quả kinh doanh"],
+    ["EPS","<i>Earnings Per Share</i> — lợi nhuận trên mỗi cổ phiếu"],
+    ["P/E","<i>Price / Earnings</i> — giá / lợi nhuận mỗi cp (đắt hay rẻ)"],
+    ["P/B","<i>Price / Book</i> — giá / giá trị sổ sách"],
+    ["ROE","<i>Return on Equity</i> — LN / vốn chủ sở hữu"],
+    ["ROA","<i>Return on Assets</i> — LN / tổng tài sản"],
+    ["D/E","<i>Debt / Equity</i> — nợ / vốn chủ sở hữu (đo đòn bẩy)"],
+  ]},
+  {g:"Phân tích & chỉ báo", items:[
+    ["FA","<i>Fundamental Analysis</i> — phân tích cơ bản"],
+    ["TA","<i>Technical Analysis</i> — phân tích kỹ thuật"],
+    ["CANSLIM","7 tiêu chí chọn cổ phiếu tăng trưởng (C·A·N·S·L·I·M)"],
+    ["MA / EMA","<i>Moving Average</i> — đường trung bình động (EMA: hàm mũ)"],
+    ["RSI","<i>Relative Strength Index</i> — chỉ số sức mạnh tương đối (0–100)"],
+    ["MACD","<i>Moving Average Convergence Divergence</i> — phân kỳ hội tụ TB động"],
+    ["CW","<i>Covered Warrant</i> — chứng quyền có bảo đảm"],
+  ]},
+  {g:"Giao dịch & lệnh", items:[
+    ["LO","<i>Limit Order</i> — lệnh giới hạn, đặt giá xác định"],
+    ["ATO","<i>At The Open</i> — lệnh khớp tại phiên mở cửa"],
+    ["ATC","<i>At The Close</i> — lệnh khớp tại phiên đóng cửa"],
+    ["MP","<i>Market Price</i> — lệnh thị trường, khớp ngay giá tốt nhất"],
+    ["T+","Chu kỳ thanh toán (T = ngày giao dịch; T+2 = 2 ngày sau)"],
+    ["GDKHQ","Giao dịch không hưởng quyền (cổ tức/quyền mua)"],
+    ["DCA","<i>Dollar-Cost Averaging</i> — trung bình giá, mua đều đặn"],
+    ["FOMO","<i>Fear Of Missing Out</i> — tâm lý sợ bỏ lỡ"],
+    ["Margin","Vay tiền công ty chứng khoán để mua thêm (đòn bẩy)"],
+  ]},
+  {g:"Thị trường & tổ chức", items:[
+    ["HOSE","Sở Giao dịch Chứng khoán TP.HCM"],
+    ["HNX","Sở Giao dịch Chứng khoán Hà Nội"],
+    ["UPCoM","<i>Unlisted Public Company Market</i> — sàn công ty đại chúng chưa niêm yết"],
+    ["VN-Index","Chỉ số toàn bộ cổ phiếu niêm yết trên HOSE"],
+    ["VN30","Rổ 30 cổ phiếu vốn hóa lớn & thanh khoản cao nhất HOSE"],
+    ["HNX-Index","Chỉ số của sàn HNX"],
+    ["UBCKNN","Ủy ban Chứng khoán Nhà nước (cơ quan quản lý)"],
+    ["VSDC","Tổng công ty Lưu ký & Bù trừ Chứng khoán Việt Nam"],
+    ["ETF","<i>Exchange-Traded Fund</i> — quỹ hoán đổi danh mục, mua bán như cổ phiếu"],
+  ]},
+];
+const glossBody=document.getElementById('glossBody');
+glossBody.innerHTML=GLOSS.map(sec=>
+  '<div class="gg-block"><div class="gg-title">'+sec.g+'</div><div class="gg-grid">'+
+  sec.items.map(it=>'<div class="gg-item"><span class="gg-abbr">'+it[0]+'</span><span class="gg-full">'+it[1]+'</span></div>').join('')+
+  '</div></div>').join('');
+/* --- Quản lý 2 ngăn kéo phải (chỉ 1 mở cùng lúc) --- */
+function openDrawer(id){
+  const el=document.getElementById(id);
+  const willOpen=!el.classList.contains('open');
+  ['gloss','score'].forEach(x=>document.getElementById(x).classList.remove('open'));
+  if(willOpen) el.classList.add('open');
+  document.body.classList.toggle('gloss-open',willOpen);
+  setTimeout(fit,270);
+}
+function toggleGloss(){ openDrawer('gloss'); }
+function toggleScore(){ openDrawer('score'); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){
+  ['gloss','score'].forEach(x=>document.getElementById(x).classList.remove('open'));
+  document.body.classList.remove('gloss-open'); setTimeout(fit,270);} });
+document.getElementById('glossSearch').addEventListener('input',function(){
+  const q=this.value.trim().toLowerCase();
+  document.querySelectorAll('.gg-block').forEach(block=>{
+    let any=false;
+    block.querySelectorAll('.gg-item').forEach(it=>{ const hit=it.textContent.toLowerCase().includes(q);
+      it.classList.toggle('hide',!hit); if(hit)any=true; });
+    block.querySelector('.gg-title').classList.toggle('hide',!any);
+  });
+});
+
+/* ============ CÔNG CỤ CHẤM ĐIỂM ============ */
+const CRITERIA=[
+  {cat:"Nền tảng & tài chính", max:45, items:[
+    {l:"Tăng trưởng LN (so cùng kỳ)", max:12, opts:["Giảm / thất thường","Tăng nhẹ (<15%)","Tăng mạnh & đều (≥20%)"]},
+    {l:"ROE", max:10, opts:["Dưới 10%","10–15%","Trên 15%"]},
+    {l:"Biên lợi nhuận & xu hướng", max:8, opts:["Mỏng / đang giảm","Ổn định","Cao / cải thiện"]},
+    {l:"Nợ vay (D/E)", max:8, opts:["Cao (>1.5)","Vừa (0.5–1.5)","Thấp / lành mạnh (<0.5)"]},
+    {l:"Dòng tiền kinh doanh", max:7, opts:["Âm","Dương thất thường","Dương & bền vững"]},
+  ]},
+  {cat:"Định giá", max:20, items:[
+    {l:"P/E so ngành & lịch sử", max:10, opts:["Đắt hơn nhiều","Ngang bằng","Rẻ hơn / hợp lý"]},
+    {l:"P/B", max:5, opts:["Cao bất thường","Hợp lý","Thấp so tài sản"]},
+    {l:"Cổ tức", max:5, opts:["Không trả","Thấp","Đều & khá"]},
+  ]},
+  {cat:"Kỹ thuật & xu hướng", max:20, items:[
+    {l:"Xu hướng giá (so với MA)", max:8, opts:["Dưới MA / giảm","Đi ngang","Trên MA / tăng"]},
+    {l:"Khối lượng & thanh khoản", max:6, opts:["Thấp / cạn","Trung bình","Cao & tăng"]},
+    {l:"Động lượng (RSI)", max:6, opts:["Quá mua >80 / yếu","Trung tính","Khỏe, chưa quá mua"]},
+  ]},
+  {cat:"Định tính & vĩ mô", max:15, items:[
+    {l:"Vị thế ngành / lợi thế", max:6, opts:["Yếu / cạnh tranh gắt","Trung bình","Dẫn đầu / có 'hào'"]},
+    {l:"Ban lãnh đạo & cổ đông tổ chức", max:5, opts:["Thiếu minh bạch","Ổn","Uy tín, có tổ chức lớn"]},
+    {l:"Catalyst / câu chuyện tăng trưởng", max:4, opts:["Không rõ","Có tiềm năng","Rõ ràng, sắp diễn ra"]},
+  ]},
+];
+const scoreBody=document.getElementById('scoreBody');
+let html='<div class="sc-hint">Với mỗi tiêu chí, chọn mức đúng nhất với cổ phiếu bạn đang xét. Điểm & khung thời gian phù hợp cập nhật tức thì bên dưới.</div>';
+CRITERIA.forEach((c,ci)=>{
+  html+='<div class="sc-cat"><span>'+c.cat+'</span><b>'+c.max+'đ</b></div>';
+  c.items.forEach((it,ii)=>{
+    const half=Math.round(it.max/2);
+    html+='<div class="sc-item"><label>'+it.l+'</label>'+
+      '<select data-ci="'+ci+'" data-max="'+it.max+'" data-half="'+half+'">'+
+      '<option value="0">'+it.opts[0]+'</option>'+
+      '<option value="'+half+'">'+it.opts[1]+'</option>'+
+      '<option value="'+it.max+'">'+it.opts[2]+'</option>'+
+      '</select></div>';
+  });
+});
+scoreBody.innerHTML=html;
+
+const scoreFoot=document.getElementById('scoreFoot');
+function verdict(t){
+  if(t>=80)return{txt:"Xuất sắc — ưu tiên giải ngân",col:"#5ce6a0"};
+  if(t>=65)return{txt:"Tốt — có thể đầu tư, canh điểm mua",col:"#a8e6a0"};
+  if(t>=50)return{txt:"Trung bình — theo dõi / thăm dò nhỏ",col:"#ffc24b"};
+  return{txt:"Yếu — nên tránh",col:"#ff6b7d"};
+}
+function hLabel(v){ if(v>=70)return["Phù hợp cao","#5ce6a0"]; if(v>=50)return["Cân nhắc","#ffc24b"]; return["Chưa phù hợp","#ff6b7d"]; }
+function computeScore(){
+  const sums=[0,0,0,0];
+  scoreBody.querySelectorAll('select').forEach(s=>{ sums[+s.dataset.ci]+=(+s.value); });
+  const total=sums.reduce((a,b)=>a+b,0);
+  const faP=sums[0]/45, valP=sums[1]/20, taP=sums[2]/20, qP=sums[3]/15;
+  const longS=Math.round((faP*0.5+valP*0.25+qP*0.25)*100);
+  const midS =Math.round((faP*0.35+taP*0.35+valP*0.15+qP*0.15)*100);
+  const shortS=Math.round((taP*0.6+faP*0.2+qP*0.2)*100);
+  const v=verdict(total);
+  const bar=(name,val)=>{const l=hLabel(val);
+    return '<div class="sc-bar"><div class="top"><b>'+name+'</b><span>'+val+'/100 · <span style="color:'+l[1]+'">'+l[0]+'</span></span></div>'+
+      '<div class="track"><div class="fill" style="width:'+val+'%;background:'+l[1]+'"></div></div></div>';};
+  scoreFoot.innerHTML=
+    '<div class="sc-total"><div class="num" style="color:'+v.col+'">'+total+'<small>/100</small></div>'+
+    '<div class="verdict" style="color:'+v.col+'">'+v.txt+'</div></div>'+
+    '<div class="sc-bars">'+bar('Ngắn hạn (ngày–tuần)',shortS)+bar('Trung hạn (tháng–1 năm)',midS)+bar('Dài hạn (nhiều năm)',longS)+'</div>'+
+    '<button class="sc-reset" onclick="resetScore()">↺ Đặt lại</button>';
+}
+function resetScore(){ scoreBody.querySelectorAll('select').forEach(s=>s.value="0"); computeScore(); }
+scoreBody.addEventListener('change',computeScore);
+computeScore();
+
+/* ============ KHỞI CHẠY ============ */
+relayout(); fit();
+window.addEventListener('resize',fit);
+</script>
+</body>
+</html>

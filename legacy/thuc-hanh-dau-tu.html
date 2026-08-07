@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thực hành Đầu tư — Tour hướng dẫn từng bước</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#121a2e; --panel2:#0f1626; --line:#2a3550; --text:#eaf0fb; --muted:#93a0bd;
+    --good:#5ce6a0; --warn:#ffc24b; --bad:#ff6b7d; --accent:#5ac8ff; --accent2:#c792ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif;
+    background:radial-gradient(1200px 700px at 15% -10%,#16233b 0%,var(--bg) 55%);color:var(--text);line-height:1.55;}
+  a{color:var(--accent);}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;
+    background:rgba(11,16,32,.9);backdrop-filter:blur(8px);}
+  header .row1{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  header h1{margin:0;font-size:19px;background:linear-gradient(92deg,var(--accent),var(--accent2),var(--good));
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  header .sub{color:var(--muted);font-size:12.5px;}
+  .spacer{flex:1;}
+  .backlink{font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:6px 11px;text-decoration:none;}
+  .backlink:hover{border-color:var(--accent);color:var(--accent);}
+  /* Stepper */
+  .stepper{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap;}
+  .step-dot{display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:20px;
+    font-size:12px;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap;}
+  .step-dot .n{width:20px;height:20px;border-radius:50%;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+  .step-dot.active{border-color:var(--accent);color:var(--text);background:rgba(90,200,255,.08);}
+  .step-dot.active .n{background:var(--accent);color:#04121f;}
+  .step-dot.done .n{background:var(--good);color:#04121f;}
+  .step-dot.done{color:var(--text);}
+  .pbar{height:4px;background:var(--line);border-radius:4px;margin-top:12px;overflow:hidden;}
+  .pbar>div{height:100%;background:linear-gradient(90deg,var(--accent),var(--good));transition:width .3s;}
+
+  main{max-width:1000px;margin:0 auto;padding:26px 20px 120px;}
+  .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:#04121f;background:var(--accent);border-radius:20px;padding:4px 11px;margin-bottom:12px;}
+  h2.step-title{margin:2px 0 4px;font-size:26px;}
+  .lead{color:var(--muted);font-size:14.5px;margin:0 0 18px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:14px 0;}
+  .theory{border-left:4px solid var(--accent2);background:rgba(199,146,255,.07);border-radius:10px;padding:12px 15px;margin:14px 0;font-size:13.5px;}
+  .theory b{color:#e9dcff;}
+  .why{border-left:4px solid var(--good);background:rgba(92,230,160,.07);border-radius:10px;padding:12px 15px;margin:14px 0;font-size:13.5px;}
+  .todo{border-left:4px solid var(--warn);background:rgba(255,194,75,.08);border-radius:10px;padding:12px 15px;margin:14px 0;font-size:13.5px;}
+  .todo b{color:#ffe6ad;}
+
+  /* Filters */
+  .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;}
+  .filt label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;}
+  .filt .val{color:var(--accent);font-weight:700;}
+  .filt input[type=range]{width:100%;accent-color:var(--accent);}
+  .filt input[type=checkbox]{accent-color:var(--good);transform:scale(1.2);margin-right:7px;}
+  /* Table */
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;}
+  th{color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;}
+  tr.fail{opacity:.4;}
+  tr.sel{background:rgba(90,200,255,.1);}
+  .tick{font-weight:800;color:var(--text);}
+  .sub-name{color:var(--muted);font-size:11px;font-weight:400;}
+  .reason{display:inline-block;font-size:10.5px;color:var(--bad);border:1px solid rgba(255,107,125,.4);border-radius:12px;padding:1px 7px;margin-left:4px;}
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;transition:.15s;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .btn.pick.on{background:var(--accent);color:#04121f;border-color:var(--accent);font-weight:700;}
+  .count{font-size:13px;color:var(--muted);margin:12px 0 2px;}
+  .count b{color:var(--good);}
+
+  /* Metric chips */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;}
+  .metric{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px 14px;position:relative;}
+  .metric .k{font-size:12px;color:var(--muted);}
+  .metric .v{font-size:22px;font-weight:800;margin:2px 0;}
+  .metric .n{font-size:12px;line-height:1.4;}
+  .metric .tag{position:absolute;top:12px;right:12px;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:12px;}
+  .t-good{background:rgba(92,230,160,.16);color:var(--good);}
+  .t-warn{background:rgba(255,194,75,.16);color:var(--warn);}
+  .t-bad{background:rgba(255,107,125,.16);color:var(--bad);}
+
+  /* Score */
+  .sc-total{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+  .sc-total .num{font-size:52px;font-weight:800;line-height:1;}
+  .sc-total .num small{font-size:20px;color:var(--muted);}
+  .sc-total .verdict{font-size:15px;font-weight:700;}
+  .breakdown{margin-top:16px;}
+  .bd-cat{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 6px;
+    display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding-bottom:4px;}
+  .bd-cat b{color:var(--accent);}
+  .bd-item{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;font-size:12.5px;padding:4px 0;}
+  .bd-item .raw{color:var(--muted);font-size:11.5px;}
+  .bd-item .pts{font-weight:700;width:52px;text-align:right;}
+  .bars{margin-top:8px;display:flex;flex-direction:column;gap:11px;}
+  .bar .top{display:flex;justify-content:space-between;font-size:13px;}
+  .bar .top b{font-weight:600;}
+  .bar .track{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin-top:5px;}
+  .bar .fill{height:100%;border-radius:6px;transition:width .3s;}
+  .decision{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:6px;}
+  .dbox{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:13px 15px;}
+  .dbox .k{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .dbox .v{font-size:18px;font-weight:800;margin-top:4px;}
+
+  /* Nav */
+  .nav{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:12px;
+    padding:14px 22px;background:rgba(11,16,32,.94);border-top:1px solid var(--line);backdrop-filter:blur(8px);}
+  .nav .hint{color:var(--muted);font-size:12.5px;flex:1;}
+  .nav button{border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:600;cursor:pointer;border:1px solid var(--line);}
+  .nav .prev{background:var(--panel);color:var(--text);}
+  .nav .prev:hover{border-color:var(--accent);}
+  .nav .next{background:var(--accent);color:#04121f;border-color:var(--accent);}
+  .nav .next:disabled{opacity:.4;cursor:not-allowed;}
+  .nav .next:not(:disabled):hover{filter:brightness(1.08);}
+  .spark{display:block;}
+  .hidden{display:none;}
+  .disclaimer{color:var(--muted);font-size:11.5px;text-align:center;margin-top:26px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="row1">
+    <h1>🎓 Thực hành Đầu tư — Tour từng bước</h1>
+    <span class="sub">Từ lọc mã → phân tích → chấm điểm → quyết định</span>
+    <span class="spacer"></span>
+    <a class="backlink" href="mindmap-dau-tu-chung-khoan.html">← Mở Mindmap lý thuyết</a>
+  </div>
+  <div class="stepper" id="stepper"></div>
+  <div class="pbar"><div id="pbarFill" style="width:0%"></div></div>
+</header>
+
+<main><div id="stepArea"></div>
+  <div class="disclaimer">Dữ liệu mã cổ phiếu trong tour là <b>hư cấu, chỉ để minh họa phương pháp</b> — không phải khuyến nghị đầu tư thật.</div>
+</main>
+
+<div class="nav">
+  <button class="prev" id="btnPrev" onclick="go(cur-1)">← Quay lại</button>
+  <span class="hint" id="navHint"></span>
+  <button class="next" id="btnNext" onclick="go(cur+1)">Tiếp theo →</button>
+</div>
+
+<script>
+/* ============ DỮ LIỆU MÃ (hư cấu) ============ */
+const STOCKS=[
+  {t:"AAA",name:"Thép AAA — Vật liệu",sector:"Vật liệu",price:27.0,mktCap:45000,vol:8.0,
+    growth:28,roe:22,margin:16,de:0.4,ocf:"+",pe:12,peSec:14,pb:2.1,pbFair:2.2,div:2,trend:"up",rsi:62,
+    pos:2,mgmt:2,cat:2,seed:1.0},
+  {t:"BBB",name:"Ngân hàng BBB",sector:"Ngân hàng",price:22.0,mktCap:120000,vol:12.0,
+    growth:18,roe:20,margin:30,de:1.2,ocf:"+",pe:9,peSec:11,pb:1.5,pbFair:1.8,div:0,trend:"up",rsi:58,
+    pos:2,mgmt:2,cat:1,seed:0.7},
+  {t:"CCC",name:"Bán lẻ CCC",sector:"Bán lẻ",price:15.0,mktCap:6000,vol:0.8,
+    growth:-12,roe:8,margin:4,de:1.8,ocf:"-",pe:30,peSec:18,pb:2.5,pbFair:1.8,div:0,trend:"down",rsi:38,
+    pos:0,mgmt:1,cat:0,seed:-0.8},
+  {t:"DDD",name:"Điện DDD — Tiện ích",sector:"Tiện ích",price:30.0,mktCap:30000,vol:1.5,
+    growth:5,roe:14,margin:20,de:0.9,ocf:"+",pe:11,peSec:12,pb:1.4,pbFair:1.6,div:7,trend:"side",rsi:50,
+    pos:1,mgmt:2,cat:1,seed:0.1},
+  {t:"EEE",name:"Công nghệ EEE",sector:"Công nghệ",price:90.0,mktCap:50000,vol:5.0,
+    growth:25,roe:25,margin:18,de:0.3,ocf:"+",pe:18,peSec:16,pb:4.0,pbFair:3.0,div:0,trend:"up",rsi:82,
+    pos:2,mgmt:2,cat:2,seed:1.1},
+  {t:"FFF",name:"Penny FFF — vốn hóa nhỏ",sector:"Đầu cơ",price:6.0,mktCap:400,vol:0.05,
+    growth:4,roe:6,margin:3,de:2.2,ocf:"±",pe:40,peSec:18,pb:3.0,pbFair:1.5,div:0,trend:"side",rsi:55,
+    pos:0,mgmt:0,cat:0,seed:0.0},
+];
+const byT=t=>STOCKS.find(s=>s.t===t);
+
+/* ============ TRẠNG THÁI ============ */
+let cur=0, selected=null;
+let filters={mktCap:5000, vol:0.5, roe:10, growthPos:true};
+
+/* ============ CHẤM ĐIỂM ============ */
+function lvlPts(lvl,max){ return lvl===2?max : lvl===1?Math.round(max/2) : 0; }
+function ocfLvl(o){ return o==="+"?2 : o==="±"?1 : 0; }
+function volLvl(v){ return v<0.5?0 : v<2?1 : 2; }
+function breakdown(s){
+  const g=s.growth<=0?0:s.growth<20?1:2;
+  const r=s.roe<10?0:s.roe<=15?1:2;
+  const m=s.margin<8?0:s.margin<=15?1:2;
+  const d=s.de>1.5?0:s.de>=0.5?1:2;
+  const o=ocfLvl(s.ocf);
+  const peR=s.pe/s.peSec, pe=peR>1.1?0:peR<0.9?2:1;
+  const pbR=s.pb/s.pbFair, pb=pbR>1.1?0:pbR<0.9?2:1;
+  const dv=s.div<=0?0:s.div<3?1:2;
+  const tr=s.trend==="up"?2:s.trend==="side"?1:0;
+  const lq=volLvl(s.vol);
+  const rs=(s.rsi>80||s.rsi<30)?0:(s.rsi>70?1:2);
+  const cats=[
+    {cat:"Nền tảng & tài chính",max:45,items:[
+      {l:"Tăng trưởng LN",raw:s.growth+"% YoY",lvl:g,max:12},
+      {l:"ROE",raw:s.roe+"%",lvl:r,max:10},
+      {l:"Biên lợi nhuận",raw:s.margin+"%",lvl:m,max:8},
+      {l:"Nợ vay D/E",raw:s.de.toFixed(1),lvl:d,max:8},
+      {l:"Dòng tiền KD",raw:s.ocf==="+"?"Dương bền":s.ocf==="±"?"Thất thường":"Âm",lvl:o,max:7},
+    ]},
+    {cat:"Định giá",max:20,items:[
+      {l:"P/E vs ngành",raw:s.pe+" / ngành "+s.peSec,lvl:pe,max:10},
+      {l:"P/B",raw:s.pb+" / hợp lý "+s.pbFair,lvl:pb,max:5},
+      {l:"Cổ tức",raw:s.div+"%",lvl:dv,max:5},
+    ]},
+    {cat:"Kỹ thuật & xu hướng",max:20,items:[
+      {l:"Xu hướng giá",raw:s.trend==="up"?"Trên MA, tăng":s.trend==="side"?"Đi ngang":"Dưới MA, giảm",lvl:tr,max:8},
+      {l:"Thanh khoản",raw:s.vol+" tr cp/phiên",lvl:lq,max:6},
+      {l:"Động lượng RSI",raw:"RSI "+s.rsi+(s.rsi>80?" (quá mua)":""),lvl:rs,max:6},
+    ]},
+    {cat:"Định tính & vĩ mô",max:15,items:[
+      {l:"Vị thế ngành",raw:["Yếu","Trung bình","Dẫn đầu"][s.pos],lvl:s.pos,max:6},
+      {l:"Ban lãnh đạo & cổ đông TC",raw:["Kém","Ổn","Uy tín"][s.mgmt],lvl:s.mgmt,max:5},
+      {l:"Catalyst",raw:["Không rõ","Tiềm năng","Rõ ràng"][s.cat],lvl:s.cat,max:4},
+    ]},
+  ];
+  cats.forEach(c=>{ c.sum=0; c.items.forEach(it=>{it.pts=lvlPts(it.lvl,it.max); c.sum+=it.pts;}); });
+  const sums=cats.map(c=>c.sum);
+  const total=sums.reduce((a,b)=>a+b,0);
+  const faP=sums[0]/45, valP=sums[1]/20, taP=sums[2]/20, qP=sums[3]/15;
+  const horizons={
+    short:Math.round((taP*0.6+faP*0.2+qP*0.2)*100),
+    mid:Math.round((faP*0.35+taP*0.35+valP*0.15+qP*0.15)*100),
+    long:Math.round((faP*0.5+valP*0.25+qP*0.25)*100),
+  };
+  return {cats,sums,total,horizons};
+}
+function verdict(t){
+  if(t>=80)return{txt:"Xuất sắc — ưu tiên giải ngân",col:"var(--good)"};
+  if(t>=65)return{txt:"Tốt — có thể đầu tư, canh điểm mua",col:"#a8e6a0"};
+  if(t>=50)return{txt:"Trung bình — theo dõi / thăm dò nhỏ",col:"var(--warn)"};
+  return{txt:"Yếu — nên tránh",col:"var(--bad)"};
+}
+function hLabel(v){ return v>=70?["Phù hợp cao","var(--good)"]:v>=50?["Cân nhắc","var(--warn)"]:["Chưa phù hợp","var(--bad)"]; }
+
+/* ============ SPARKLINE ============ */
+function spark(s,w,h){
+  const n=24, pts=[];
+  for(let i=0;i<n;i++){
+    const base=0.5 - s.seed*0.35*(i/(n-1)-0.5)*2*(s.trend==="down"?-1:1);
+    const wig=Math.sin(i*0.9+s.price)*0.06 + Math.sin(i*2.1)*0.03;
+    let y = s.trend==="up" ? 0.85-(i/(n-1))*0.6 + wig
+          : s.trend==="down" ? 0.2+(i/(n-1))*0.6 + wig
+          : 0.5 + wig;
+    pts.push(Math.max(0.06,Math.min(0.94,y)));
+  }
+  const step=w/(n-1);
+  const d=pts.map((p,i)=>(i?"L":"M")+(i*step).toFixed(1)+","+(p*h).toFixed(1)).join(" ");
+  const col=s.trend==="up"?"var(--good)":s.trend==="down"?"var(--bad)":"var(--warn)";
+  return '<svg class="spark" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+
+    '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="2"/></svg>';
+}
+
+/* ============ CÁC BƯỚC ============ */
+const STEPS=[
+  {name:"Bắt đầu", render:renderIntro, canNext:()=>true},
+  {name:"Lọc sơ bộ", render:renderScreen, canNext:()=>!!selected, hint:()=>selected?("Đã chọn "+selected+" — bấm Tiếp theo"):"Chọn 1 mã đã qua bộ lọc để phân tích sâu"},
+  {name:"Sức khỏe tài chính", render:renderFA, canNext:()=>true},
+  {name:"Định giá", render:renderVal, canNext:()=>true},
+  {name:"Kỹ thuật & điểm mua", render:renderTA, canNext:()=>true},
+  {name:"Chấm điểm & Quyết định", render:renderDecision, canNext:()=>false, hint:()=>"Hoàn tất tour — bạn có thể quay lại bất kỳ bước nào"},
+];
+
+/* ---- Bước 0 ---- */
+function renderIntro(){
+  return `
+  <span class="badge">Bước 1 / 6 · Định hướng</span>
+  <h2 class="step-title">Bạn sắp đi qua quy trình của một nhà đầu tư kỷ luật</h2>
+  <p class="lead">Thay vì mua theo cảm tính, ta sẽ đi qua một <b>cái phễu</b>: từ rộng đến hẹp, từ khách quan đến quyết định.</p>
+  <div class="card">
+    <div class="metrics">
+      <div class="metric"><div class="k">01 · Lọc</div><div class="v" style="color:var(--accent)">Sàng mã</div><div class="n">Loại nhanh mã kém thanh khoản, yếu nền tảng — thu hẹp hàng nghìn mã còn vài mã đáng xem.</div></div>
+      <div class="metric"><div class="k">02 · Phân tích sâu</div><div class="v" style="color:var(--accent2)">FA + TA</div><div class="n">Đọc sức khỏe tài chính, định giá đắt/rẻ, rồi xem đồ thị để tìm điểm mua.</div></div>
+      <div class="metric"><div class="k">03 · Chấm điểm</div><div class="v" style="color:var(--good)">Thang 100</div><div class="n">Quy mọi yếu tố về một con số & khung thời gian phù hợp.</div></div>
+      <div class="metric"><div class="k">04 · Quyết định</div><div class="v" style="color:var(--warn)">Vào lệnh?</div><div class="n">Chốt hành động kèm quản trị rủi ro: tỷ trọng, cắt lỗ, nguyên tắc tạm dừng.</div></div>
+    </div>
+  </div>
+  <div class="theory">📖 <b>Bám lý thuyết:</b> đây chính là các nhánh 3 (Phân tích), 4 (Rủi ro) và 7 (Chấm điểm) trong mindmap, được xâu thành một hành trình liền mạch.</div>
+  <div class="todo">👉 <b>Việc của bạn:</b> bấm <b>Tiếp theo</b> để bước vào phòng lọc mã.</div>`;
+}
+
+/* ---- Bước 1: Lọc ---- */
+function renderScreen(){
+  return `
+  <span class="badge">Bước 2 / 6 · Phân tích & Lọc mã</span>
+  <h2 class="step-title">Sàng lọc: giữ lại mã đáng để tốn công phân tích</h2>
+  <p class="lead">Kéo các ngưỡng dưới đây. Mã không đạt sẽ mờ đi kèm lý do bị loại. Đây là bước loại bỏ rủi ro rẻ nhất.</p>
+  <div class="card">
+    <div class="filters">
+      <div class="filt"><label>Vốn hóa tối thiểu: <span class="val" id="vC">5.000</span> tỷ</label>
+        <input type="range" min="0" max="60000" step="1000" value="${filters.mktCap}" oninput="filters.mktCap=+this.value;paintScreen()"></div>
+      <div class="filt"><label>Thanh khoản tối thiểu: <span class="val" id="vV">0.5</span> tr cp/phiên</label>
+        <input type="range" min="0" max="10" step="0.1" value="${filters.vol}" oninput="filters.vol=+this.value;paintScreen()"></div>
+      <div class="filt"><label>ROE tối thiểu: <span class="val" id="vR">10</span>%</label>
+        <input type="range" min="0" max="30" step="1" value="${filters.roe}" oninput="filters.roe=+this.value;paintScreen()"></div>
+      <div class="filt"><label style="margin-top:22px"><input type="checkbox" ${filters.growthPos?"checked":""} onchange="filters.growthPos=this.checked;paintScreen()">Chỉ giữ mã tăng trưởng LN dương</label></div>
+    </div>
+    <div class="count" id="count"></div>
+    <div style="overflow:auto"><table id="tbl">
+      <thead><tr><th>Mã</th><th>Vốn hóa (tỷ)</th><th>TK (tr cp)</th><th>Tăng trg LN</th><th>ROE</th><th>Xu hướng</th><th></th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </div>
+  <div class="why">💡 <b>Vì sao 3 ngưỡng này?</b> <b>Thanh khoản</b> thấp → khó bán khi cần (bẫy của penny). <b>Vốn hóa</b> quá nhỏ → dễ bị thao túng giá. <b>ROE</b> & <b>tăng trưởng dương</b> → doanh nghiệp thật sự làm ra tiền, không phải "câu chuyện".</div>
+  <div class="theory">📖 <b>Bám lý thuyết:</b> tương ứng chữ <b>S</b> (cung–cầu, thanh khoản) và <b>C/A</b> (tăng trưởng LN) trong CANSLIM, cùng chỉ số <b>ROE</b> ở nhánh Phân tích.</div>
+  <div class="todo">👉 <b>Việc của bạn:</b> sau khi lọc, bấm <b>Chọn</b> ở một mã còn trụ lại để mang đi phân tích sâu.</div>`;
+}
+function screenPass(s){
+  const reasons=[];
+  if(s.mktCap<filters.mktCap)reasons.push("Vốn hóa nhỏ");
+  if(s.vol<filters.vol)reasons.push("Thanh khoản thấp");
+  if(s.roe<filters.roe)reasons.push("ROE thấp");
+  if(filters.growthPos&&s.growth<=0)reasons.push("LN không tăng");
+  return reasons;
+}
+function paintScreen(){
+  document.getElementById('vC').textContent=filters.mktCap.toLocaleString('vi-VN');
+  document.getElementById('vV').textContent=filters.vol.toFixed(1);
+  document.getElementById('vR').textContent=filters.roe;
+  let pass=0;
+  const tb=document.getElementById('tbody');
+  tb.innerHTML=STOCKS.map(s=>{
+    const rs=screenPass(s); const ok=rs.length===0; if(ok)pass++;
+    const tr={up:'<span style="color:var(--good)">▲ Tăng</span>',side:'<span style="color:var(--warn)">→ Ngang</span>',down:'<span style="color:var(--bad)">▼ Giảm</span>'}[s.trend];
+    return `<tr class="${ok?'':'fail'} ${selected===s.t?'sel':''}">
+      <td><span class="tick">${s.t}</span> <span class="sub-name">${s.sector}</span>${rs.map(r=>'<span class="reason">'+r+'</span>').join('')}</td>
+      <td>${s.mktCap.toLocaleString('vi-VN')}</td><td>${s.vol}</td>
+      <td style="color:${s.growth>0?'var(--good)':'var(--bad)'}">${s.growth>0?'+':''}${s.growth}%</td>
+      <td>${s.roe}%</td><td>${tr}</td>
+      <td>${ok?`<button class="btn pick ${selected===s.t?'on':''}" onclick="pick('${s.t}')">${selected===s.t?'✓ Đã chọn':'Chọn'}</button>`:'—'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('count').innerHTML=`<b>${pass}</b>/${STOCKS.length} mã qua bộ lọc`+(selected?` · đang chọn: <b style="color:var(--accent)">${selected}</b>`:'');
+  refreshNav();
+}
+function pick(t){ selected=t; paintScreen(); }
+
+/* ---- Bước 2: FA ---- */
+function chip(lvl,goodTxt,warnTxt,badTxt){
+  return lvl===2?`<span class="tag t-good">${goodTxt}</span>`:lvl===1?`<span class="tag t-warn">${warnTxt}</span>`:`<span class="tag t-bad">${badTxt}</span>`;
+}
+function renderFA(){
+  const s=byT(selected);
+  const g=s.growth<=0?0:s.growth<20?1:2, r=s.roe<10?0:s.roe<=15?1:2, m=s.margin<8?0:s.margin<=15?1:2,
+    d=s.de>1.5?0:s.de>=0.5?1:2, o=ocfLvl(s.ocf);
+  return `
+  <span class="badge">Bước 3 / 6 · Phân tích cơ bản (FA)</span>
+  <h2 class="step-title">Sức khỏe tài chính của ${s.t} <span style="color:var(--muted);font-size:16px">— ${s.name}</span></h2>
+  <p class="lead">Đọc 3 báo cáo tài chính để xem doanh nghiệp có thực sự khỏe, hay chỉ "lãi trên giấy".</p>
+  <div class="card"><div class="metrics">
+    <div class="metric">${chip(g,'Tăng mạnh','Tăng nhẹ','Đáng lo')}<div class="k">Tăng trưởng lợi nhuận (YoY)</div><div class="v">${s.growth>0?'+':''}${s.growth}%</div><div class="n">${g===2?'Động cơ tăng giá cổ phiếu bền vững.':g===1?'Có tăng nhưng chưa đột phá.':'Lợi nhuận đi lùi — cờ đỏ.'}</div></div>
+    <div class="metric">${chip(r,'Hiệu quả','Tạm ổn','Kém')}<div class="k">ROE — hiệu quả vốn chủ</div><div class="v">${s.roe}%</div><div class="n">Mỗi 100đ vốn cổ đông tạo ra ${s.roe}đ lãi/năm.</div></div>
+    <div class="metric">${chip(m,'Biên dày','Trung bình','Mỏng')}<div class="k">Biên lợi nhuận ròng</div><div class="v">${s.margin}%</div><div class="n">Bán 100đ, giữ lại ${s.margin}đ lãi ròng.</div></div>
+    <div class="metric">${chip(d,'Nợ lành mạnh','Nợ vừa','Nợ cao')}<div class="k">Nợ vay / Vốn chủ (D/E)</div><div class="v">${s.de.toFixed(1)}</div><div class="n">${d===2?'Ít phụ thuộc nợ vay.':d===1?'Đòn bẩy ở mức chấp nhận được.':'Đòn bẩy cao — rủi ro khi lãi suất tăng.'}</div></div>
+    <div class="metric">${chip(o,'Tiền thật về','Thất thường','Âm')}<div class="k">Dòng tiền kinh doanh</div><div class="v">${s.ocf==='+'?'Dương':s.ocf==='±'?'Chập chờn':'Âm'}</div><div class="n">${o===2?'Lãi đi kèm tiền thật — không phải lãi ảo.':o===0?'Báo lãi nhưng tiền không về → coi chừng.':'Cần theo dõi thêm.'}</div></div>
+  </div></div>
+  <div class="why">💡 <b>Bẫy "lãi giả – tiền âm":</b> một DN có thể khoe lợi nhuận lớn nhưng dòng tiền kinh doanh âm (bán chịu, hàng tồn). Vì thế ta luôn soi <b>dòng tiền</b> song song với con số lợi nhuận.</div>
+  <div class="theory">📖 <b>Bám lý thuyết:</b> nhánh 3 → "Đọc hiểu BCTC" (3 báo cáo) và các chỉ số EPS/ROE/D/E/biên lợi nhuận.</div>`;
+}
+
+/* ---- Bước 3: Định giá ---- */
+function renderVal(){
+  const s=byT(selected);
+  const peR=s.pe/s.peSec, pe=peR>1.1?0:peR<0.9?2:1;
+  const pbR=s.pb/s.pbFair, pb=pbR>1.1?0:pbR<0.9?2:1;
+  const dv=s.div<=0?0:s.div<3?1:2;
+  return `
+  <span class="badge">Bước 4 / 6 · Định giá</span>
+  <h2 class="step-title">${s.t} đang đắt hay rẻ?</h2>
+  <p class="lead">Một doanh nghiệp tốt vẫn có thể là khoản đầu tư tệ <i>nếu mua ở giá quá cao</i>. Định giá trả lời câu hỏi đó.</p>
+  <div class="card"><div class="metrics">
+    <div class="metric">${chip(pe,'Rẻ hơn ngành','Ngang ngành','Đắt hơn ngành')}<div class="k">P/E</div><div class="v">${s.pe}<span style="font-size:13px;color:var(--muted)"> · ngành ${s.peSec}</span></div><div class="n">Bỏ ${s.pe} đồng để mua 1 đồng lợi nhuận/năm.</div></div>
+    <div class="metric">${chip(pb,'Dưới giá trị','Hợp lý','Cao')}<div class="k">P/B</div><div class="v">${s.pb}<span style="font-size:13px;color:var(--muted)"> · hợp lý ~${s.pbFair}</span></div><div class="n">Trả gấp ${s.pb} lần giá trị sổ sách.</div></div>
+    <div class="metric">${chip(dv,'Cổ tức khá','Cổ tức thấp','Không cổ tức')}<div class="k">Tỷ suất cổ tức</div><div class="v">${s.div}%</div><div class="n">${dv===2?'Dòng tiền thụ động đều đặn.':dv===0?'Toàn bộ kỳ vọng đặt vào tăng giá.':'Có nhưng khiêm tốn.'}</div></div>
+  </div></div>
+  <div class="why">💡 So sánh P/E, P/B <b>với chính ngành và lịch sử của mã</b>, không so tuyệt đối. P/E 9 của ngân hàng khác hẳn P/E 9 của công nghệ.</div>
+  <div class="theory">📖 <b>Bám lý thuyết:</b> nhánh 3 → chỉ số P/E, P/B và nguồn lợi nhuận "cổ tức".</div>`;
+}
+
+/* ---- Bước 4: TA ---- */
+function renderTA(){
+  const s=byT(selected);
+  const tr=s.trend==="up"?2:s.trend==="side"?1:0;
+  const lq=volLvl(s.vol);
+  const rs=(s.rsi>80||s.rsi<30)?0:(s.rsi>70?1:2);
+  const entry = tr===2 && rs===2 ? {t:"Điểm mua thuận lợi",c:"var(--good)",n:"Xu hướng tăng, động lượng khỏe mà chưa quá mua — canh mua khi giá điều chỉnh nhẹ về vùng hỗ trợ."}
+    : tr===2 && rs<2 ? {t:"Tăng nhưng đang nóng",c:"var(--warn)",n:"RSI cao/quá mua — chờ một nhịp chỉnh thay vì mua đuổi đỉnh (tránh FOMO)."}
+    : tr===1 ? {t:"Chờ xác nhận",c:"var(--warn)",n:"Giá đi ngang — đợi break khỏi vùng tích lũy kèm khối lượng lớn."}
+    : {t:"Chưa nên mua",c:"var(--bad)",n:"Xu hướng giảm — 'đừng bắt dao rơi'. Đứng ngoài tới khi tạo đáy rõ ràng."};
+  return `
+  <span class="badge">Bước 5 / 6 · Phân tích kỹ thuật</span>
+  <h2 class="step-title">Khi nào mua ${s.t}?</h2>
+  <p class="lead">FA nói <i>mua cái gì</i>, TA nói <i>mua khi nào</i>. Ta xem xu hướng, khối lượng và động lượng.</p>
+  <div class="card">
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+      <div>${spark(s,320,90)}<div style="color:var(--muted);font-size:11.5px;margin-top:4px">Diễn biến giá minh họa (~24 phiên)</div></div>
+      <div class="metrics" style="flex:1;min-width:260px">
+        <div class="metric">${chip(tr,'Trên MA','Đi ngang','Dưới MA')}<div class="k">Xu hướng vs MA</div><div class="v">${s.trend==='up'?'Tăng':s.trend==='side'?'Ngang':'Giảm'}</div></div>
+        <div class="metric">${chip(lq,'Dồi dào','Trung bình','Cạn')}<div class="k">Thanh khoản</div><div class="v">${s.vol} tr</div></div>
+        <div class="metric">${chip(rs,'Khỏe','Quá mua/bán','Cực đoan')}<div class="k">RSI</div><div class="v">${s.rsi}</div></div>
+      </div>
+    </div>
+    <div style="margin-top:16px;border-left:4px solid ${entry.c};background:rgba(255,255,255,.03);border-radius:10px;padding:12px 15px">
+      <b style="color:${entry.c};font-size:15px">${entry.t}</b><div style="font-size:13.5px;margin-top:4px">${entry.n}</div></div>
+  </div>
+  <div class="why">💡 RSI trên 80 = <b>quá mua</b>: giá đã chạy nhanh, xác suất điều chỉnh cao. Con số chấm điểm không "sợ" tâm lý — nhưng bạn thì nên: đây là lúc kỷ luật thắng cảm xúc.</div>
+  <div class="theory">📖 <b>Bám lý thuyết:</b> nhánh 3 → Công cụ TA (xu hướng, MA, RSI, khối lượng) và nhánh 4 → tránh FOMO.</div>`;
+}
+
+/* ---- Bước 5: Chấm điểm & Quyết định ---- */
+function renderDecision(){
+  const s=byT(selected); const b=breakdown(s); const v=verdict(b.total);
+  const best=[["Ngắn hạn",b.horizons.short],["Trung hạn",b.horizons.mid],["Dài hạn",b.horizons.long]].sort((a,c)=>c[1]-a[1])[0];
+  const size = b.total>=80?"15–20%": b.total>=65?"8–12%": b.total>=50?"≤ 5% (thăm dò)":"0% (loại)";
+  const action = b.total>=80?"Ứng viên mạnh — có thể giải ngân theo khung phù hợp nhất."
+    : b.total>=65?"Đủ tốt — vào lệnh thăm dò, gia tăng khi có xác nhận."
+    : b.total>=50?"Chưa đủ — đưa vào watchlist, chờ cải thiện."
+    : "Loại khỏi danh mục cân nhắc.";
+  const bar=(name,val)=>{const l=hLabel(val);
+    return `<div class="bar"><div class="top"><b>${name}</b><span style="color:${l[1]}">${val}/100 · ${l[0]}</span></div>
+      <div class="track"><div class="fill" style="width:${val}%;background:${l[1]}"></div></div></div>`;};
+  const bd=b.cats.map(c=>`<div class="bd-cat"><span>${c.cat}</span><b>${c.sum}/${c.max}đ</b></div>`+
+    c.items.map(it=>`<div class="bd-item"><span>${it.l}</span><span class="raw">${it.raw}</span><span class="pts" style="color:${it.pts===it.max?'var(--good)':it.pts===0?'var(--bad)':'var(--warn)'}">${it.pts}/${it.max}</span></div>`).join('')).join('');
+  return `
+  <span class="badge">Bước 6 / 6 · Chấm điểm & Ra quyết định</span>
+  <h2 class="step-title">Kết luận về ${s.t}</h2>
+  <p class="lead">Mọi phân tích quy về một con số và một hành động cụ thể.</p>
+  <div class="card">
+    <div class="sc-total"><div class="num" style="color:${v.col}">${b.total}<small>/100</small></div>
+      <div class="verdict" style="color:${v.col}">${v.txt}</div></div>
+    <div class="bars" style="margin-top:16px">
+      ${bar("Ngắn hạn (ngày–tuần)",b.horizons.short)}
+      ${bar("Trung hạn (tháng–1 năm)",b.horizons.mid)}
+      ${bar("Dài hạn (nhiều năm)",b.horizons.long)}
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:4px">CHI TIẾT ĐIỂM THÀNH PHẦN</div>
+    <div class="breakdown">${bd}</div>
+  </div>
+  <div class="card">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">NẾU QUYẾT ĐỊNH VÀO LỆNH</div>
+    <div class="decision">
+      <div class="dbox"><div class="k">Khung thời gian hợp nhất</div><div class="v" style="color:var(--accent)">${best[0]}</div></div>
+      <div class="dbox"><div class="k">Tỷ trọng đề xuất tối đa</div><div class="v">${size}</div></div>
+      <div class="dbox"><div class="k">Cắt lỗ kỷ luật</div><div class="v" style="color:var(--bad)">−8% từ giá mua</div></div>
+      <div class="dbox"><div class="k">Trước khi bấm lệnh</div><div class="v" style="font-size:14px">Tạm dừng ≥ 1 ngày · hỏi "kịch bản xấu nhất?"</div></div>
+    </div>
+    <div class="why" style="margin-top:14px">🧭 <b>Hành động:</b> ${action}</div>
+  </div>
+  <div class="theory">📖 <b>Bám lý thuyết:</b> nhánh 7 (thang điểm 100 & khung thời gian) + nhánh 4 (quản lý vốn, cắt lỗ, nguyên tắc tạm dừng). Con số chỉ <b>hỗ trợ</b> quyết định — kỷ luật rủi ro mới giữ bạn sống sót.</div>
+  <div class="todo">👉 Thử <b>quay lại Bước 2</b>, chọn mã khác (ví dụ EEE đang quá mua, hay DDD cổ tức cao) và xem điểm & khung thời gian đổi ra sao.</div>`;
+}
+
+/* ============ ĐIỀU HƯỚNG ============ */
+function renderStepper(){
+  document.getElementById('stepper').innerHTML=STEPS.map((s,i)=>
+    `<div class="step-dot ${i===cur?'active':''} ${i<cur?'done':''}" onclick="go(${i})">
+      <span class="n">${i<cur?'✓':i+1}</span>${s.name}</div>`).join('');
+  document.getElementById('pbarFill').style.width=((cur)/(STEPS.length-1)*100)+'%';
+}
+function refreshNav(){
+  const st=STEPS[cur];
+  document.getElementById('btnPrev').style.visibility=cur===0?'hidden':'visible';
+  const next=document.getElementById('btnNext');
+  const can=st.canNext();
+  next.disabled=!can;
+  next.style.visibility=cur===STEPS.length-1?'hidden':'visible';
+  document.getElementById('navHint').innerHTML=st.hint?st.hint():'';
+}
+function go(i){
+  if(i<0||i>=STEPS.length)return;
+  // chặn tiến nếu bước hiện tại chưa cho phép
+  if(i>cur && !STEPS[cur].canNext())return;
+  // các bước phân tích cần đã chọn mã
+  if(i>=2 && !selected){ cur=1; }
+  else { cur=i; }
+  document.getElementById('stepArea').innerHTML=STEPS[cur].render();
+  if(cur===1) paintScreen();
+  renderStepper(); refreshNav();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+go(0);
+</script>
+</body>
+</html>

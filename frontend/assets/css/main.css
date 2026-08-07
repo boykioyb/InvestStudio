@@ -1,0 +1,377 @@
+/* ==========================================================================
+   InvestStudio — bảng màu & style dùng chung (giao diện tối)
+   Chỉ chứa trình bày. Không có logic chấm điểm ở đây.
+   ========================================================================== */
+
+:root {
+  --bg: #0b1020;
+  --panel: #121a2e;
+  --panel2: #0f1626;
+  --line: #2a3550;
+  --text: #eaf0fb;
+  --muted: #93a0bd;
+  --good: #5ce6a0;
+  --warn: #ffc24b;
+  --bad: #ff6b7d;
+  --accent: #5ac8ff;
+  --accent2: #c792ff;
+
+  /* nền mờ dùng cho nhãn trạng thái */
+  --good-soft: rgba(92, 230, 160, 0.16);
+  --warn-soft: rgba(255, 194, 75, 0.16);
+  --bad-soft: rgba(255, 107, 125, 0.16);
+
+  --radius: 14px;
+  --radius-sm: 9px;
+
+  /* thanh cuộn */
+  --scroll-size: 10px;
+  --scroll-thumb: #2f3c5c;
+  --scroll-thumb-hover: #4a5b85;
+  --scroll-track: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   Thanh cuộn dùng chung
+   Mặc định của trình duyệt là thanh sáng, chọi hẳn với nền tối và trông như
+   lỗi hiển thị. Khai báo cho cả hai chuẩn: `scrollbar-*` (Firefox, và Chrome
+   mới) và `::-webkit-scrollbar` (Safari, Chrome cũ).
+
+   Lưu ý: thanh tab và dải chip mã CỐ Ý ẩn thanh cuộn trong CSS scoped của
+   chúng — selector scoped có độ ưu tiên cao hơn nên vẫn giữ nguyên ý đồ đó.
+   ========================================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
+::-webkit-scrollbar {
+  width: var(--scroll-size);
+  height: var(--scroll-size);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  /* Viền trong suốt + bo nền: tạo khoảng đệm để thanh không dính sát mép */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+
+/* Góc giao nhau khi có cả thanh dọc lẫn ngang (bảng cân đối 121 dòng) */
+::-webkit-scrollbar-corner {
+  background: var(--scroll-track);
+}
+
+html,
+body,
+#__nuxt {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Arial, sans-serif;
+  background: var(--bg);
+  background-image: radial-gradient(1200px 700px at 15% -10%, #16233b 0%, var(--bg) 55%);
+  background-attachment: fixed;
+  color: var(--text);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* ---------- Bố cục ---------- */
+.site-header {
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(11, 16, 32, 0.9);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 19px;
+  background: linear-gradient(92deg, var(--accent), var(--accent2), var(--good));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.site-header .sub {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
+/* ---------- Thẻ / khối ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin: 16px 0;
+}
+
+.sec-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 2px 0 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.note {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* ---------- Form ---------- */
+.searchbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.searchbar input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 11px;
+  padding: 14px 16px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.searchbar input::placeholder {
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.searchbar input:focus,
+.fg input:focus,
+.fg select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.btn {
+  border-radius: 11px;
+  padding: 10px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text);
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn.primary {
+  background: var(--accent);
+  color: #04121f;
+  border-color: var(--accent);
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 16px;
+}
+
+.fg {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.fg label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fg input,
+.fg select {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* ---------- Trạng thái (một nơi duy nhất ánh xạ level → màu) ---------- */
+.lv-good {
+  color: var(--good);
+}
+.lv-warn {
+  color: var(--warn);
+}
+.lv-bad {
+  color: var(--bad);
+}
+.lv-na {
+  color: var(--muted);
+}
+
+.bg-good {
+  background: var(--good);
+}
+.bg-warn {
+  background: var(--warn);
+}
+.bg-bad {
+  background: var(--bad);
+}
+.bg-na {
+  background: var(--muted);
+}
+
+.tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.tag.lv-good {
+  background: var(--good-soft);
+}
+.tag.lv-warn {
+  background: var(--warn-soft);
+}
+.tag.lv-bad {
+  background: var(--bad-soft);
+}
+.tag.lv-na {
+  background: rgba(147, 160, 189, 0.14);
+}
+
+/* ---------- Thông báo ---------- */
+.msg {
+  border-left: 4px solid var(--warn);
+  background: rgba(255, 194, 75, 0.08);
+  border-radius: 10px;
+  padding: 12px 15px;
+  font-size: 13.5px;
+}
+
+.msg.error {
+  border-left-color: var(--bad);
+  background: rgba(255, 107, 125, 0.08);
+}
+
+.msg.ok {
+  border-left-color: var(--good);
+  background: rgba(92, 230, 160, 0.07);
+}
+
+/* ---------- Badge nguồn ---------- */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+/* ---------- Tiện ích ---------- */
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.disclaimer {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.6;
+  text-align: center;
+  margin-top: 26px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+/* gạch chân chấm cho từ có tooltip (title) */
+.gloss {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+}
+
+@media (max-width: 560px) {
+  .wrap {
+    padding: 18px 14px 60px;
+  }
+  .card {
+    padding: 15px 14px;
+  }
+}
