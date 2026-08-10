@@ -8,18 +8,70 @@
 #
 # Kiến trúc: MỘT nguồn sự thật — toàn bộ crawl + chấm điểm nằm ở backend
 # (backend/app/services/scoring.py). Frontend chỉ render kết quả API trả về.
+# Việc lập chỉ mục RAG chạy nền ở service `worker` (Celery + Redis).
+
+# Biến môi trường dùng CHUNG cho backend và worker (một nơi khai báo, không lệch).
+x-app-env: &app-env
+  APP_DATABASE_URL: postgresql+psycopg://invest:invest@postgres:5432/investstudio
+  # ⚠️ ĐỔI trước khi lên môi trường thật — bí mật ký token đăng nhập.
+  APP_JWT_SECRET: ${APP_JWT_SECRET:-doi-bi-mat-nay-truoc-khi-len-that}
+  # Chạy http://localhost nên cookie KHÔNG bật Secure. Đặt true khi có HTTPS.
+  APP_COOKIE_SECURE: "false"
+  # Key Gemini cho RAG — lấy ở https://aistudio.google.com/apikey
+  APP_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  # Model sinh câu trả lời — đổi bằng LLM_MODEL trong .env
+  APP_GEMINI_CHAT_MODEL: ${LLM_MODEL:-gemini-3.6-flash}
+  # Model nhúng (embedding) — đổi bằng EMBED_MODEL
+  APP_GEMINI_EMBED_MODEL: ${EMBED_MODEL:-gemini-embedding-001}
+  # Celery: Redis làm broker (/0) và result backend (/1)
+  APP_CELERY_BROKER_URL: redis://redis:6379/0
+  APP_CELERY_RESULT_BACKEND: redis://redis:6379/1
+  TZ: Asia/Ho_Chi_Minh
 
 services:
+  # PostgreSQL kèm pgvector — lưu tài khoản, mã yêu thích và kho vector cho RAG.
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: invest
+      POSTGRES_PASSWORD: invest
+      POSTGRES_DB: investstudio
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invest -d investstudio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # Redis — broker + result backend cho Celery.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build: ./backend
     image: investstudio-backend
     ports:
       - "${API_PORT:-8010}:8000"
     environment:
+      <<: *app-env
       # Frontend đi qua proxy cùng origin nên không cần CORS. Danh sách này chỉ
       # dành cho trường hợp bạn gọi thẳng API từ công cụ khác.
       APP_CORS_ORIGINS: '["http://localhost:${WEB_PORT:-3010}","http://127.0.0.1:${WEB_PORT:-3010}"]'
-      TZ: Asia/Ho_Chi_Minh
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - vnstock-cache:/root/.vnstock   # giữ cache/cfg vnstock giữa các lần chạy
     healthcheck:
@@ -28,7 +80,23 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 20s
+    restart: unless-stopped
+
+  # Worker Celery — chạy job lập chỉ mục RAG (dùng chung image với backend).
+  worker:
+    build: ./backend
+    image: investstudio-backend
+    command: celery -A app.core.celery_app:celery_app worker -l info
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - vnstock-cache:/root/.vnstock   # dùng lại cache crawl như backend
     restart: unless-stopped
 
   frontend:
@@ -47,3 +115,4 @@ services:
 
 volumes:
   vnstock-cache:
+  pg-data:

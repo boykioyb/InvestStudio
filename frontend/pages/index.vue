@@ -114,6 +114,9 @@ useHead({
       </form>
 
       <NuxtLink to="/danh-sach" class="chip nav">📋 Danh sách mã</NuxtLink>
+      <NuxtLink to="/theo-doi" class="chip nav">⭐ Theo dõi</NuxtLink>
+      <NuxtLink to="/tro-ly" class="chip nav">💬 Trợ lý</NuxtLink>
+      <FavoriteButton v-if="data?.ticker" :ticker="data.ticker" />
 
       <div class="quick">
         <button

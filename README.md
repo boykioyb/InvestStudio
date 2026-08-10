@@ -28,9 +28,13 @@ còn `round(2.5)=2`.
 ## Chạy
 
 ```bash
-docker compose up --build          # Web :3010 · API :8010
+cp .env.example .env               # điền GEMINI_API_KEY nếu muốn dùng trợ lý RAG
+docker compose up --build          # Web :3010 · API :8010 · Postgres (nội bộ)
 ```
 
+- Kèm sẵn **PostgreSQL + pgvector** (lưu tài khoản, mã yêu thích, kho vector RAG) —
+  tự khởi tạo bảng lúc backend chạy, không cần thao tác gì thêm.
+- Trợ lý RAG cần `GEMINI_API_KEY` trong `.env`; các phần khác chạy được mà không cần key.
 - Giao diện: <http://localhost:3010> — mở được từ **điện thoại/máy khác trong LAN**
   bằng `http://<IP-máy-chủ>:3010` (trình duyệt gọi `/api` cùng origin, Nuxt proxy
   sang backend qua mạng nội bộ Docker nên không dính CORS và không phụ thuộc `localhost`)
@@ -72,6 +76,48 @@ Tham số của `/api/stocks/{ticker}`:
 ```bash
 curl "http://localhost:8010/api/stocks/FPT"
 curl "http://localhost:8010/api/stocks/VPB?pe_sec=9&pos=2"   # ngân hàng
+```
+
+## Tài khoản · Mã theo dõi · Trợ lý RAG
+
+Đăng nhập để **lưu mã yêu thích** và dùng **trợ lý hỏi–đáp** (RAG). Token là
+cookie **httpOnly** (JavaScript không đọc được → an toàn hơn trước XSS); mật khẩu
+lưu dạng băm **bcrypt**, không bao giờ lưu bản thô.
+
+| Endpoint | Mô tả |
+|---|---|
+| `POST /api/auth/register` · `login` · `logout` | Đăng ký / đăng nhập / đăng xuất (đặt cookie) |
+| `GET /api/auth/me` | Thông tin tài khoản đang đăng nhập |
+| `GET · POST /api/watchlist` | Liệt kê / thêm mã theo dõi |
+| `PATCH · DELETE /api/watchlist/{id}` | Sửa ghi chú·ngưỡng / bỏ theo dõi |
+| `POST /api/chat` | Hỏi trợ lý một câu (RAG) |
+| `POST /api/chat/reindex` · `GET /api/chat/status` | Lập chỉ mục lại VN30 + tin / xem trạng thái |
+
+Trang web tương ứng: <http://localhost:3010/dang-nhap> · `/theo-doi` (⭐ mã theo dõi)
+· `/tro-ly` (💬 trợ lý). Nút ⭐ nằm ngay trong màn hình phân tích của mỗi mã.
+
+**RAG hoạt động thế nào** (một nguồn sự thật vẫn ở backend):
+
+1. **Lập chỉ mục** — tổng quan rổ VN30 (từ **một** request `price_board`) + tin tức
+   từng mã → nhúng bằng Gemini `gemini-embedding-001` (ép 768 chiều) → lưu vào cột
+   `vector` của pgvector. Vì nguồn giới hạn **20 request/phút**, luồng mặc định KHÔNG
+   gọi `analyze()` cho từng mã (mỗi analyze bắn nhiều request); thêm cờ `--deep` nếu
+   muốn kèm điểm số/ROE (chậm hơn, có tự nghỉ khi chạm giới hạn).
+2. **Hỏi** — câu hỏi được nhúng → tìm `k` đoạn gần nghĩa nhất (khoảng cách cosine,
+   chỉ mục HNSW) → Gemini `gemini-3.6-flash` tổng hợp **chỉ từ ngữ cảnh đó**, kèm
+   nguồn để kiểm chứng. Không đủ dữ liệu thì nói thẳng, **không bịa số, không khuyến nghị mua bán**.
+
+**Lập chỉ mục chạy như một JOB NỀN qua Celery** (service `worker` + `redis`), tách
+khỏi web process nên không chặn request và sống sót qua restart. Tiến độ ghi vào
+bảng `index_jobs`, đọc qua `GET /api/chat/status`. Kích hoạt lần đầu (cần
+`GEMINI_API_KEY`) bằng nút trên trang `/tro-ly`, hoặc bằng dòng lệnh:
+
+```bash
+docker compose exec backend python -m scripts.reindex          # đẩy job: cả VN30 + tin
+docker compose exec backend python -m scripts.reindex FPT VCB  # đẩy job: vài mã cụ thể
+docker compose exec backend python -m scripts.reindex --deep   # kèm điểm số/ROE (chậm)
+docker compose exec backend python -m scripts.reindex --inline # chạy ngay, không cần worker
+docker compose logs -f worker                                   # xem worker xử lý
 ```
 
 ## Danh sách mã — sắp xếp ở MÁY CHỦ
@@ -162,15 +208,23 @@ trình duyệt**, máy chủ chỉ nhận để tính rồi trả kết quả, k
 ```
 backend/           FastAPI
   app/
-    api/routes/    endpoint
+    api/routes/    endpoint (stocks · screener · auth · watchlist · chat)
+    api/deps.py    lấy người dùng đang đăng nhập
+    core/          config · security (bcrypt + JWT)
+    db/            engine · session · init_db (tạo pgvector + bảng)
+    models/        ORM: user · watchlist · rag_document
     schemas/       DTO (Pydantic)
     services/
       scoring.py   ★ NGUỒN SỰ THẬT của mô hình chấm điểm
       analyzer.py  orchestrator gộp nguồn
       screener.py  danh sách mã + sắp xếp
       providers/   cafef.py · vnstock_source.py
+      rag/         gemini · store (pgvector) · indexer · chat
+  scripts/         reindex.py — lập chỉ mục RAG từ dòng lệnh
   tests/           khóa hành vi mô hình chấm điểm
 frontend/          Nuxt 3 (chỉ render)
+  composables/     useAuth · useWatchlist · useChat (chỉ gọi API, không logic)
+  pages/           index · danh-sach · dang-nhap · dang-ky · theo-doi · tro-ly
 legacy/            bản cũ (HTML tĩnh + CLI Python) — giữ để tham khảo
 ```
 

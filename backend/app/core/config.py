@@ -1,4 +1,4 @@
-"""Cấu hình ứng dụng (đọc từ biến môi trường)."""
+"""Cấu hình ứng dụng (đọc từ biến môi trường, tiền tố APP_)."""
 from __future__ import annotations
 
 from functools import lru_cache
@@ -10,11 +10,41 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
 
     app_name: str = "InvestStudio API"
-    version: str = "2.0.0"
+    version: str = "3.0.0"
     # Origin của frontend Nuxt được phép gọi API (CORS).
     cors_origins: list[str] = ["http://localhost:3010", "http://127.0.0.1:3010"]
     # Thời gian cache kết quả phân tích (giây) — tránh gọi nguồn liên tục.
     cache_ttl_seconds: int = 900
+
+    # ── Cơ sở dữ liệu (PostgreSQL + pgvector) ────────────────────────────────
+    #  Dialect psycopg (psycopg 3). Trong Docker host là "postgres" (tên service).
+    database_url: str = "postgresql+psycopg://invest:invest@localhost:5432/investstudio"
+
+    # ── Xác thực (JWT trong cookie httpOnly) ─────────────────────────────────
+    #  ⚠️ ĐỔI ở môi trường thật — bí mật này ký toàn bộ token đăng nhập.
+    jwt_secret: str = "doi-bi-mat-nay-truoc-khi-len-that"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 ngày
+    #  Cookie chỉ gửi qua HTTPS khi bật. Để False khi chạy http://localhost.
+    cookie_secure: bool = False
+    cookie_name: str = "access_token"
+
+    # ── RAG / Gemini ─────────────────────────────────────────────────────────
+    gemini_api_key: str = ""                       # lấy ở https://aistudio.google.com/apikey
+    gemini_chat_model: str = "gemini-3.6-flash"    # model sinh câu trả lời (đổi qua LLM_MODEL)
+    gemini_embed_model: str = "gemini-embedding-001"  # model nhúng (đổi qua EMBED_MODEL)
+    #  gemini-embedding-001 mặc định 3072 chiều nhưng ép được về 768 (Matryoshka)
+    #  bằng output_dimensionality → khớp cột Vector(768), không phải đổi schema.
+    embed_dim: int = 768
+    rag_top_k: int = 6                            # số đoạn văn bản lấy về cho mỗi câu hỏi
+    #  Giãn cách (giây) giữa 2 lần gọi nguồn khi lập chỉ mục — nguồn giới hạn
+    #  ~20 request/phút, nên nhồi liên tục sẽ bị chặn. 4s ≈ 15 req/phút, có biên an toàn.
+    index_throttle_seconds: float = 4.0
+
+    # ── Celery (hàng đợi job nền) ────────────────────────────────────────────
+    #  Mặc định localhost cho chạy máy; Docker ghi đè thành host "redis".
+    celery_broker_url: str = "redis://localhost:6379/0"
+    celery_result_backend: str = "redis://localhost:6379/1"
 
 
 @lru_cache

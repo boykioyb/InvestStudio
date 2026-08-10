@@ -5,3 +5,18 @@ pydantic-settings>=2.6
 vnstock>=4.0.5
 certifi
 pytest>=8.0
+
+# ── Tài khoản người dùng + lưu trữ (login/đăng ký, mã yêu thích) ──────────────
+sqlalchemy>=2.0            # ORM (ánh xạ bảng ↔ đối tượng Python)
+psycopg[binary]>=3.2       # driver PostgreSQL (dialect postgresql+psycopg)
+bcrypt>=4.2                # băm mật khẩu (password hashing)
+pyjwt>=2.9                 # JWT (JSON Web Token — token xác thực)
+email-validator>=2.1       # kiểm tra định dạng email cho Pydantic EmailStr
+
+# ── RAG (Retrieval-Augmented Generation — sinh câu trả lời có truy xuất) ───────
+pgvector>=0.3              # kiểu cột vector cho SQLAlchemy + PostgreSQL
+google-genai>=1.0          # SDK Gemini (embedding + sinh câu trả lời)
+
+# ── Hàng đợi tác vụ nền (lập chỉ mục RAG chạy như một job) ─────────────────────
+celery>=5.4                # job queue — worker chạy reindex tách khỏi web process
+redis>=5.0                 # broker + result backend cho Celery
