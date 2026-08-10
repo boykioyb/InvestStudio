@@ -6,6 +6,8 @@ web process — nó được đẩy vào hàng đợi Celery cho worker xử lý
 """
 from __future__ import annotations
 
+import sys
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -30,7 +32,12 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
     try:
         return chat.answer_question(db, payload.question.strip(), ticker)
     except GeminiError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
+        #  ghi log phía máy chủ để còn gỡ lỗi.
+        print(f"[chat] GeminiError: {exc}", file=sys.stderr)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Trợ lý tạm thời không phản hồi được. Vui lòng thử lại sau.") from exc
 
 
 def _status(db: Session) -> IndexStatus:
@@ -61,8 +68,10 @@ def reindex(deep: bool = Query(False, description="Kèm điểm số/ROE qua ana
     try:
         task = reindex_task.delay(None, True, deep)
     except Exception as exc:  # noqa: BLE001 - broker (Redis) không tới được
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=f"Không đưa được job vào hàng đợi: {exc}") from exc
+        print(f"[chat] enqueue reindex thất bại: {exc}", file=sys.stderr)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Hệ thống hàng đợi tạm thời không sẵn sàng. Vui lòng thử lại sau.") from exc
     return IndexStatus(documents=current.documents, tickers=current.tickers, running=True,
                        last_message="Đã đưa vào hàng đợi, worker sẽ xử lý…", task_id=task.id)
 

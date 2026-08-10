@@ -10,10 +10,7 @@ const localError = ref('')
 
 useHead({ title: 'Đăng ký — InvestStudio' })
 
-const nextPath = computed(() => {
-  const next = String(route.query.next || '/')
-  return next.startsWith('/') ? next : '/'
-})
+const nextPath = computed(() => isSafeNext(String(route.query.next || '/')))
 
 onMounted(async () => {
   await ensureLoaded()

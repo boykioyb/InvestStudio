@@ -127,11 +127,15 @@ def _analysis_doc(symbol: str, name: str, report: Reporter) -> Optional[store.Do
 
 
 def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
-              report: Reporter) -> str:
+              report: Reporter, skip_existing: bool = True) -> str:
     """Chạy trọn một lần lập chỉ mục (đồng bộ). Trả thông điệp kết thúc.
 
     `report(message)` được gọi ở mỗi bước để bên ngoài hiển thị/ghi tiến độ.
     Tự mở/đóng một DB session riêng (an toàn cả trong worker Celery lẫn CLI).
+
+    `skip_existing=True`: bỏ qua mã đã có tin (`news:*`) → chạy lại thì RESUME từ
+    chỗ dừng thay vì làm lại từ đầu (quan trọng vì vnai có thể GIẾT tiến trình khi
+    chạm trần request, để job dở dang).
     """
     db = SessionLocal()
     total = 0
@@ -143,8 +147,12 @@ def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
                 lambda: screener.fetch_list("VN30", "market_cap", "desc"), report)
             rows = [(r.symbol, r.name, r) for r in listing.rows]
 
-        report(f"Bắt đầu lập chỉ mục {len(rows)} mã…")
+        done = store.existing_source_keys(db, "news:") if skip_existing else set()
+        report(f"Bắt đầu lập chỉ mục {len(rows)} mã (bỏ qua {len(done)} mã đã có)…")
         for index, (symbol, name, row) in enumerate(rows, start=1):
+            if include_news and skip_existing and f"news:{symbol}" in done:
+                report(f"Bỏ qua {index}/{len(rows)} {symbol} (đã lập chỉ mục).")
+                continue
             docs: list[store.DocInput] = []
             if row is not None:  # tóm tắt từ bảng giá rổ — 0 request thêm
                 docs.append({
@@ -171,6 +179,6 @@ def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
 
 
 def reindex_blocking(symbols: Optional[list[str]] = None, include_news: bool = True,
-                     deep: bool = False) -> str:
+                     deep: bool = False, skip_existing: bool = True) -> str:
     """Chạy đồng bộ NGAY trong tiến trình hiện tại (CLI --inline; không cần Celery)."""
-    return run_index(symbols, include_news, deep, report=print)
+    return run_index(symbols, include_news, deep, report=print, skip_existing=skip_existing)

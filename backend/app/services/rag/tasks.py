@@ -15,8 +15,8 @@ from app.services.rag import indexer
 
 
 @celery_app.task(bind=True, name="rag.reindex")
-def reindex_task(self, symbols: Optional[list[str]] = None,
-                 include_news: bool = True, deep: bool = False) -> dict:
+def reindex_task(self, symbols: Optional[list[str]] = None, include_news: bool = True,
+                 deep: bool = False, skip_existing: bool = True) -> dict:
     init_db()
     db = SessionLocal()
     job = IndexJob(task_id=self.request.id, status="RUNNING", message="Đang khởi động…")
@@ -29,7 +29,7 @@ def reindex_task(self, symbols: Optional[list[str]] = None,
         self.update_state(state="PROGRESS", meta={"message": message})
 
     try:
-        final = indexer.run_index(symbols, include_news, deep, report)
+        final = indexer.run_index(symbols, include_news, deep, report, skip_existing)
         job.status = "DONE"
         job.message = final
         db.commit()

@@ -8,11 +8,7 @@ const password = ref('')
 
 useHead({ title: 'Đăng nhập — InvestStudio' })
 
-const nextPath = computed(() => {
-  const next = String(route.query.next || '/')
-  //  Chỉ nhận đường dẫn nội bộ để tránh chuyển hướng ra ngoài (open redirect).
-  return next.startsWith('/') ? next : '/'
-})
+const nextPath = computed(() => isSafeNext(String(route.query.next || '/')))
 
 onMounted(async () => {
   await ensureLoaded()

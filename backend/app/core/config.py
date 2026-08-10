@@ -5,6 +5,10 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+#  Giá trị JWT secret dùng cho DEV. Nếu còn nguyên chuỗi này ở môi trường thật
+#  (cookie_secure=True) thì app TỪ CHỐI khởi động — xem app/main.py.
+DEV_JWT_SECRET = "doi-bi-mat-nay-truoc-khi-len-that"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
@@ -22,7 +26,7 @@ class Settings(BaseSettings):
 
     # ── Xác thực (JWT trong cookie httpOnly) ─────────────────────────────────
     #  ⚠️ ĐỔI ở môi trường thật — bí mật này ký toàn bộ token đăng nhập.
-    jwt_secret: str = "doi-bi-mat-nay-truoc-khi-len-that"
+    jwt_secret: str = DEV_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 ngày
     #  Cookie chỉ gửi qua HTTPS khi bật. Để False khi chạy http://localhost.
@@ -38,8 +42,9 @@ class Settings(BaseSettings):
     embed_dim: int = 768
     rag_top_k: int = 6                            # số đoạn văn bản lấy về cho mỗi câu hỏi
     #  Giãn cách (giây) giữa 2 lần gọi nguồn khi lập chỉ mục — nguồn giới hạn
-    #  ~20 request/phút, nên nhồi liên tục sẽ bị chặn. 4s ≈ 15 req/phút, có biên an toàn.
-    index_throttle_seconds: float = 4.0
+    #  ~20 request/phút và vnai có thể GIẾT tiến trình khi chạm trần. 6s ≈ 10
+    #  req/phút, biên an toàn rộng; job resume được nên chậm mà chắc.
+    index_throttle_seconds: float = 6.0
 
     # ── Celery (hàng đợi job nền) ────────────────────────────────────────────
     #  Mặc định localhost cho chạy máy; Docker ghi đè thành host "redis".

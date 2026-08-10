@@ -64,3 +64,12 @@ def stats(db: Session) -> tuple[int, int]:
     documents = db.scalar(select(func.count()).select_from(RagDocument)) or 0
     tickers = db.scalar(select(func.count(func.distinct(RagDocument.ticker)))) or 0
     return int(documents), int(tickers)
+
+
+def existing_source_keys(db: Session, prefix: Optional[str] = None) -> set[str]:
+    """Tập `source_key` đã có (lọc theo tiền tố như 'news:'). Dùng để lập chỉ mục
+    RESUME được — bỏ qua mã đã xong, chạy lại là đi tiếp từ chỗ dừng."""
+    stmt = select(RagDocument.source_key)
+    if prefix:
+        stmt = stmt.where(RagDocument.source_key.like(f"{prefix}%"))
+    return set(db.scalars(stmt))
