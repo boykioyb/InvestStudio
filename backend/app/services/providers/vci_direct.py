@@ -71,6 +71,28 @@ def constituents(group: str = "VN30") -> list[str]:
     return [row["symbol"] for row in data if isinstance(row, dict) and row.get("symbol")]
 
 
+#  Sàn VCI ghi "HSX"; phần còn lại của app quen "HOSE".
+_BOARD_MAP = {"HSX": "HOSE", "HOSE": "HOSE", "HNX": "HNX", "UPCOM": "UPCOM"}
+
+
+def symbol_directory() -> dict[str, dict]:
+    """Bản đồ mã → {name, exchange} cho TOÀN thị trường trong MỘT request.
+
+    Dùng để bù tên công ty + sàn cho bảng giá (bảng giá VCI không kèm tên).
+    """
+    rows = _request("GET", f"{_TRADING}/price/symbols/getAll")
+    out: dict[str, dict] = {}
+    for r in rows or []:
+        sym = r.get("symbol")
+        if not sym:
+            continue
+        out[sym] = {
+            "name": r.get("organName") or r.get("organShortName") or sym,
+            "exchange": _BOARD_MAP.get(r.get("board", ""), r.get("board") or ""),
+        }
+    return out
+
+
 def price_board(symbols: Iterable[str]) -> list[dict]:
     """Bảng giá cho một loạt mã (một request cho cả rổ). Trả bản ghi đã làm phẳng."""
     records = _request("POST", f"{_TRADING}/price/symbols/getList",

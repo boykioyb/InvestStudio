@@ -129,9 +129,14 @@ def _load_rows(symbols: Optional[list[str]], report: Reporter):
         codes = ([s.upper() for s in symbols] if symbols
                  else vci_direct.constituents("VN30"))
         records = {r["symbol"]: r for r in vci_direct.price_board(codes) if r.get("symbol")}
+        directory = vci_direct.symbol_directory()  # tên công ty + sàn (1 request)
         rows = []
         for code in codes:
-            row = screener._row(records.get(code) or {"symbol": code})
+            info = directory.get(code) or {}
+            #  Bù organ_name + exchange để screener._row có tên/sàn thật.
+            record = {**(records.get(code) or {"symbol": code}),
+                      "organ_name": info.get("name"), "exchange": info.get("exchange")}
+            row = screener._row(record)
             rows.append((code, row.name if row else code, row))
         return rows, True
     except VciError as exc:
