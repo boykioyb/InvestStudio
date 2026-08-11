@@ -1,10 +1,11 @@
-"""Provider vnstock — nguồn DUY NHẤT cho khối cơ bản, và dự phòng cho khối kỹ thuật.
+"""Provider khối cơ bản + kỹ thuật — nay là ADAPTER MỎNG trên `vci_direct`.
 
-vnstock gọi API JSON/GraphQL nội bộ của Vietcap (VCI) kèm header trình duyệt
-xoay vòng + proxy, nên qua được WAF mà curl trần bị chặn.
+Đã CAI vnstock/vnai hoàn toàn ở tầng này: kỹ thuật (OHLCV), cơ bản (chỉ số/BCTC)
+và hồ sơ (tên/ngành) đều gọi thẳng API VCI qua `vci_direct` — không còn dính trần
+20 req/phút hay bị vnai giết tiến trình. Giữ tên file để các nơi import khỏi đổi.
 
-Lưu ý format: `Finance.ratio()` của VCI trả bảng "long" với nhãn cột năm TRÙNG
-NHAU → phải truy cập theo VỊ TRÍ (cột cuối = kỳ gần nhất), không dùng tên cột.
+Chỉ số cơ bản lấy CHUẨN (RATIO_YEAR năm gần nhất + TTM mới nhất), tránh bug cũ của
+`Finance.ratio()` vnstock đọc trúng dòng nhãn năm rác.
 """
 from __future__ import annotations
 
@@ -52,23 +53,18 @@ def fetch_fundamentals(ticker: str, source: str = "VCI") -> FundamentalData:
 
 
 def fetch_company(ticker: str) -> tuple[str, str]:
-    """(tên hiển thị, ngành) — best effort, fallback về chính mã."""
+    """(tên hiển thị, ngành) — lấy thẳng VCI, fallback về chính mã."""
     try:
-        from vnstock import Company
-
-        overview = Company(symbol=ticker, source="VCI").overview()
-        record = overview.to_dict("records")[0] if len(overview) else {}
-        name = str(record.get("short_name") or record.get("company_name")
-                   or record.get("organ_name") or ticker)
-        sector = str(record.get("industry") or record.get("icb_name3")
-                     or record.get("icb_name2") or "—")
-        if name.lower() in ("nan", "none", ""):
-            name = ticker
-        if sector.lower() in ("nan", "none", ""):
-            sector = "—"
-        return name, sector
-    except Exception:
+        profile = vci_direct.company_profile(ticker)
+    except VciError:
         return ticker, "—"
+    name = str(profile.get("name") or ticker)
+    sector = str(profile.get("sector") or "—")
+    if name.strip().lower() in ("nan", "none", ""):
+        name = ticker
+    if sector.strip().lower() in ("nan", "none", ""):
+        sector = "—"
+    return name, sector
 
 
 def fetch_ohlcv(ticker: str, days: int) -> list[Candle]:

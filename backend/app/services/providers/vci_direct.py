@@ -242,6 +242,22 @@ def fundamentals(symbol: str) -> dict:
     return out
 
 
+def company_profile(symbol: str) -> dict:
+    """Tên + ngành + vài chỉ số hồ sơ. `sector` để TIẾNG ANH vì benchmark P/E của
+    analyzer khớp theo key không dấu (technology/bank…); `sector_vn` để hiển thị."""
+    _ensure_handshake()
+    d = (_request("GET", f"{_IQ_COMPANY}/details", params={"ticker": symbol.upper()}) or {}).get("data") or {}
+    return {
+        "name": d.get("viOrganName") or d.get("viOrganShortName") or symbol.upper(),
+        "sector": d.get("sector") or "",
+        "sector_vn": d.get("sectorVn") or "",
+        "market_cap": d.get("marketCap"),
+        "current_price": d.get("currentPrice"),
+        "target_price": d.get("targetPrice"),
+        "rating": d.get("rating"),
+    }
+
+
 def news(symbol: str, days: int = 180, size: int = 50) -> list[dict]:
     """Tin tức của một mã. Giàu hơn vnstock: kèm nguồn, link bài gốc, tóm tắt."""
     to = date.today()
