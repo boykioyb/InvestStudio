@@ -42,3 +42,33 @@ def reindex_task(self, symbols: Optional[list[str]] = None, include_news: bool =
         raise
     finally:
         db.close()
+
+
+@celery_app.task(bind=True, name="rag.index_analysis")
+def index_analysis_task(self, analysis: dict) -> dict:
+    """Nạp kết quả PHÂN TÍCH của một mã vào kho RAG (chạy nền sau khi phân tích).
+
+    Nhận sẵn dữ liệu đã tính (không crawl lại) → chỉ nhúng + upsert. Nhờ vậy
+    "phân tích tới đâu, trợ lý biết tới đó", kể cả mã ngoài VN30.
+    """
+    from app.schemas.stock import StockAnalysis
+    from app.services.rag import indexer, store
+    from app.services.rag.gemini import GeminiError, embed_texts
+
+    init_db()
+    data = StockAnalysis(**analysis)
+    doc: store.DocInput = {
+        "source_key": f"analysis:{data.ticker}", "doc_type": "analysis", "ticker": data.ticker,
+        "title": f"Phân tích {data.ticker} — {data.name}",
+        "content": indexer.analysis_text(data),
+        "meta": {"score": data.score.total, "name": data.name}, "embedding": [],
+    }
+    db = SessionLocal()
+    try:
+        doc["embedding"] = embed_texts([doc["content"]])[0]
+        store.upsert_documents(db, [doc])
+        return {"indexed": data.ticker}
+    except GeminiError as exc:  # thiếu key / lỗi Gemini → bỏ qua, không phá gì
+        return {"skipped": str(exc)}
+    finally:
+        db.close()

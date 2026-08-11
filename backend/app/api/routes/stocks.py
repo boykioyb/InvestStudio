@@ -44,6 +44,21 @@ def _sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _index_analysis(result: StockAnalysis) -> None:
+    """Đẩy phân tích vừa tính vào kho RAG (chạy nền qua Celery).
+
+    Nhờ vậy "phân tích tới đâu, trợ lý biết tới đó" — kể cả mã ngoài VN30. Chỉ
+    chạy khi đã cấu hình Gemini; mọi lỗi ở đây KHÔNG được làm hỏng phản hồi phân tích.
+    """
+    if not get_settings().gemini_api_key:
+        return
+    try:
+        from app.services.rag.tasks import index_analysis_task
+        index_analysis_task.delay(result.model_dump(mode="json"))
+    except Exception:  # noqa: BLE001 - broker lỗi cũng không được ảnh hưởng phân tích
+        pass
+
+
 @router.get(
     "/{ticker}",
     response_model=StockAnalysis,
@@ -77,6 +92,7 @@ def analyze_stock(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
     _cache[key] = (time.monotonic(), result)
+    _index_analysis(result)
     return result
 
 
@@ -143,6 +159,7 @@ def analyze_stock_stream(
             return
 
         _cache[key] = (time.monotonic(), outcome["data"])
+        _index_analysis(outcome["data"])
         yield _sse("result", outcome["data"].model_dump(mode="json"))
 
     return StreamingResponse(

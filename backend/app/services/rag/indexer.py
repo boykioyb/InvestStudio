@@ -1,14 +1,12 @@
 """Lập chỉ mục dữ liệu VN30 + tin tức vào kho vector cho RAG.
 
-Vòng lặp lập chỉ mục nằm ở `run_index(...)` — KHÔNG tự quản lý tiến trình. Việc
-chạy nền do Celery lo (xem `app/services/rag/tasks.py`); chế độ inline (CLI) gọi
-thẳng `reindex_blocking`. Tiến độ báo ra ngoài qua callback `report`.
+Nguồn dữ liệu: ưu tiên **VCI trực tiếp** (`providers/vci_direct.py`) — không qua
+vnstock/vnai nên KHÔNG dính trần 20 req/phút và KHÔNG bị giết tiến trình; cả rổ
+VN30 (giá + tin) lấy xong trong vài giây. Nếu VCI lỗi (đổi API…) thì tự **quay
+về vnstock** (screener/feed) với giãn cách + retry như cũ.
 
-Ràng buộc cứng: nguồn crawl giới hạn ~20 request/phút. Vì vậy:
-  • Tóm tắt VN30 lấy từ `price_board` — MỘT request cho cả rổ.
-  • Tin tức: 1 request/mã, có giãn cách (`index_throttle_seconds`).
-  • Chạm giới hạn thì TỰ NGHỈ rồi thử lại thay vì chết cả job.
-  • `deep=True` mới gọi `analyze()` cho từng mã (nặng request → chậm).
+Vòng lặp nằm ở `run_index(...)`; việc chạy nền do Celery lo (xem `tasks.py`).
+`deep=True` mới gọi `analyze()` cho điểm số/ROE (vẫn qua vnstock → có giãn cách).
 """
 from __future__ import annotations
 
@@ -19,14 +17,15 @@ from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.schemas.stock import NewsFeed, ScreenerRow, StockAnalysis
 from app.services import analyzer, feed, screener
+from app.services.providers import vci_direct
 from app.services.providers.base import ProviderError
+from app.services.providers.vci_direct import VciError
 from app.services.rag import store
 from app.services.rag.gemini import embed_texts
 
-#  Kiểu hàm nhận thông điệp tiến độ (in ra, ghi DB, cập nhật Celery… tùy nơi gọi).
 Reporter = Callable[[str], None]
 
-#  Dấu hiệu trong thông điệp lỗi cho biết đã chạm giới hạn nguồn.
+#  Dấu hiệu lỗi đã chạm trần nguồn (chỉ còn dùng cho đường vnstock fallback).
 _RATE_HINTS = ("rate limit", "giới hạn", "quota", "429", "too many", "tối đa")
 
 
@@ -39,16 +38,13 @@ def _looks_rate_limited(exc: Exception) -> bool:
 
 
 def _with_retry(fn: Callable, report: Reporter, *, tries: int = 3, cooldown: int = 65):
-    """Gọi `fn`; chạm giới hạn nguồn thì nghỉ `cooldown` giây rồi thử lại.
-
-    Lỗi KHÔNG phải giới hạn (mã lạ, nguồn hỏng) thì ném ngay để bên gọi bỏ qua mã.
-    """
+    """Đường vnstock: chạm trần thì nghỉ rồi thử lại (vnai hay giết tiến trình)."""
     for attempt in range(tries):
         try:
             return fn()
-        except Exception as exc:  # noqa: BLE001 - cần bắt cả lỗi rate-limit của vnai
+        except Exception as exc:  # noqa: BLE001
             if _looks_rate_limited(exc) and attempt < tries - 1:
-                report(f"Chạm giới hạn nguồn (20 req/phút), nghỉ {cooldown}s rồi thử lại…")
+                report(f"Chạm giới hạn nguồn, nghỉ {cooldown}s rồi thử lại…")
                 time.sleep(cooldown)
                 continue
             raise
@@ -59,7 +55,7 @@ def _fmt(value: Optional[float], unit: str = "") -> str:
 
 
 def _summary_text(row: ScreenerRow) -> str:
-    """Ảnh chụp thị trường của một mã (rẻ — dựng từ bảng giá rổ, 0 request thêm)."""
+    """Ảnh chụp thị trường của một mã (từ bảng giá rổ — 0 request thêm mỗi mã)."""
     return "\n".join([
         f"Mã {row.symbol} — {row.name} (sàn {row.exchange}).",
         f"Giá: {_fmt(row.price, ' nghìn đ')}, thay đổi {_fmt(row.change_pct, '%')}.",
@@ -70,7 +66,7 @@ def _summary_text(row: ScreenerRow) -> str:
     ])
 
 
-def _analysis_text(a: StockAnalysis) -> str:
+def analysis_text(a: StockAnalysis) -> str:
     m = a.metrics
     return "\n".join([
         f"Phân tích {a.ticker} — {a.name} (ngành {a.sector}).",
@@ -83,7 +79,16 @@ def _analysis_text(a: StockAnalysis) -> str:
     ])
 
 
-def _news_text(feed_data: NewsFeed) -> str:
+def _news_text_vci(symbol: str, items: list[dict]) -> str:
+    parts = [f"Tin tức và sự kiện gần đây của {symbol}:"]
+    for it in items[:15]:
+        date = f" ({it['date']})" if it.get("date") else ""
+        source = f" — {it['source']}" if it.get("source") else ""
+        parts.append(f"- {it['title']}{date}{source}")
+    return "\n".join(parts)
+
+
+def _news_text_feed(feed_data: NewsFeed) -> str:
     parts = [f"Tin tức và sự kiện gần đây của {feed_data.ticker}:"]
     for item in feed_data.news[:12]:
         parts.append(f"- {item.title}{f' ({item.date})' if item.date else ''}")
@@ -102,18 +107,6 @@ def _embed_and_store(db, docs: list[store.DocInput]) -> int:
     return store.upsert_documents(db, docs)
 
 
-def _news_doc(symbol: str, name: str, report: Reporter) -> Optional[store.DocInput]:
-    try:
-        news = _with_retry(lambda: feed.fetch_news(symbol), report)
-    except ProviderError:
-        return None
-    return {
-        "source_key": f"news:{symbol}", "doc_type": "news", "ticker": symbol,
-        "title": f"Tin tức {symbol}", "content": _news_text(news),
-        "meta": {"name": name}, "embedding": [],
-    }
-
-
 def _analysis_doc(symbol: str, name: str, report: Reporter) -> Optional[store.DocInput]:
     try:
         analysis = _with_retry(lambda: analyzer.analyze(symbol), report)
@@ -121,40 +114,69 @@ def _analysis_doc(symbol: str, name: str, report: Reporter) -> Optional[store.Do
         return None
     return {
         "source_key": f"analysis:{symbol}", "doc_type": "analysis", "ticker": symbol,
-        "title": f"Phân tích {symbol} — {name}", "content": _analysis_text(analysis),
+        "title": f"Phân tích {symbol} — {name}", "content": analysis_text(analysis),
         "meta": {"score": analysis.score.total, "name": name}, "embedding": [],
     }
+
+
+def _load_rows(symbols: Optional[list[str]], report: Reporter):
+    """Trả (rows, use_vci) với rows = [(mã, tên, ScreenerRow|None)].
+
+    Đường VCI: 1 request lấy rổ + 1 request bảng giá cả rổ; tái dùng
+    `screener._row` để giữ nguyên cách quy đổi đơn vị đã kiểm chứng.
+    """
+    try:
+        codes = ([s.upper() for s in symbols] if symbols
+                 else vci_direct.constituents("VN30"))
+        records = {r["symbol"]: r for r in vci_direct.price_board(codes) if r.get("symbol")}
+        rows = []
+        for code in codes:
+            row = screener._row(records.get(code) or {"symbol": code})
+            rows.append((code, row.name if row else code, row))
+        return rows, True
+    except VciError as exc:
+        report(f"VCI lỗi ({exc}) — quay về vnstock.")
+        if symbols:
+            return [(c.upper(), c.upper(), None) for c in symbols], False
+        listing = _with_retry(
+            lambda: screener.fetch_list("VN30", "market_cap", "desc"), report)
+        return [(r.symbol, r.name, r) for r in listing.rows], False
+
+
+def _news_doc_text(symbol: str, use_vci: bool) -> str:
+    """Nội dung doc tin cho một mã. Ưu tiên VCI, hỏng thì rơi về vnstock feed."""
+    if use_vci:
+        try:
+            return _news_text_vci(symbol, vci_direct.news(symbol, days=180, size=30))
+        except VciError:
+            pass
+    try:
+        return _news_text_feed(feed.fetch_news(symbol))
+    except ProviderError:
+        return ""
 
 
 def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
               report: Reporter, skip_existing: bool = True) -> str:
     """Chạy trọn một lần lập chỉ mục (đồng bộ). Trả thông điệp kết thúc.
 
-    `report(message)` được gọi ở mỗi bước để bên ngoài hiển thị/ghi tiến độ.
-    Tự mở/đóng một DB session riêng (an toàn cả trong worker Celery lẫn CLI).
-
-    `skip_existing=True`: bỏ qua mã đã có tin (`news:*`) → chạy lại thì RESUME từ
-    chỗ dừng thay vì làm lại từ đầu (quan trọng vì vnai có thể GIẾT tiến trình khi
-    chạm trần request, để job dở dang).
+    `skip_existing=True` → bỏ qua mã đã có tin (`news:*`) để chạy lại thì RESUME.
     """
     db = SessionLocal()
     total = 0
     try:
-        if symbols:
-            rows = [(code.upper(), code.upper(), None) for code in symbols]
-        else:
-            listing = _with_retry(
-                lambda: screener.fetch_list("VN30", "market_cap", "desc"), report)
-            rows = [(r.symbol, r.name, r) for r in listing.rows]
-
+        rows, use_vci = _load_rows(symbols, report)
         done = store.existing_source_keys(db, "news:") if skip_existing else set()
-        report(f"Bắt đầu lập chỉ mục {len(rows)} mã (bỏ qua {len(done)} mã đã có)…")
+        report(f"Bắt đầu lập chỉ mục {len(rows)} mã "
+               f"({'VCI trực tiếp' if use_vci else 'vnstock'}; bỏ qua {len(done)} mã đã có)…")
+
         for index, (symbol, name, row) in enumerate(rows, start=1):
             if include_news and skip_existing and f"news:{symbol}" in done:
                 report(f"Bỏ qua {index}/{len(rows)} {symbol} (đã lập chỉ mục).")
                 continue
+
             docs: list[store.DocInput] = []
-            if row is not None:  # tóm tắt từ bảng giá rổ — 0 request thêm
+            if row is not None:
                 docs.append({
                     "source_key": f"summary:{symbol}", "doc_type": "summary", "ticker": symbol,
                     "title": f"Tổng quan {symbol} — {name}", "content": _summary_text(row),
@@ -163,17 +185,23 @@ def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
             if deep:
                 if (doc := _analysis_doc(symbol, name, report)):
                     docs.append(doc)
-                _throttle()
+                _throttle()  # analyze() vẫn qua vnstock → luôn giãn cách
             if include_news:
-                if (doc := _news_doc(symbol, name, report)):
-                    docs.append(doc)
-                _throttle()
+                if (text := _news_doc_text(symbol, use_vci)):
+                    docs.append({
+                        "source_key": f"news:{symbol}", "doc_type": "news", "ticker": symbol,
+                        "title": f"Tin tức {symbol}", "content": text,
+                        "meta": {"name": name}, "embedding": [],
+                    })
+                if not use_vci:  # chỉ giãn cách khi phải dùng vnstock
+                    _throttle()
 
             total += _embed_and_store(db, docs)
             report(f"Đã xử lý {index}/{len(rows)} mã ({total} đoạn).")
-        done = f"Hoàn tất: {total} đoạn văn bản cho {len(rows)} mã."
-        report(done)
-        return done
+
+        done_msg = f"Hoàn tất: {total} đoạn văn bản cho {len(rows)} mã."
+        report(done_msg)
+        return done_msg
     finally:
         db.close()
 

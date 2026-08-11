@@ -36,12 +36,14 @@ def answer_question(db: Session, question: str, ticker: Optional[str] = None) ->
     hits = store.search(db, query_vector, settings.rag_top_k, ticker=ticker)
 
     if not hits:
-        msg = (f"Chưa có dữ liệu đã lập chỉ mục cho {ticker}. " if ticker
-               else "Kho dữ liệu chưa được lập chỉ mục. ")
-        return ChatResponse(
-            answer=msg + "Hãy bấm 'Lập chỉ mục' (cần đăng nhập) để nạp dữ liệu VN30 và tin tức.",
-            citations=[],
-        )
+        if ticker:
+            answer = (f"Chưa có dữ liệu về {ticker}. Hãy mở màn Phân tích mã {ticker} một lần — "
+                      "trợ lý sẽ tự học mã này ngay sau đó. (Hoặc dùng nút 'Lập chỉ mục' ở "
+                      "trang Trợ lý để nạp cả rổ VN30.)")
+        else:
+            answer = ("Kho dữ liệu chưa được lập chỉ mục. Vào trang Trợ lý (💬) rồi bấm "
+                      "'Lập chỉ mục VN30 + tin', hoặc cứ phân tích một mã bất kỳ để trợ lý học dần.")
+        return ChatResponse(answer=answer, citations=[])
 
     #  Ghép ngữ cảnh có đánh số để Gemini có thể dẫn nguồn [1], [2]…
     context_blocks = []
