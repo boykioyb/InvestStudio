@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { ChevronDown, ChevronUp, List, MessageCircle, Search, Star } from 'lucide-vue-next'
 import type { AnalyzeOptions, QualitativeOption, SourceOption } from '~/types/stock'
 
 const { data, pending, error, progress, analyze } = useStockAnalysis()
+
+//  Chia sẻ mã đang xem cho trợ lý nổi (ChatWidget) để hỏi đúng ngữ cảnh mã đó.
+const activeTicker = useActiveTicker()
+watch(() => data.value?.ticker, (code) => { activeTicker.value = code || '' })
 
 const ticker = ref('')
 const showAdvanced = ref(false)
@@ -74,11 +79,27 @@ function pick(code: string) {
   submit()
 }
 
-//  Mở từ trang Danh sách mã (/?ma=FPT) thì phân tích ngay, khỏi gõ lại.
+//  Khởi tạo màn hình:
+//   1) Có ?ma=FPT (mở từ Danh sách/Theo dõi) → phân tích ngay mã đó.
+//   2) Không có → nếu đã đăng nhập và có mã theo dõi, tự phân tích MÃ GẦN NHẤT.
+//   3) Chưa đăng nhập / chưa theo dõi mã nào → giữ nguyên màn trống.
 const route = useRoute()
-onMounted(() => {
+const { isLoggedIn, ensureLoaded } = useAuth()
+const { items: watchItems, loaded: watchLoaded, load: loadWatchlist } = useWatchlist()
+
+onMounted(async () => {
   const code = String(route.query.ma || '').trim().toUpperCase()
-  if (code) pick(code)
+  if (code) {
+    pick(code)
+    return
+  }
+
+  await ensureLoaded()
+  if (!isLoggedIn.value) return
+  if (!watchLoaded.value) await loadWatchlist()
+  //  Danh sách trả về đã sắp theo created_at giảm dần → phần tử đầu là mã mới theo dõi nhất.
+  const recent = watchItems.value[0]
+  if (recent) pick(recent.ticker)
 })
 
 useHead({
@@ -94,7 +115,7 @@ useHead({
   <div class="app">
     <!-- ---------- Thanh trên: tiêu đề + tìm kiếm + tùy chọn ---------- -->
     <header class="bar">
-      <h1 class="brand">🔎 Phân tích mã</h1>
+      <h1 class="brand"><Search /> Phân tích mã</h1>
 
       <form class="search" @submit.prevent="submit">
         <input
@@ -113,9 +134,9 @@ useHead({
         </button>
       </form>
 
-      <NuxtLink to="/danh-sach" class="chip nav">📋 Danh sách mã</NuxtLink>
-      <NuxtLink to="/theo-doi" class="chip nav">⭐ Theo dõi</NuxtLink>
-      <NuxtLink to="/tro-ly" class="chip nav">💬 Trợ lý</NuxtLink>
+      <NuxtLink to="/danh-sach" class="chip nav"><List /> Danh sách mã</NuxtLink>
+      <NuxtLink to="/theo-doi" class="chip nav"><Star /> Theo dõi</NuxtLink>
+      <NuxtLink to="/tro-ly" class="chip nav"><MessageCircle /> Trợ lý</NuxtLink>
       <FavoriteButton v-if="data?.ticker" :ticker="data.ticker" />
 
       <div class="quick">
@@ -137,8 +158,10 @@ useHead({
         :aria-expanded="showAdvanced"
         @click="showAdvanced = !showAdvanced"
       >
-        {{ showAdvanced ? '▴ Tùy chọn' : '▾ Tùy chọn' }}
+        <ChevronUp v-if="showAdvanced" /><ChevronDown v-else /> Tùy chọn
       </button>
+
+      <AuthNav />
     </header>
 
     <!-- ---------- Tùy chọn nâng cao: thả xuống, không đẩy bố cục ---------- -->

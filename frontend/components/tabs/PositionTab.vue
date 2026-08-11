@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { X } from 'lucide-vue-next'
+
 import DatePicker from '~/components/DatePicker.vue'
 
 /** Tab Vị thế: nhập các đợt mua → đối chiếu giá vốn với điểm số và giá thị trường. */
@@ -78,7 +80,7 @@ function submitLot() {
           <span class="hint">{{ viDate(l.date) }}</span>
           <span class="tnum lot-cost">{{ num(l.price * l.quantity, 0) }} nghìn đ</span>
           <button type="button" class="del" :aria-label="`Xóa đợt mua thứ ${i + 1}`"
-                  @click="removeLot(ticker, i)">✕</button>
+                  @click="removeLot(ticker, i)"><X /></button>
         </div>
       </div>
       <p v-else class="hint">Chưa có đợt mua nào.</p>

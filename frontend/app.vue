@@ -4,4 +4,6 @@
 
 <template>
   <NuxtPage />
+  <!-- Trợ lý RAG nổi ở góc — dùng được ở mọi trang, tự bắt mã đang xem. -->
+  <ChatWidget />
 </template>

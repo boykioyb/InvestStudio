@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Star } from 'lucide-vue-next'
 import type { BestHorizon, Decision, Horizon } from '~/types/stock'
 
 /** Cột phải: hợp khung thời gian nào + nếu mua thì làm thế nào. */
@@ -19,7 +20,7 @@ const { textClass, fillClass } = useLevel()
       <div v-for="h in horizons" :key="h.key" class="hz" :class="{ best: h.key === bestHorizon?.key }">
         <div class="hz-top">
           <span class="hz-label">
-            <span v-if="h.key === bestHorizon?.key" class="star" aria-label="phù hợp nhất">★</span>
+            <Star v-if="h.key === bestHorizon?.key" class="star" aria-label="phù hợp nhất" fill="currentColor" />
             <span class="hz-label-text">{{ h.label }}</span>
             <!-- Chỉ hiện khi máy chủ có gửi lời giải thích. -->
             <InfoPopover :explain="h.explain" :label="h.label" />

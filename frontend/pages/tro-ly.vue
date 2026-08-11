@@ -4,6 +4,8 @@
  * Hỏi bằng ngôn ngữ tự nhiên; câu trả lời do backend tổng hợp từ dữ liệu VN30 +
  * tin tức đã lập chỉ mục, kèm nguồn để người dùng tự kiểm chứng.
  */
+import { MessageCircle, Search, Star } from 'lucide-vue-next'
+
 const { isLoggedIn, ensureLoaded } = useAuth()
 const { turns, pending, status, ask, fetchStatus, reindex } = useChat()
 
@@ -52,10 +54,10 @@ async function startReindex(): Promise<void> {
 <template>
   <div class="wrap">
     <header class="head">
-      <h1>💬 Trợ lý hỏi–đáp</h1>
+      <h1><MessageCircle /> Trợ lý hỏi–đáp</h1>
       <div class="row nav">
-        <NuxtLink to="/" class="btn">🔎 Phân tích</NuxtLink>
-        <NuxtLink to="/theo-doi" class="btn">⭐ Theo dõi</NuxtLink>
+        <NuxtLink to="/" class="btn"><Search /> Phân tích</NuxtLink>
+        <NuxtLink to="/theo-doi" class="btn"><Star /> Theo dõi</NuxtLink>
       </div>
     </header>
 

@@ -6,6 +6,8 @@
  * nhập (kèm đường dẫn quay lại). Mọi thao tác dữ liệu đều qua composable —
  * thành phần này chỉ hiển thị và gọi hàm.
  */
+import { Star } from 'lucide-vue-next'
+
 const props = defineProps<{ ticker: string }>()
 
 const { isLoggedIn, ensureLoaded } = useAuth()
@@ -46,7 +48,7 @@ async function toggle(): Promise<void> {
     :title="active ? `Bỏ theo dõi ${code}` : `Theo dõi ${code}`"
     @click="toggle"
   >
-    <span aria-hidden="true">{{ active ? '★' : '☆' }}</span>
+    <Star aria-hidden="true" :fill="active ? 'currentColor' : 'none'" />
     <span class="lb">{{ active ? 'Đang theo dõi' : 'Theo dõi' }}</span>
   </button>
 </template>

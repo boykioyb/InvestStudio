@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { List, Search } from 'lucide-vue-next'
 import type { ScreenerColumn, ScreenerRow } from '~/types/stock'
 
 /**
@@ -59,7 +60,7 @@ function analyze(row: ScreenerRow): void {
 <template>
   <div class="app">
     <header class="bar">
-      <h1 class="brand">📋 Danh sách mã</h1>
+      <h1 class="brand"><List /> Danh sách mã</h1>
 
       <nav class="chips" aria-label="Chọn rổ cổ phiếu">
         <button
@@ -76,7 +77,7 @@ function analyze(row: ScreenerRow): void {
         </button>
       </nav>
 
-      <NuxtLink to="/" class="chip link">🔎 Phân tích mã</NuxtLink>
+      <NuxtLink to="/" class="chip link"><Search /> Phân tích mã</NuxtLink>
     </header>
 
     <p v-if="error" class="msg error" role="alert">{{ error }}</p>

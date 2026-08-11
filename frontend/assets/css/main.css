@@ -35,6 +35,14 @@
   box-sizing: border-box;
 }
 
+/* Icon Lucide: cỡ theo chữ, canh giữa dòng — một nơi khai báo cho toàn app. */
+.lucide {
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.18em;
+  flex: none;
+}
+
 /* ==========================================================================
    Thanh cuộn dùng chung
    Mặc định của trình duyệt là thanh sáng, chọi hẳn với nền tối và trông như

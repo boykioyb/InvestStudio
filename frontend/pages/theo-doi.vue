@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { List, MessageCircle, Search, Star, Target, TrendingUp } from 'lucide-vue-next'
+
 /** Trang danh sách mã theo dõi. Cần đăng nhập; chưa đăng nhập thì chuyển hướng. */
 const { user, isLoggedIn, ensureLoaded } = useAuth()
 const { items, pending, error, load, add, remove } = useWatchlist()
@@ -41,11 +43,11 @@ function fmtPrice(value: number | null): string {
 <template>
   <div class="wrap">
     <header class="head">
-      <h1>⭐ Mã đang theo dõi</h1>
+      <h1><Star /> Mã đang theo dõi</h1>
       <div class="row nav">
-        <NuxtLink to="/" class="btn">🔎 Phân tích</NuxtLink>
-        <NuxtLink to="/danh-sach" class="btn">📋 Danh sách</NuxtLink>
-        <NuxtLink to="/tro-ly" class="btn">💬 Trợ lý</NuxtLink>
+        <NuxtLink to="/" class="btn"><Search /> Phân tích</NuxtLink>
+        <NuxtLink to="/danh-sach" class="btn"><List /> Danh sách</NuxtLink>
+        <NuxtLink to="/tro-ly" class="btn"><MessageCircle /> Trợ lý</NuxtLink>
       </div>
     </header>
 
@@ -66,7 +68,7 @@ function fmtPrice(value: number | null): string {
     <p v-if="pending" class="note">Đang tải danh sách…</p>
 
     <p v-else-if="!items.length" class="msg">
-      Chưa có mã nào. Thêm ở trên, hoặc bấm ⭐ ngay trong màn hình phân tích của một mã.
+      Chưa có mã nào. Thêm ở trên, hoặc bấm <Star /> ngay trong màn hình phân tích của một mã.
     </p>
 
     <div v-else class="list">
@@ -75,8 +77,8 @@ function fmtPrice(value: number | null): string {
           <button type="button" class="ticker" @click="analyze(item.ticker)">{{ item.ticker }}</button>
           <p v-if="item.note" class="note">{{ item.note }}</p>
           <p class="targets">
-            <span v-if="item.target_price !== null">🎯 Giá mục tiêu: <b>{{ fmtPrice(item.target_price) }}</b></span>
-            <span v-if="item.target_score !== null">📈 Điểm mục tiêu: <b>{{ item.target_score }}/100</b></span>
+            <span v-if="item.target_price !== null"><Target /> Giá mục tiêu: <b>{{ fmtPrice(item.target_price) }}</b></span>
+            <span v-if="item.target_score !== null"><TrendingUp /> Điểm mục tiêu: <b>{{ item.target_score }}/100</b></span>
           </p>
         </div>
         <div class="right row">
