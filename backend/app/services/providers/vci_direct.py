@@ -156,6 +156,92 @@ def ohlcv(symbol: str, days: int = 180) -> list[dict]:
     return out
 
 
+_IQ_COMPANY = f"{_IQ}/v1/company"
+_handshaken = False
+
+
+def _ensure_handshake() -> None:
+    """Các endpoint tài chính cần cookie từ /priceboard — lấy một lần rồi giữ."""
+    global _handshaken
+    if _handshaken:
+        return
+    try:
+        _client.get("https://trading.vietcap.com.vn/priceboard", timeout=15.0)
+    except httpx.HTTPError:
+        pass
+    _handshaken = True
+
+
+def _fnum(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fin_years(base: str, section: str) -> list[dict]:
+    data = (_request("GET", f"{base}/financial-statement", params={"section": section}) or {})
+    return ((data.get("data") or {}).get("years")) or []
+
+
+def _profit_growth(base: str) -> Optional[float]:
+    """Tăng trưởng LN sau thuế (% YoY) — 2 năm gần nhất (isa20, fallback isa22)."""
+    years = sorted(_fin_years(base, "INCOME_STATEMENT"), key=lambda r: r.get("yearReport") or 0)
+    if len(years) < 2:
+        return None
+    prof = [(_fnum(r.get("isa20")) if _fnum(r.get("isa20")) is not None else _fnum(r.get("isa22")))
+            for r in years]
+    cur, prev = prof[-1], prof[-2]
+    if cur is None or not prev:
+        return None
+    return round((cur - prev) / abs(prev) * 100, 1)
+
+
+def _ocf_sign(base: str) -> Optional[str]:
+    """'+' dương nhiều năm · '±' thất thường · '-' âm kỳ gần nhất (cfa18)."""
+    years = sorted(_fin_years(base, "CASH_FLOW"), key=lambda r: r.get("yearReport") or 0)
+    vals = [v for v in (_fnum(r.get("cfa18")) for r in years) if v is not None][::-1]
+    if not vals:
+        return None
+    if vals[0] <= 0:
+        return "-"
+    return "+" if all(v > 0 for v in vals) else "±"
+
+
+def fundamentals(symbol: str) -> dict:
+    """Chỉ số cơ bản CHUẨN từ VCI (thay Finance của vnstock, vốn đọc nhầm cột).
+
+    ROE/biên/D-E/cổ tức lấy **năm gần nhất** (RATIO_YEAR, nhãn năm đúng); P/E-P/B
+    lấy **TTM mới nhất** (phản ánh giá hiện tại); tăng trưởng + dấu OCF từ BCTC.
+    Trả dict khớp các trường FundamentalData; thiếu số nào thì None.
+    """
+    _ensure_handshake()
+    base = f"{_IQ_COMPANY}/{symbol.upper()}"
+    rows = (_request("GET", f"{base}/statistics-financial") or {}).get("data") or []
+    years = [r for r in rows if r.get("ratioType") == "RATIO_YEAR"]
+    #  Loại các dòng TTM bị dán nhãn năm rác (year < 2020) để lấy đúng kỳ mới nhất.
+    ttms = [r for r in rows if r.get("ratioType") == "RATIO_TTM" and int(r.get("year") or 0) >= 2020]
+
+    out: dict = {"growth": None, "roe": None, "margin": None, "de": None,
+                 "ocf": None, "pe": None, "pb": None, "div": None}
+    if years:
+        a = max(years, key=lambda r: int(r.get("year") or 0))
+        roe, margin = _fnum(a.get("roe")), _fnum(a.get("afterTaxProfitMargin"))
+        de, div = _fnum(a.get("debtPerEquity")), _fnum(a.get("dividendYield"))
+        out["roe"] = round(roe * 100, 1) if roe is not None else None
+        out["margin"] = round(margin * 100, 1) if margin is not None else None
+        out["de"] = round(de, 2) if de is not None else None
+        out["div"] = round(div * 100, 2) if div is not None else None
+    if ttms:
+        t = max(ttms, key=lambda r: (int(r.get("year") or 0), r.get("quarter") or 0))
+        pe, pb = _fnum(t.get("pe")), _fnum(t.get("pb"))
+        out["pe"] = round(pe, 1) if pe is not None else None
+        out["pb"] = round(pb, 2) if pb is not None else None
+    out["growth"] = _profit_growth(base)
+    out["ocf"] = _ocf_sign(base)
+    return out
+
+
 def news(symbol: str, days: int = 180, size: int = 50) -> list[dict]:
     """Tin tức của một mã. Giàu hơn vnstock: kèm nguồn, link bài gốc, tóm tắt."""
     to = date.today()
