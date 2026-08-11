@@ -2,8 +2,8 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
 pydantic-settings>=2.6
-vnstock>=4.0.5
-certifi
+httpx>=0.27               # gọi thẳng API VCI/Vietcap (đã CAI vnstock/vnai)
+certifi                   # SSL bundle cho provider CafeF (urllib)
 pytest>=8.0
 
 # ── Tài khoản người dùng + lưu trữ (login/đăng ký, mã yêu thích) ──────────────

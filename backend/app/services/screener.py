@@ -231,29 +231,30 @@ def sort_rows(rows: list[ScreenerRow], sort: str, order: str) -> list[ScreenerRo
 
 def fetch_list(group: str, sort: str, order: str) -> ScreenerList:
     """Danh sách mã của một rổ, đã sắp xếp sẵn. Raise ProviderError nếu rỗng."""
-    try:
-        from vnstock import Listing, Trading
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+    #  Đã CAI vnstock: rổ + bảng giá + tên công ty lấy thẳng VCI (không qua vnai).
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
 
     try:
-        symbols = [str(s).strip().upper() for s in Listing(source="VCI").symbols_by_group(group)]
-    except Exception as exc:
+        symbols = vci_direct.constituents(group)
+    except VciError as exc:
         raise ProviderError(f"Không lấy được danh sách mã của rổ {group}: {exc}") from exc
 
-    symbols = [s for s in symbols if s]
     if not symbols:
         raise ProviderError(f"Rổ {group} không có mã nào.")
 
     try:
-        frame = Trading(source="VCI").price_board(symbols)
-    except Exception as exc:
+        records = vci_direct.price_board(symbols)
+        directory = vci_direct.symbol_directory()  # tên + sàn cho cả rổ (1 request)
+    except VciError as exc:
         raise ProviderError(f"Không lấy được bảng giá của rổ {group}: {exc}") from exc
 
-    if frame is None or len(frame) == 0:
-        raise ProviderError(f"Nguồn không trả bảng giá cho rổ {group}.")
-
-    rows = [row for row in (_row(record) for record in _flatten(frame)) if row]
+    rows = []
+    for record in records:
+        info = directory.get(record.get("symbol")) or {}
+        enriched = {**record, "organ_name": info.get("name"), "exchange": info.get("exchange")}
+        if (row := _row(enriched)):
+            rows.append(row)
     if not rows:
         raise ProviderError(f"Rổ {group} không có dòng dữ liệu hợp lệ.")
 

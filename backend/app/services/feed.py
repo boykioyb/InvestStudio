@@ -17,9 +17,8 @@ from urllib.parse import quote_plus
 from app.schemas.stock import CorporateActions, EventItem, NewsFeed, NewsItem, NewsLink
 from app.services.providers.base import ProviderError
 
-_NEWS_NOTE = ("Nguồn dữ liệu chỉ cung cấp TIÊU ĐỀ và ngày công bố — không có URL bài viết. "
-              "Các nút bên dưới mỗi tin là link TÌM KIẾM theo đúng tiêu đề, không phải "
-              "đường dẫn tới bài gốc.")
+_NEWS_NOTE = ("Tin nào có 'Đọc bài gốc' là link tới bản gốc do nguồn cung cấp; các nút "
+              "'Tìm trên…' là link TÌM KIẾM theo tiêu đề (dự phòng khi không có bài gốc).")
 
 
 def _search_links(ticker: str, title: str) -> list[NewsLink]:
@@ -62,63 +61,54 @@ def _f(value: Any) -> Optional[float]:
         return None
 
 
-def _company(ticker: str):
-    try:
-        from vnstock import Company
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
-    return Company(symbol=ticker.upper().strip(), source="VCI")
-
-
-def _event_items(frame) -> list[EventItem]:
-    if frame is None or len(frame) == 0:
-        return []
+def _event_items(events: list[dict]) -> list[EventItem]:
+    """Ánh xạ event dict của vci_direct → EventItem (đã sẵn field khớp)."""
     items: list[EventItem] = []
-    for record in frame.to_dict("records"):
-        name = _clean(record.get("event_name_vi") or record.get("event_name_en"))
+    for e in events:
+        name = _clean(e.get("name"))
         if not name:
             continue
-        ratio = _f(record.get("exercise_ratio"))
         items.append(EventItem(
             name=name,
-            title=_clean(record.get("event_title_vi") or record.get("event_title_en")),
-            date=_date(record.get("public_date") or record.get("display_date1")),
-            #  Nguồn trả tỷ lệ dạng 0–1 → đổi sang phần trăm cho dễ đọc.
-            ratio=round(ratio * 100, 2) if ratio is not None else None,
-            value_per_share=_f(record.get("value_per_share")),
-            record_date=_date(record.get("record_date")),
-            exright_date=_date(record.get("exright_date")),
-            payout_date=_date(record.get("payout_date")),
-            action=_clean(record.get("action_type_vi")),
+            title=_clean(e.get("title")),
+            date=_date(e.get("date")),
+            ratio=e.get("ratio"),
+            value_per_share=e.get("value_per_share"),
+            record_date=_date(e.get("record_date")),
+            exright_date=_date(e.get("exright_date")),
+            payout_date=_date(e.get("payout_date")),
+            action=_clean(e.get("action")),
         ))
     return sorted(items, key=lambda e: e.date, reverse=True)
 
 
 def fetch_news(ticker: str) -> NewsFeed:
-    """Tin công bố + sự kiện doanh nghiệp gần đây."""
+    """Tin công bố + sự kiện doanh nghiệp gần đây (lấy thẳng VCI, không qua vnstock)."""
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
+
     ticker = ticker.upper().strip()
-    company = _company(ticker)
 
     def safe(getter):
         try:
             return getter()
-        except Exception:
+        except VciError:
             return None
 
     news: list[NewsItem] = []
-    frame = safe(company.news)
-    if frame is not None and len(frame):
-        for record in frame.to_dict("records"):
-            title = _clean(record.get("news_title") or record.get("friendly_title"))
-            if title:
-                news.append(NewsItem(
-                    title=title,
-                    date=_date(record.get("public_date")),
-                    links=_search_links(ticker, title),
-                ))
-        news.sort(key=lambda n: n.date, reverse=True)
+    for item in (safe(lambda: vci_direct.news(ticker, days=365, size=50)) or []):
+        title = _clean(item.get("title"))
+        if not title:
+            continue
+        links: list[NewsLink] = []
+        #  VCI có link bài gốc → dùng thẳng; kèm luôn link tìm kiếm dự phòng.
+        if item.get("link"):
+            links.append(NewsLink(label="Đọc bài gốc", url=item["link"], kind="official"))
+        links += _search_links(ticker, title)
+        news.append(NewsItem(title=title, date=_date(item.get("date")), links=links))
+    news.sort(key=lambda n: n.date, reverse=True)
 
-    events = _event_items(safe(company.events))
+    events = _event_items(safe(lambda: vci_direct.events(ticker)) or [])
 
     if not news and not events:
         raise ProviderError(f"Không có tin tức hay sự kiện nào cho {ticker}.")
@@ -131,12 +121,13 @@ def fetch_news(ticker: str) -> NewsFeed:
 
 def fetch_corporate_actions(ticker: str) -> CorporateActions:
     """Sự kiện liên quan tới vốn và quyền lợi cổ đông, chia theo loại."""
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
+
     ticker = ticker.upper().strip()
     try:
-        events = _event_items(_company(ticker).events())
-    except ProviderError:
-        raise
-    except Exception as exc:
+        events = _event_items(vci_direct.events(ticker))
+    except VciError as exc:
         raise ProviderError(f"Không lấy được sự kiện doanh nghiệp của {ticker}: {exc}") from exc
 
     if not events:

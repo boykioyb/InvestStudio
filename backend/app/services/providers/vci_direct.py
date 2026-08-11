@@ -242,20 +242,161 @@ def fundamentals(symbol: str) -> dict:
     return out
 
 
+def board(symbol: str) -> dict:
+    """Bảng giá đầy đủ MỘT mã (giá, bước giá 3 mức, khối ngoại, room) — 1 request.
+
+    Trả số THÔ (đồng / cp / đồng) — tầng market.py tự quy đổi đơn vị như cũ.
+    """
+    recs = _request("POST", f"{_TRADING}/price/symbols/getList",
+                    json={"symbols": [symbol.upper()]})
+    if not recs:
+        return {}
+    r = recs[0]
+    li, mp, ba = r.get("listingInfo") or {}, r.get("matchPrice") or {}, r.get("bidAsk") or {}
+    return {
+        "ref": li.get("refPrice"), "ceiling": li.get("ceiling"), "floor": li.get("floor"),
+        "open": mp.get("openPrice"), "high": mp.get("highest"), "low": mp.get("lowest"),
+        "match_price": mp.get("matchPrice"), "match_vol": mp.get("matchVol"),
+        "avg_price": mp.get("avgMatchPrice"),
+        "accumulated_volume": mp.get("accumulatedVolume"),
+        "foreign_buy_volume": mp.get("foreignBuyVolume"),
+        "foreign_sell_volume": mp.get("foreignSellVolume"),
+        "foreign_buy_value": mp.get("foreignBuyValue"),
+        "foreign_sell_value": mp.get("foreignSellValue"),
+        "current_room": mp.get("currentRoom"), "total_room": mp.get("totalRoom"),
+        "bids": [(b.get("price"), b.get("volume")) for b in (ba.get("bidPrices") or [])[:3]],
+        "asks": [(a.get("price"), a.get("volume")) for a in (ba.get("askPrices") or [])[:3]],
+        "sending_time": mp.get("sendingTime") or li.get("sendingTime") or "",
+    }
+
+
 def company_profile(symbol: str) -> dict:
     """Tên + ngành + vài chỉ số hồ sơ. `sector` để TIẾNG ANH vì benchmark P/E của
     analyzer khớp theo key không dấu (technology/bank…); `sector_vn` để hiển thị."""
     _ensure_handshake()
     d = (_request("GET", f"{_IQ_COMPANY}/details", params={"ticker": symbol.upper()}) or {}).get("data") or {}
+    #  Trả nguyên field thô (camelCase) + vài khóa chuẩn hóa cho tiện dùng.
     return {
+        **d,
         "name": d.get("viOrganName") or d.get("viOrganShortName") or symbol.upper(),
         "sector": d.get("sector") or "",
         "sector_vn": d.get("sectorVn") or "",
-        "market_cap": d.get("marketCap"),
-        "current_price": d.get("currentPrice"),
-        "target_price": d.get("targetPrice"),
-        "rating": d.get("rating"),
     }
+
+
+def shareholders(symbol: str) -> list[dict]:
+    """Danh sách cổ đông + người nội bộ (cùng nguồn). percentage là phân số 0–1."""
+    _ensure_handshake()
+    rows = (_request("GET", f"{_IQ_COMPANY}/{symbol.upper()}/shareholder") or {}).get("data") or []
+    return [{
+        "name": r.get("ownerName") or r.get("ownerNameEn") or "",
+        "position": r.get("positionName") or "",
+        "quantity": _fnum(r.get("quantity")),
+        "percent": _fnum(r.get("percentage")),
+        "type": r.get("ownerType") or "",
+    } for r in rows if (r.get("ownerName") or r.get("ownerNameEn"))]
+
+
+def relationships(symbol: str) -> dict:
+    """{subsidiaries:[...], affiliates:[...]} — công ty con và liên kết."""
+    _ensure_handshake()
+    d = (_request("GET", f"{_IQ_COMPANY}/{symbol.upper()}/relationship") or {}).get("data") or {}
+
+    def _map(items):
+        return [{
+            "name": r.get("rightOrganNameVi") or r.get("rightOrganNameEn") or "",
+            "code": r.get("rightTicker") or r.get("rightOrganCode") or "",
+            "percent": _fnum(r.get("ownedPercentage")),
+        } for r in (items or []) if (r.get("rightOrganNameVi") or r.get("rightOrganNameEn"))]
+
+    return {"subsidiaries": _map(d.get("subsidiaries")), "affiliates": _map(d.get("affiliates"))}
+
+
+def events(symbol: str, days: int = 540, size: int = 20) -> list[dict]:
+    """Sự kiện doanh nghiệp (cổ tức, phát hành, nội bộ…).
+
+    LƯU Ý: endpoint events có trần page size kỳ quặc — size lớn (≥50) lại trả
+    RỖNG; size=20 trả đủ. Đừng nâng size mà không đo lại.
+    """
+    _ensure_handshake()
+    to = date.today()
+    frm = to - timedelta(days=days)
+    data = _request("GET", f"{_IQ}/v1/events", params={
+        "ticker": symbol.upper(), "fromDate": frm.isoformat(), "toDate": to.isoformat(),
+        "page": 1, "size": size,
+    })
+    content = ((data or {}).get("data") or {}).get("content") or []
+    out = []
+    for e in content:
+        name = e.get("eventNameVi") or e.get("eventNameEn") or ""
+        if not name:
+            continue
+        ratio = _fnum(e.get("exerciseRatio") or e.get("ratio"))
+        out.append({
+            "name": name,
+            "title": e.get("eventTitleVi") or e.get("eventTitleEn") or "",
+            "date": (e.get("publicDate") or e.get("displayDate1") or "")[:10],
+            "ratio": round(ratio * 100, 2) if ratio is not None else None,
+            "value_per_share": _fnum(e.get("valuePerShare")),
+            "record_date": (e.get("recordDate") or "")[:10],
+            "exright_date": (e.get("exrightDate") or e.get("exerciseDate") or "")[:10],
+            "payout_date": (e.get("paymentDate") or e.get("issueDate") or "")[:10],
+            "action": e.get("actionTypeVi") or "",
+        })
+    return out
+
+
+def _statement_labels(base: str) -> dict:
+    """Bản đồ field-code → nhãn tiếng Việt cho một mã (dùng chung 3 báo cáo)."""
+    data = (_request("GET", f"{base}/financial-statement/metrics") or {}).get("data") or {}
+    labels: dict[str, str] = {}
+    for section in data.values():
+        for f in section if isinstance(section, list) else []:
+            field, title = f.get("field"), (f.get("titleVi") or f.get("titleEn"))
+            if field and title:
+                labels[field.lower()] = title
+    return labels
+
+
+def financial_statement(symbol: str, section: str, periods: int = 4) -> dict:
+    """Một báo cáo (INCOME_STATEMENT|BALANCE_SHEET|CASH_FLOW): {periods:[năm], rows:[{label,values}]}.
+
+    Nhãn lấy thẳng từ API (titleVi). Trả số THÔ — tầng details tự quy tỷ đồng.
+    """
+    _ensure_handshake()
+    base = f"{_IQ_COMPANY}/{symbol.upper()}"
+    years = sorted(_fin_years(base, section), key=lambda r: r.get("yearReport") or 0, reverse=True)
+    years = years[:periods]
+    if not years:
+        return {"periods": [], "rows": []}
+    labels = _statement_labels(base)
+    #  Field codes theo thứ tự trong báo cáo (bỏ cột hành chính).
+    skip = {"organcode", "ticker", "createdate", "updatedate", "yearreport",
+            "lengthreport", "publicdate"}
+    codes = [k for k in years[0].keys() if k.lower() not in skip]
+    period_labels = [str(y.get("yearReport")) for y in years]
+    rows = []
+    for code in codes:
+        vals = [_fnum(y.get(code)) for y in years]
+        if any(v is not None for v in vals):
+            rows.append({"label": labels.get(code.lower(), code), "values": vals})
+    return {"periods": period_labels, "rows": rows}
+
+
+def ratios_latest(symbol: str) -> dict:
+    """{field: value} của kỳ NĂM gần nhất (+ P/E, P/B từ TTM) cho tab Chỉ số."""
+    _ensure_handshake()
+    rows = (_request("GET", f"{_IQ_COMPANY}/{symbol.upper()}/statistics-financial") or {}).get("data") or []
+    years = [r for r in rows if r.get("ratioType") == "RATIO_YEAR"]
+    ttms = [r for r in rows if r.get("ratioType") == "RATIO_TTM" and int(r.get("year") or 0) >= 2020]
+    out: dict = {}
+    if years:
+        out.update({k: _fnum(v) for k, v in max(years, key=lambda r: int(r.get("year") or 0)).items()
+                    if isinstance(v, (int, float))})
+    if ttms:
+        t = max(ttms, key=lambda r: (int(r.get("year") or 0), r.get("quarter") or 0))
+        out["pe"], out["pb"] = _fnum(t.get("pe")), _fnum(t.get("pb"))
+    return out
 
 
 def news(symbol: str, days: int = 180, size: int = 50) -> list[dict]:

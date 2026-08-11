@@ -51,36 +51,27 @@ def _price(value: Any) -> Optional[float]:
 # ── Tab Giao dịch ────────────────────────────────────────────────────────────
 def fetch_board(ticker: str) -> TradingBoard:
     """Ảnh chụp bảng giá của phiên hiện tại (giá, bước giá, khối ngoại)."""
-    try:
-        from vnstock import Trading
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+    #  Đã CAI vnstock: bảng giá lấy thẳng VCI (getList) — bid/ask + khối ngoại + room.
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
 
     ticker = ticker.upper().strip()
     try:
-        frame = Trading(symbol=ticker, source="VCI").price_board([ticker])
-    except Exception as exc:
+        row = vci_direct.board(ticker)
+    except VciError as exc:
         raise ProviderError(f"Không lấy được bảng giá của {ticker}: {exc}") from exc
 
-    if frame is None or len(frame) == 0:
+    if not row:
         raise ProviderError(f"Không có bảng giá cho {ticker}.")
 
-    #  Cột dạng MultiIndex ("match", "match_price") → gộp thành khóa phẳng.
-    row: dict[str, Any] = {}
-    record = frame.iloc[0]
-    for column in frame.columns:
-        key = column[-1] if isinstance(column, tuple) else column
-        row[str(key)] = record[column]
-
-    reference = _price(row.get("reference_price"))
+    reference = _price(row.get("ref"))
     match = _price(row.get("match_price"))
     change = round(match - reference, 2) if (match is not None and reference) else None
 
-    def levels(prefix: str) -> list[QuoteLevel]:
+    def levels(pairs: list) -> list[QuoteLevel]:
         result: list[QuoteLevel] = []
-        for i in (1, 2, 3):
-            price = _price(row.get(f"{prefix}_{i}_price"))
-            volume = _f(row.get(f"{prefix}_{i}_volume"))
+        for raw_price, raw_volume in pairs:
+            price, volume = _price(raw_price), _f(raw_volume)
             if price is not None or volume is not None:
                 result.append(QuoteLevel(price=price, volume=volume))
         return result
@@ -115,18 +106,18 @@ def fetch_board(ticker: str) -> TradingBoard:
         ticker=ticker,
         asof=str(row.get("sending_time") or "")[:19],
         reference=reference,
-        ceiling=_price(row.get("ceiling_price")),
-        floor=_price(row.get("floor_price")),
-        open=_price(row.get("open_price")),
-        high=_price(row.get("highest")),
-        low=_price(row.get("lowest")),
+        ceiling=_price(row.get("ceiling")),
+        floor=_price(row.get("floor")),
+        open=_price(row.get("open")),
+        high=_price(row.get("high")),
+        low=_price(row.get("low")),
         match_price=match,
         match_volume=_f(row.get("match_vol")),
-        avg_price=_price(row.get("avg_match_price")),
+        avg_price=_price(row.get("avg_price")),
         change=change,
         change_pct=round(change / reference * 100, 2) if (change is not None and reference) else None,
-        bids=levels("bid"),
-        asks=levels("ask"),
+        bids=levels(row.get("bids") or []),
+        asks=levels(row.get("asks") or []),
         foreign=foreign,
         note=("Ảnh chụp bảng giá. Giá quy về nghìn đồng. "
               + ("Phiên này chưa có giá khớp." if match is None

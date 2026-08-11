@@ -25,9 +25,54 @@ from app.services.providers.base import ProviderError
 _BILLION = 1_000_000_000
 
 _STATEMENTS: dict[str, tuple[str, str]] = {
-    "income": ("income_statement", "Kết quả kinh doanh"),
-    "balance": ("balance_sheet", "Cân đối kế toán"),
-    "cashflow": ("cash_flow", "Lưu chuyển tiền tệ"),
+    "income": ("INCOME_STATEMENT", "Kết quả kinh doanh"),
+    "balance": ("BALANCE_SHEET", "Cân đối kế toán"),
+    "cashflow": ("CASH_FLOW", "Lưu chuyển tiền tệ"),
+}
+
+#  Field camelCase của VCI → (nhãn tiếng Anh để gom nhóm, nhãn tiếng Việt để hiện).
+_RATIO_FIELD_MAP: dict[str, tuple[str, str]] = {
+    "pe": ("P/E", "P/E"), "pb": ("P/B", "P/B"), "ps": ("P/S", "P/S"),
+    "priceToCashFlow": ("Price/Cash Flow", "Giá/Dòng tiền"),
+    "evToEbitda": ("EV/EBITDA", "EV/EBITDA"),
+    "marketCap": ("Market Cap", "Vốn hóa"),
+    "numberOfSharesMktCap": ("Outstanding Shares (mil)", "Số CP lưu hành"),
+    "dividendYield": ("Dividend Yield (%)", "Tỷ suất cổ tức"),
+    "roe": ("ROE (%)", "ROE"), "roa": ("ROA (%)", "ROA"), "roic": ("ROIC", "ROIC"),
+    "grossMargin": ("Gross Margin (%)", "Biên LN gộp"),
+    "ebitMargin": ("EBIT Margin (%)", "Biên EBIT"),
+    "preTaxProfitMargin": ("Pre-tax Profit Margin (%)", "Biên LN trước thuế"),
+    "afterTaxProfitMargin": ("After-tax Profit Margin (%)", "Biên LN sau thuế"),
+    "ebit": ("EBIT", "EBIT"), "ebitda": ("EBITDA", "EBITDA"),
+    "cashRatio": ("Cash Ratio", "Thanh toán tiền mặt"),
+    "quickRatio": ("Quick Ratio", "Thanh toán nhanh"),
+    "currentRatio": ("Current Ratio", "Thanh toán hiện hành"),
+    "debtPerEquity": ("Debt/Equity", "Nợ/Vốn chủ"),
+    "debtToEquity": ("Debt to Equity", "Nợ trên vốn chủ"),
+    "financialLeverage": ("Financial Leverage", "Đòn bẩy tài chính"),
+    "ownersEquity": ("Owners Equity", "Vốn chủ sở hữu"),
+    "assetTurnover": ("Asset Turnover", "Vòng quay tài sản"),
+    "fixedAssetTurnover": ("Fixed Asset Turnover", "Vòng quay TSCĐ"),
+    "cashCycle": ("Cash Cycle", "Chu kỳ tiền"),
+    "daySaleOutstanding": ("Days Sales Outstanding", "Số ngày phải thu"),
+    "daysInventoryOutstanding": ("Days Inventory Outstanding", "Số ngày tồn kho"),
+    "daysPayableOutstanding": ("Days Payable Outstanding", "Số ngày phải trả"),
+    "netInterestMargin": ("Net Interest Margin", "Biên lãi thuần (NIM)"),
+    "ldrLoanDepositRatio": ("LDR (%)", "LDR"), "npl": ("NPL (%)", "Nợ xấu"),
+    "cir": ("CIR", "CIR"), "car": ("CAR", "CAR"),
+    "loansGrowth": ("Loans Growth (%)", "Tăng trưởng cho vay"),
+    "depositGrowth": ("Deposit Growth (%)", "Tăng trưởng tiền gửi"),
+    "casaRatio": ("CASA Ratio", "Tỷ lệ CASA"),
+    "loansLossReservesToNPLs": ("Loan Loss Reserves/NPLs", "DP rủi ro/Nợ xấu"),
+    "loansLossReserveToLoans": ("Loan Loss Reserve/Loans", "DP rủi ro/Cho vay"),
+    "provisionToOutstandingLoans": ("Provision/Outstanding Loans", "Trích lập DP/Cho vay"),
+    "equityToLiabilities": ("Equity/Total Liabilities", "Vốn chủ/Tổng nợ"),
+    "equityToLoans": ("Equity/Loans", "Vốn chủ/Cho vay"),
+    "totalEquityTotalAsset": ("Equity/Total Assets", "Vốn chủ/Tổng tài sản"),
+    "averageYieldOnEarningAssets": ("Avg Yield on Earning Assets", "LS bình quân TS sinh lãi"),
+    "averageCostOfFinancing": ("Avg Cost of Financing", "Chi phí vốn bình quân"),
+    "nonAndInterestIncome": ("Non-interest Income", "Thu nhập ngoài lãi"),
+    "costToIncome": ("Cost/Income Ratio", "Chi phí/Thu nhập"),
 }
 
 #  Gộp 54 chỉ số thành nhóm dễ đọc. Khóa là tên tiếng Anh do nguồn trả về.
@@ -94,23 +139,20 @@ def _percent(value: Any, digits: int = 2) -> Optional[float]:
 
 
 def fetch_profile(ticker: str) -> CompanyProfile:
-    """Hồ sơ doanh nghiệp: tổng quan, lãnh đạo, cổ đông, công ty con/liên kết."""
-    try:
-        from vnstock import Company
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+    """Hồ sơ doanh nghiệp (thẳng VCI): tổng quan, lãnh đạo, cổ đông, công ty con/liên kết."""
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
 
     ticker = ticker.upper().strip()
     try:
-        company = Company(symbol=ticker, source="VCI")
-        overview = company.overview()
-    except Exception as exc:
+        p = vci_direct.company_profile(ticker)
+        holders = vci_direct.shareholders(ticker)
+        rel = vci_direct.relationships(ticker)
+    except VciError as exc:
         raise ProviderError(f"Không lấy được hồ sơ của {ticker}: {exc}") from exc
 
-    if overview is None or len(overview) == 0:
+    if not p:
         raise ProviderError(f"Không có hồ sơ doanh nghiệp cho {ticker}.")
-
-    row: dict[str, Any] = overview.iloc[0].to_dict()
 
     highlights: list[Highlight] = []
 
@@ -118,98 +160,59 @@ def fetch_profile(ticker: str) -> CompanyProfile:
         if value:
             highlights.append(Highlight(label=label, value=value, note=note))
 
-    high_1y, low_1y = _to_float(row.get("highest_price1_year")), _to_float(row.get("lowest_price1_year"))
+    high_1y, low_1y = _to_float(p.get("highestPrice1Year")), _to_float(p.get("lowestPrice1Year"))
     if high_1y and low_1y:
         add("Đỉnh / đáy 1 năm", f"{high_1y / 1000:,.2f} / {low_1y / 1000:,.2f}", "nghìn đ/cp")
 
-    avg_vol = _to_float(row.get("average_match_volume1_month"))
+    avg_vol = _to_float(p.get("averageMatchVolume1Month"))
     if avg_vol:
         add("KL khớp TB 1 tháng", f"{avg_vol / 1_000_000:,.2f} triệu cp/phiên")
 
-    avg_val = _to_float(row.get("average_match_value1_month"))
+    avg_val = _to_float(p.get("averageMatchValue1Month"))
     if avg_val:
         add("GT khớp TB 1 tháng", f"{avg_val / _BILLION:,.0f} tỷ đồng/phiên")
 
-    foreign = _percent(row.get("foreigner_percentage"))
-    room = _percent(row.get("maximum_foreign_percentage"))
+    foreign = _percent(p.get("foreignerPercentage"))
+    room = _percent(p.get("maximumForeignPercentage"))
     if foreign is not None:
         add("Sở hữu nước ngoài", f"{foreign}%",
             f"trần cho phép {room}%" if room is not None else "")
 
-    state = _percent(row.get("state_percentage"))
+    state = _percent(p.get("statePercentage"))
     if state is not None:
         add("Sở hữu nhà nước", f"{state}%")
 
-    free_float = _percent(row.get("free_float_percentage"))
-    if free_float is not None:
-        add("Tỷ lệ cổ phiếu tự do chuyển nhượng", f"{free_float}%",
-            "phần thực sự giao dịch trên sàn")
-
     analyst: Optional[AnalystView] = None
-    rating = _clean(row.get("rating"))
+    rating = _clean(p.get("rating"))
     if rating:
-        target = _to_float(row.get("target_price"))
+        target = _to_float(p.get("targetPrice"))
         analyst = AnalystView(
             source="Vietcap (VCI) — khuyến nghị của công ty chứng khoán, không phải của công cụ này",
             rating=rating,
             target_price=round(target / 1000, 2) if target else None,
-            upside_pct=_percent(row.get("upside_to_target_percent"), 1),
-            analyst=_clean(row.get("analyst")),
-            as_of=_clean(row.get("rating_as_of")),
+            upside_pct=_percent(p.get("upsideToTargetPercent"), 1),
+            analyst=_clean(p.get("analyst")),
+            as_of=_clean(p.get("ratingAsOf"))[:10],
         )
 
-    def people(frame, name_col: str, position_col: str = "") -> list[Person]:
-        if frame is None or len(frame) == 0:
-            return []
-        result: list[Person] = []
-        for record in frame.to_dict("records"):
-            name = _clean(record.get(name_col))
-            if not name:
-                continue
-            result.append(Person(
-                name=name,
-                position=_clean(record.get(position_col)) if position_col else "",
-                percent=_percent(record.get("officer_own_percent") or record.get("share_own_percent")),
-                quantity=_to_float(record.get("officer_own_quantity") or record.get("quantity")),
-            ))
-        return result
+    def person(h: dict) -> Person:
+        return Person(name=_clean(h.get("name")), position=_clean(h.get("position")),
+                      percent=_percent(h.get("percent")), quantity=_to_float(h.get("quantity")))
 
-    def safe(getter) -> Any:
-        try:
-            return getter()
-        except Exception:
-            return None
-
-    officers = people(safe(company.officers), "officer_name", "officer_position")
-    shareholders = people(safe(company.shareholders), "share_holder")
-
-    subsidiaries: list[RelatedCompany] = []
-    subs = safe(company.subsidiaries)
-    if subs is not None and len(subs):
-        subsidiaries = [
-            RelatedCompany(name=_clean(r.get("organ_name")), code=_clean(r.get("sub_organ_code")),
-                           percent=_percent(r.get("ownership_percent")))
-            for r in subs.to_dict("records") if _clean(r.get("organ_name"))
-        ]
-
-    affiliates: list[RelatedCompany] = []
-    affs = safe(company.affiliate)
-    if affs is not None and len(affs):
-        affiliates = [
-            RelatedCompany(name=_clean(r.get("right_organ_name_vi") or r.get("right_organ_name_en")),
-                           code=_clean(r.get("right_ticker") or r.get("right_organ_code")),
-                           percent=_percent(r.get("owned_percentage")))
-            for r in affs.to_dict("records")
-            if _clean(r.get("right_organ_name_vi") or r.get("right_organ_name_en"))
-        ]
+    officers = [person(h) for h in holders if _clean(h.get("position"))]
+    shareholders = [person(h) for h in holders if _clean(h.get("name"))]
+    subsidiaries = [RelatedCompany(name=_clean(s["name"]), code=_clean(s["code"]),
+                                   percent=_percent(s["percent"])) for s in rel["subsidiaries"]]
+    affiliates = [RelatedCompany(name=_clean(a["name"]), code=_clean(a["code"]),
+                                 percent=_percent(a["percent"])) for a in rel["affiliates"]]
 
     return CompanyProfile(
         ticker=ticker,
-        name=_clean(row.get("organ_name"), ticker),
-        short_name=_clean(row.get("organ_short_name")),
-        sector=_clean(row.get("sector") or row.get("industry")),
-        exchange=_clean(row.get("com_group_code")),
-        listing_date=_clean(row.get("listing_date"))[:10],
+        name=_clean(p.get("name"), ticker),
+        short_name=_clean(p.get("viOrganShortName")),
+        sector=_clean(p.get("sector_vn") or p.get("sector")),
+        exchange=_clean(p.get("comGroupCode")),
+        listing_date="",
         highlights=highlights,
         analyst=analyst,
         officers=sorted(officers, key=lambda p: p.percent or 0, reverse=True)[:12],
@@ -220,48 +223,34 @@ def fetch_profile(ticker: str) -> CompanyProfile:
 
 
 def fetch_statement(ticker: str, statement: StatementKey) -> FinancialStatement:
-    """Một báo cáo tài chính, nhãn tiếng Việt, đơn vị tỷ đồng."""
-    try:
-        from vnstock import Finance
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+    """Một báo cáo tài chính (thẳng VCI), nhãn tiếng Việt, đơn vị tỷ đồng."""
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
 
     ticker = ticker.upper().strip()
-    method_name, title = _STATEMENTS[statement]
+    section, title = _STATEMENTS[statement]
 
     try:
-        frame = getattr(Finance(symbol=ticker, source="VCI"), method_name)(
-            period="year", lang="vi", dropna=False)
-    except Exception as exc:
+        data = vci_direct.financial_statement(ticker, section)
+    except VciError as exc:
         raise ProviderError(f"Không lấy được {title.lower()} của {ticker}: {exc}") from exc
 
-    if frame is None or len(frame) == 0:
+    periods = data["periods"]
+    if not periods:
         raise ProviderError(f"Không có {title.lower()} cho {ticker}.")
 
-    periods = [str(c) for c in frame.columns if str(c).isdigit()]
-    if not periods:
-        raise ProviderError(f"Nguồn không trả kỳ báo cáo nào cho {ticker}.")
-
-    label_col = "item" if "item" in frame.columns else "item_en"
-    rows: list[StatementRow] = []
-    for record in frame.to_dict("records"):
-        label = _clean(record.get(label_col))
-        values = [_to_float(record.get(p)) for p in periods]
-        #  Bỏ dòng rỗng hoàn toàn để bảng không bị loãng.
-        if label and any(v is not None for v in values):
-            rows.append(StatementRow(
-                label=label,
-                values=[round(v / _BILLION, 2) if v is not None else None for v in values],
-            ))
+    rows = [
+        StatementRow(
+            label=row["label"],
+            values=[round(v / _BILLION, 2) if v is not None else None for v in row["values"]],
+        )
+        for row in data["rows"] if row["label"]
+    ]
 
     return FinancialStatement(
-        ticker=ticker,
-        statement=statement,
-        title=title,
-        unit="tỷ đồng",
-        periods=periods,
-        rows=rows,
-        note="Bản miễn phí của nguồn giới hạn tối đa 4 kỳ gần nhất.",
+        ticker=ticker, statement=statement, title=title, unit="tỷ đồng",
+        periods=periods, rows=rows,
+        note="Báo cáo năm từ VCI (tối đa 4 kỳ gần nhất).",
     )
 
 
@@ -272,32 +261,26 @@ def fetch_ratios(ticker: str) -> RatioTable:
     không thể gán năm một cách chắc chắn — thà hiển thị một kỳ đúng còn hơn
     bốn kỳ gán sai năm.
     """
-    try:
-        from vnstock import Finance
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+    from app.services.providers import vci_direct
+    from app.services.providers.vci_direct import VciError
 
     ticker = ticker.upper().strip()
     try:
-        frame = Finance(symbol=ticker, source="VCI").ratio(
-            period="year", lang="vi", dropna=False)
-    except Exception as exc:
+        raw = vci_direct.ratios_latest(ticker)
+    except VciError as exc:
         raise ProviderError(f"Không lấy được chỉ số của {ticker}: {exc}") from exc
 
-    if frame is None or len(frame) == 0:
+    if not raw:
         raise ProviderError(f"Không có chỉ số tài chính cho {ticker}.")
 
-    columns = list(frame.columns)
-    en_index = columns.index("item_en") if "item_en" in columns else 0
-    vi_index = columns.index("item") if "item" in columns else en_index
-
-    #  Cột cuối = kỳ gần nhất (TTM) — đã đối chiếu với P/E hiển thị ở tab phân tích.
+    #  Field camelCase của VCI → (nhãn Anh để gom nhóm, nhãn Việt để hiện).
     by_key: dict[str, tuple[str, Optional[float]]] = {}
-    for i in range(len(frame)):
-        key = _clean(frame.iloc[i, en_index])
-        if not key or key in _RATIO_SKIP:
+    for field, value in raw.items():
+        mapping = _RATIO_FIELD_MAP.get(field)
+        if not mapping or value is None:
             continue
-        by_key[key] = (_clean(frame.iloc[i, vi_index], key), _to_float(frame.iloc[i, -1]))
+        en_label, vi_label = mapping
+        by_key[en_label] = (vi_label, _to_float(value))
 
     groups: list[RatioGroup] = []
     used: set[str] = set()
@@ -332,6 +315,6 @@ def fetch_ratios(ticker: str) -> RatioTable:
 
     return RatioTable(
         ticker=ticker,
-        period_label="Kỳ gần nhất (TTM — bốn quý gần nhất)",
+        period_label="Chỉ số năm gần nhất (P/E, P/B theo TTM hiện tại)",
         groups=groups,
     )
