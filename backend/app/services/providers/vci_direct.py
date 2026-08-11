@@ -19,7 +19,7 @@ Endpoint (rút từ chính source vnstock đang cài):
 from __future__ import annotations
 
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable, Optional
 
 import httpx
@@ -115,6 +115,43 @@ def price_board(symbols: Iterable[str]) -> list[dict]:
             "accumulated_value": mp.get("accumulatedValue"),
             "foreign_buy_value": mp.get("foreignBuyValue"),
             "foreign_sell_value": mp.get("foreignSellValue"),
+        })
+    return out
+
+
+def _px(value: Any) -> Optional[float]:
+    """Giá VCI ở ĐỒNG → quy về NGHÌN ĐỒNG cho khớp phần còn lại của app."""
+    try:
+        return round(float(value) / 1000, 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def ohlcv(symbol: str, days: int = 180) -> list[dict]:
+    """Nến ngày trong `days` gần nhất, cũ→mới. Giá đã quy về nghìn đồng.
+
+    Endpoint OHLC dạng MẢNG song song (t/o/h/l/c/v). `to` là mốc unix hiện tại,
+    `countBack` là số nến lấy ngược về — lấy dư rồi cắt theo ngày cho đúng cửa sổ.
+    """
+    count_back = max(30, int(days) + 5)
+    data = _request("POST", f"{_TRADING}/chart/OHLCChart/gap-chart", json={
+        "timeFrame": "ONE_DAY", "symbols": [symbol.upper()],
+        "to": int(time.time()), "countBack": count_back,
+    })
+    if not data:
+        return []
+    el = data[0] or {}
+    ts, o, h, l, c, v = (el.get(k) or [] for k in ("t", "o", "h", "l", "c", "v"))
+    cutoff = date.today() - timedelta(days=days)
+    out: list[dict] = []
+    for i in range(len(ts)):
+        day = datetime.fromtimestamp(int(ts[i]), tz=timezone.utc).date()
+        if day < cutoff:
+            continue
+        out.append({
+            "date": day.isoformat(),
+            "open": _px(o[i]), "high": _px(h[i]), "low": _px(l[i]), "close": _px(c[i]),
+            "volume": float(v[i] or 0),
         })
     return out
 

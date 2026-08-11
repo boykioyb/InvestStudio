@@ -8,9 +8,9 @@ NHAU → phải truy cập theo VỊ TRÍ (cột cuối = kỳ gần nhất), kh
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
 from typing import Optional
 
+from app.services.providers import vci_direct
 from app.services.providers.base import (
     Candle,
     FundamentalData,
@@ -18,6 +18,7 @@ from app.services.providers.base import (
     TechnicalData,
     build_technical,
 )
+from app.services.providers.vci_direct import VciError
 
 _PRICE_LOOKBACK_DAYS = 180
 _NET_PROFIT_ROW = "Net profit/(loss) after tax"
@@ -35,27 +36,18 @@ def _to_float(value: object, default: Optional[float] = None) -> Optional[float]
 
 
 def fetch_technical(ticker: str) -> TechnicalData:
+    #  Đã CAI vnstock cho khối kỹ thuật: lấy OHLCV thẳng từ VCI (không qua vnai).
     try:
-        from vnstock import Quote
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+        candles = vci_direct.ohlcv(ticker, _PRICE_LOOKBACK_DAYS)
+    except VciError as exc:
+        raise ProviderError(f"VCI không trả giá cho {ticker}: {exc}") from exc
 
-    today = date.today()
-    try:
-        history = Quote(symbol=ticker, source="VCI").history(
-            start=(today - timedelta(days=_PRICE_LOOKBACK_DAYS)).isoformat(),
-            end=today.isoformat(),
-            interval="1D",
-        )
-    except Exception as exc:
-        raise ProviderError(f"vnstock không trả giá cho {ticker}: {exc}") from exc
+    if not candles:
+        raise ProviderError(f"Không có dữ liệu giá cho {ticker}")
 
-    if history is None or len(history) == 0:
-        raise ProviderError(f"vnstock không có dữ liệu giá cho {ticker}")
-
-    closes = [float(x) for x in history["close"].tolist()]
-    volumes = [float(x) for x in history["volume"].tolist()]
-    return build_technical(closes, volumes, str(history["time"].iloc[-1])[:10])
+    closes = [c["close"] for c in candles if c["close"] is not None]
+    volumes = [c["volume"] for c in candles]
+    return build_technical(closes, volumes, candles[-1]["date"])
 
 
 def _latest_ratios(finance) -> dict[str, Optional[float]]:
@@ -152,29 +144,16 @@ def fetch_company(ticker: str) -> tuple[str, str]:
 def fetch_ohlcv(ticker: str, days: int) -> list[Candle]:
     """Lịch sử nến ngày trong `days` ngày gần nhất (dùng cho biểu đồ nhiều khung)."""
     try:
-        from vnstock import Quote
-    except ImportError as exc:  # pragma: no cover
-        raise ProviderError("Chưa cài thư viện vnstock") from exc
+        rows = vci_direct.ohlcv(ticker, days)
+    except VciError as exc:
+        raise ProviderError(f"VCI không trả lịch sử giá cho {ticker}: {exc}") from exc
 
-    today = date.today()
-    try:
-        frame = Quote(symbol=ticker, source="VCI").history(
-            start=(today - timedelta(days=days)).isoformat(),
-            end=today.isoformat(),
-            interval="1D",
-        )
-    except Exception as exc:
-        raise ProviderError(f"vnstock không trả lịch sử giá cho {ticker}: {exc}") from exc
-
-    if frame is None or len(frame) == 0:
-        raise ProviderError(f"vnstock không có lịch sử giá cho {ticker}")
+    if not rows:
+        raise ProviderError(f"Không có lịch sử giá cho {ticker}")
 
     return [
-        Candle(
-            date=str(row.time)[:10],
-            open=float(row.open), high=float(row.high),
-            low=float(row.low), close=float(row.close),
-            volume=float(row.volume),
-        )
-        for row in frame.itertuples()
+        Candle(date=r["date"], open=r["open"], high=r["high"],
+               low=r["low"], close=r["close"], volume=r["volume"])
+        for r in rows
+        if None not in (r["open"], r["high"], r["low"], r["close"])
     ]
