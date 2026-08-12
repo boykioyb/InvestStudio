@@ -33,14 +33,29 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Tạo extension pgvector + toàn bộ bảng nếu chưa có (idempotent).
+    """Đưa schema về 'head' bằng Alembic (tạo extension pgvector + áp migration).
 
-    Gọi lúc khởi động app. Import model NGAY TẠI ĐÂY để chúng đăng ký vào
-    `Base.metadata` trước khi `create_all` chạy — nếu import ở đầu file sẽ
-    gây import vòng với `base.py`.
+    Migration baseline (0001) idempotent nên chạy được cả trên DB mới lẫn DB cũ
+    đã có bảng. Dùng KHÓA CỐ VẤN Postgres để nhiều service (backend/worker/beat)
+    khởi động cùng lúc chỉ MỘT tiến trình migrate tại một thời điểm — tránh đua.
     """
-    from app import models  # noqa: F401  (nạp để đăng ký bảng)
+    from pathlib import Path
 
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    Base.metadata.create_all(bind=engine)
+    from alembic import command
+    from alembic.config import Config
+
+    srv_root = Path(__file__).resolve().parents[2]  # thư mục /srv (chứa alembic.ini)
+    cfg = Config(str(srv_root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(srv_root / "alembic"))
+
+    lock = engine.connect()
+    try:
+        lock.execute(text("SELECT pg_advisory_lock(911)"))  # khóa session cho tới khi mở
+        lock.commit()
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        command.upgrade(cfg, "head")
+    finally:
+        lock.execute(text("SELECT pg_advisory_unlock(911)"))
+        lock.commit()
+        lock.close()

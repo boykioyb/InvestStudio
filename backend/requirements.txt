@@ -8,6 +8,7 @@ pytest>=8.0
 
 # ── Tài khoản người dùng + lưu trữ (login/đăng ký, mã yêu thích) ──────────────
 sqlalchemy>=2.0            # ORM (ánh xạ bảng ↔ đối tượng Python)
+alembic>=1.13             # migration schema (di trú cơ sở dữ liệu)
 psycopg[binary]>=3.2       # driver PostgreSQL (dialect postgresql+psycopg)
 bcrypt>=4.2                # băm mật khẩu (password hashing)
 pyjwt>=2.9                 # JWT (JSON Web Token — token xác thực)
