@@ -9,7 +9,7 @@ import { MessageCircle, Search, Star } from 'lucide-vue-next'
 definePageMeta({ middleware: 'auth' })
 
 const { ensureLoaded } = useAuth()
-const { turns, pending, status, ask, loadHistory, fetchStatus, reindex } = useChat()
+const { turns, pending, status, askStream, loadHistory, fetchStatus, reindex } = useChat()
 
 const question = ref('')
 const ticker = ref('')
@@ -38,10 +38,10 @@ onBeforeUnmount(() => {
   if (poll) clearInterval(poll)
 })
 
-async function submit(): Promise<void> {
+function submit(): void {
   const q = question.value
   question.value = ''
-  await ask(q, ticker.value)
+  askStream(q, ticker.value)
 }
 
 async function startReindex(): Promise<void> {

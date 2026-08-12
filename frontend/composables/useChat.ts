@@ -49,6 +49,50 @@ export function useChat() {
     }
   }
 
+  /** Hỏi và nhận câu trả lời THEO LUỒNG (SSE). Không có EventSource → dùng ask thường. */
+  function askStream(question: string, ticker = ''): void {
+    const q = question.trim()
+    if (!q) return
+    if (typeof EventSource === 'undefined') {
+      void ask(q, ticker)
+      return
+    }
+    const turn: ChatTurn = { question: q, response: { answer: '', citations: [], note: '' }, error: '' }
+    turns.value = [...turns.value, turn]
+    pending.value = true
+
+    const params = new URLSearchParams({ question: q })
+    const tk = ticker.trim().toUpperCase()
+    if (tk) params.set('ticker', tk)
+
+    const source = new EventSource(`${apiBase}/api/chat/stream?${params.toString()}`, {
+      withCredentials: true
+    })
+    let done = false
+    const finish = () => {
+      source.close()
+      pending.value = false
+    }
+    source.addEventListener('delta', (ev) => {
+      try {
+        if (turn.response) turn.response.answer += JSON.parse((ev as MessageEvent).data).text
+      } catch { /* bỏ gói hỏng */ }
+    })
+    source.addEventListener('final', (ev) => {
+      done = true
+      try { turn.response = JSON.parse((ev as MessageEvent).data) } catch { /* giữ phần đã nhận */ }
+      finish()
+    })
+    source.addEventListener('error', (ev) => {
+      const raw = (ev as MessageEvent).data
+      if (typeof raw === 'string' && raw) {
+        try { turn.error = JSON.parse(raw).detail } catch { /* bỏ qua */ }
+      }
+      if (!done && !turn.error) turn.error = 'Trợ lý chưa trả lời được. Thử lại sau.'
+      finish()
+    })
+  }
+
   async function loadHistory(): Promise<void> {
     try {
       const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>('/history')
@@ -79,5 +123,5 @@ export function useChat() {
     }
   }
 
-  return { turns, pending, status, ask, loadHistory, fetchStatus, reindex }
+  return { turns, pending, status, ask, askStream, loadHistory, fetchStatus, reindex }
 }

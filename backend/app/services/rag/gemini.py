@@ -55,6 +55,27 @@ def embed_texts(texts: list[str], *, is_query: bool = False) -> list[list[float]
     return [list(item.values) for item in resp.embeddings]
 
 
+def generate_answer_stream(system_instruction: str, prompt: str):
+    """Sinh câu trả lời theo LUỒNG — yield từng mẩu văn bản khi Gemini trả về."""
+    from google.genai import types
+
+    settings = get_settings()
+    try:
+        stream = _client().models.generate_content_stream(
+            model=settings.gemini_chat_model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction, temperature=0.2),
+        )
+        for chunk in stream:
+            if chunk.text:
+                yield chunk.text
+    except GeminiError:
+        raise
+    except Exception as exc:  # pragma: no cover
+        raise GeminiError(f"Gemini sinh câu trả lời (stream) lỗi: {exc}") from exc
+
+
 def generate_answer(system_instruction: str, prompt: str) -> str:
     """Sinh câu trả lời. Nhiệt độ thấp để bám sát dữ liệu, ít 'sáng tác'."""
     from google.genai import types

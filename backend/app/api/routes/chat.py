@@ -6,9 +6,12 @@ web process — nó được đẩy vào hàng đợi Celery cho worker xử lý
 """
 from __future__ import annotations
 
+import json
 import sys
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -48,6 +51,45 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
                        citations=[c.model_dump() for c in resp.citations]))
     db.commit()
     return resp
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@router.get("/stream", summary="Hỏi trợ lý (RAG) — phát câu trả lời theo luồng (SSE)")
+def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
+               ticker: Optional[str] = Query(None, max_length=12),
+               user: User = Depends(get_current_user),
+               db: Session = Depends(get_db)) -> StreamingResponse:
+    ratelimit.enforce_daily(str(user.id), "rag", get_settings().rag_daily_quota)
+    tk = ticker.upper().strip() if ticker else None
+    q = question.strip()
+
+    def gen():
+        final = None
+        try:
+            for kind, payload in chat.answer_stream(db, q, tk):
+                if kind == "delta":
+                    yield _sse("delta", {"text": payload})
+                else:
+                    final = payload
+                    yield _sse("final", payload.model_dump(mode="json"))
+        except GeminiError as exc:
+            print(f"[chat] stream GeminiError: {exc}", file=sys.stderr)
+            yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
+            return
+        #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời).
+        if final is not None:
+            db.add(ChatMessage(user_id=user.id, question=q, answer=final.answer,
+                               citations=[c.model_dump() for c in final.citations]))
+            db.commit()
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    })
 
 
 @router.get("/history", response_model=list[ChatHistoryItem],

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.schemas.chat import ChatResponse, Citation
 from app.services.rag import store
-from app.services.rag.gemini import embed_texts, generate_answer
+from app.services.rag.gemini import embed_texts, generate_answer, generate_answer_stream
 
 _SYSTEM = (
     "Bạn là trợ lý phân tích cổ phiếu Việt Nam của InvestStudio. "
@@ -30,23 +30,25 @@ def _snippet(text: str, limit: int = 240) -> str:
     return text if len(text) <= limit else text[:limit].rstrip() + "…"
 
 
-def answer_question(db: Session, question: str, ticker: Optional[str] = None) -> ChatResponse:
+def _empty_answer(ticker: Optional[str]) -> str:
+    if ticker:
+        return (f"Chưa có dữ liệu về {ticker}. Hãy mở màn Phân tích mã {ticker} một lần — "
+                "trợ lý sẽ tự học mã này ngay sau đó. (Hoặc dùng nút 'Lập chỉ mục' ở "
+                "trang Trợ lý để nạp cả rổ VN30.)")
+    return ("Kho dữ liệu chưa được lập chỉ mục. Vào trang Trợ lý (💬) rồi bấm "
+            "'Lập chỉ mục VN30 + tin', hoặc cứ phân tích một mã bất kỳ để trợ lý học dần.")
+
+
+def _retrieve(db: Session, question: str, ticker: Optional[str]):
+    """Trả (prompt, citations). prompt=None nghĩa là kho chưa có dữ liệu phù hợp."""
     settings = get_settings()
     query_vector = embed_texts([question], is_query=True)[0]
     hits = store.search(db, query_vector, settings.rag_top_k, ticker=ticker)
-
     if not hits:
-        if ticker:
-            answer = (f"Chưa có dữ liệu về {ticker}. Hãy mở màn Phân tích mã {ticker} một lần — "
-                      "trợ lý sẽ tự học mã này ngay sau đó. (Hoặc dùng nút 'Lập chỉ mục' ở "
-                      "trang Trợ lý để nạp cả rổ VN30.)")
-        else:
-            answer = ("Kho dữ liệu chưa được lập chỉ mục. Vào trang Trợ lý (💬) rồi bấm "
-                      "'Lập chỉ mục VN30 + tin', hoặc cứ phân tích một mã bất kỳ để trợ lý học dần.")
-        return ChatResponse(answer=answer, citations=[])
+        return None, []
 
     #  Ghép ngữ cảnh có đánh số để Gemini có thể dẫn nguồn [1], [2]…
-    context_blocks = []
+    context_blocks: list[str] = []
     citations: list[Citation] = []
     for index, (doc, _score) in enumerate(hits, start=1):
         context_blocks.append(f"[{index}] ({doc.ticker} · {doc.title})\n{doc.content}")
@@ -54,12 +56,32 @@ def answer_question(db: Session, question: str, ticker: Optional[str] = None) ->
             ticker=doc.ticker, doc_type=doc.doc_type, title=doc.title,
             snippet=_snippet(doc.content),
         ))
-
     prompt = (
         f"CÂU HỎI: {question}\n\n"
         "NGỮ CẢNH (mỗi khối là một nguồn, đánh số trong ngoặc vuông):\n"
         + "\n\n".join(context_blocks)
         + "\n\nHãy trả lời câu hỏi chỉ dựa trên ngữ cảnh trên."
     )
+    return prompt, citations
+
+
+def answer_question(db: Session, question: str, ticker: Optional[str] = None) -> ChatResponse:
+    prompt, citations = _retrieve(db, question, ticker)
+    if prompt is None:
+        return ChatResponse(answer=_empty_answer(ticker), citations=[])
     answer = generate_answer(_SYSTEM, prompt) or "Xin lỗi, chưa tạo được câu trả lời."
     return ChatResponse(answer=answer, citations=citations)
+
+
+def answer_stream(db: Session, question: str, ticker: Optional[str] = None):
+    """Generator: yield ('delta', text) nhiều lần rồi ('final', ChatResponse)."""
+    prompt, citations = _retrieve(db, question, ticker)
+    if prompt is None:
+        yield ("final", ChatResponse(answer=_empty_answer(ticker), citations=[]))
+        return
+    parts: list[str] = []
+    for delta in generate_answer_stream(_SYSTEM, prompt):
+        parts.append(delta)
+        yield ("delta", delta)
+    answer = "".join(parts).strip() or "Xin lỗi, chưa tạo được câu trả lời."
+    yield ("final", ChatResponse(answer=answer, citations=citations))

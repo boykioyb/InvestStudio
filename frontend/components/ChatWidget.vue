@@ -8,7 +8,7 @@
 import { LogIn, MessageCircle, Send, X } from 'lucide-vue-next'
 
 const route = useRoute()
-const { turns, pending, ask, loadHistory } = useChat()
+const { turns, pending, askStream, loadHistory } = useChat()
 const { isLoggedIn, ensureLoaded } = useAuth()
 const activeTicker = useActiveTicker()
 
@@ -34,11 +34,11 @@ const examples = computed(() =>
     : ['Mã nào vốn hóa lớn nhất VN30?', 'So sánh P/E của VCB và CTG']
 )
 
-async function submit(): Promise<void> {
+function submit(): void {
   const q = question.value
   question.value = ''
-  //  Có mã đang xem + đang bật giới hạn → hỏi trong đúng mã đó.
-  await ask(q, ticker.value && scoped.value ? ticker.value : '')
+  //  Có mã đang xem + đang bật giới hạn → hỏi trong đúng mã đó. Trả lời theo luồng.
+  askStream(q, ticker.value && scoped.value ? ticker.value : '')
 }
 </script>
 
