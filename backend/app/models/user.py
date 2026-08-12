@@ -3,7 +3,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -49,3 +58,22 @@ class WatchlistItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="watchlist")
+
+
+class Notification(Base):
+    """Thông báo trong app (kênh MVP cho cảnh báo ngưỡng theo dõi).
+
+    Job nền tạo thông báo khi giá/điểm của mã đạt ngưỡng người dùng đặt; frontend
+    hiển thị và đánh dấu đã đọc. Email/web push để giai đoạn sau.
+    """
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    ticker: Mapped[str] = mapped_column(String(12), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)  # 'price' | 'score'
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

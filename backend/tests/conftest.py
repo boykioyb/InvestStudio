@@ -15,6 +15,8 @@ _BASE = os.environ.get(
 _TEST_DB = "investstudio_test"
 os.environ["APP_DATABASE_URL"] = _BASE.rsplit("/", 1)[0] + "/" + _TEST_DB
 os.environ["APP_GEMINI_API_KEY"] = ""  # chắc chắn test không gọi Gemini thật
+#  Vô hiệu hóa giới hạn tần suất trong test (nhiều lần register/login liên tiếp).
+os.environ["APP_LOGIN_MAX_ATTEMPTS"] = "1000000"
 
 import pytest  # noqa: E402
 from sqlalchemy import text  # noqa: E402

@@ -85,7 +85,7 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # Worker Celery — chạy job lập chỉ mục RAG (dùng chung image với backend).
+  # Worker Celery — chạy job lập chỉ mục RAG + cảnh báo (dùng chung image backend).
   worker:
     build: ./backend
     image: investstudio-backend
@@ -97,8 +97,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - vnstock-cache:/root/.vnstock   # dùng lại cache crawl như backend
+    restart: unless-stopped
+
+  # Celery Beat — bộ lập lịch: reindex VN30 mỗi sáng + quét ngưỡng theo dõi 30 phút/lần.
+  beat:
+    build: ./backend
+    image: investstudio-backend
+    command: celery -A app.core.celery_app:celery_app beat -l info
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
