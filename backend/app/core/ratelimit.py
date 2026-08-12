@@ -56,3 +56,23 @@ def clear(request: Request, scope: str) -> None:
         _redis().delete(f"rl:{scope}:{_client_ip(request)}")
     except Exception:  # noqa: BLE001
         pass
+
+
+def enforce_daily(subject: str, scope: str, limit: int) -> None:
+    """Quota theo NGÀY cho một chủ thể (VD user id). Vượt → 429. Redis lỗi → cho qua."""
+    from datetime import date
+
+    key = f"quota:{scope}:{subject}:{date.today().isoformat()}"
+    try:
+        client = _redis()
+        count = client.incr(key)
+        if count == 1:
+            client.expire(key, 86400)
+        if count > limit:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Đã dùng hết {limit} lượt hỏi trợ lý hôm nay. Vui lòng thử lại ngày mai.")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001 - Redis lỗi không được chặn tính năng
+        print(f"[quota] bỏ qua vì Redis lỗi: {exc}", file=sys.stderr)

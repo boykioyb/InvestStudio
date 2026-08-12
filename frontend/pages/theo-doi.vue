@@ -2,8 +2,10 @@
 import { List, MessageCircle, Search, Star, Target, TrendingUp } from 'lucide-vue-next'
 import type { WatchlistItem } from '~/types/account'
 
-/** Trang danh sách mã theo dõi. Cần đăng nhập; chưa đăng nhập thì chuyển hướng. */
-const { user, isLoggedIn, ensureLoaded, changePassword } = useAuth()
+/** Trang danh sách mã theo dõi. Cần đăng nhập (middleware chặn nếu chưa). */
+definePageMeta({ middleware: 'auth' })
+
+const { user, ensureLoaded, changePassword } = useAuth()
 const { items, pending, error, load, add, update, remove } = useWatchlist()
 
 const newTicker = ref('')
@@ -53,11 +55,7 @@ async function submitPw(): Promise<void> {
 useHead({ title: 'Mã theo dõi — InvestStudio' })
 
 onMounted(async () => {
-  await ensureLoaded()
-  if (!isLoggedIn.value) {
-    void navigateTo({ path: '/dang-nhap', query: { next: '/theo-doi' } })
-    return
-  }
+  await ensureLoaded()  // middleware đã đảm bảo đăng nhập
   await load()
 })
 

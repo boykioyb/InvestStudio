@@ -13,7 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core import ratelimit
 from app.core.celery_app import celery_app
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.rag import ChatMessage, IndexJob
 from app.models.user import User
@@ -28,6 +30,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse, summary="Hỏi trợ lý (RAG) một câu")
 def ask(payload: ChatRequest, user: User = Depends(get_current_user),
         db: Session = Depends(get_db)) -> ChatResponse:
+    ratelimit.enforce_daily(str(user.id), "rag", get_settings().rag_daily_quota)  # quota/ngày
     ticker = payload.ticker.upper().strip() if payload.ticker else None
     question = payload.question.strip()
     try:

@@ -6,7 +6,9 @@
  */
 import { MessageCircle, Search, Star } from 'lucide-vue-next'
 
-const { isLoggedIn, ensureLoaded } = useAuth()
+definePageMeta({ middleware: 'auth' })
+
+const { ensureLoaded } = useAuth()
 const { turns, pending, status, ask, loadHistory, fetchStatus, reindex } = useChat()
 
 const question = ref('')
@@ -23,11 +25,7 @@ const examples = [
 ]
 
 onMounted(async () => {
-  await ensureLoaded()
-  if (!isLoggedIn.value) {
-    void navigateTo({ path: '/dang-nhap', query: { next: '/tro-ly' } })
-    return
-  }
+  await ensureLoaded()  // middleware đã đảm bảo đăng nhập
   await fetchStatus()
   if (!turns.value.length) await loadHistory()  // tải lại hội thoại đã lưu
   //  Khi đang lập chỉ mục thì tự làm mới trạng thái cho người dùng thấy tiến độ.

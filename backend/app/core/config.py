@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     rate_limit_redis_url: str = "redis://localhost:6379/2"
     login_max_attempts: int = 10          # số lần/cửa sổ cho mỗi IP
     login_window_seconds: int = 300       # cửa sổ 5 phút
+    rag_daily_quota: int = 100            # số lượt hỏi trợ lý/user/ngày (chống cháy Gemini)
 
 
 @lru_cache

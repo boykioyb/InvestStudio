@@ -31,6 +31,26 @@ _SECTOR_BENCHMARK: dict[str, tuple[float, float]] = {
 }
 _DEFAULT_BENCHMARK = (15.0, 2.0)
 
+#  Ngành VCI trả tiếng Anh (khớp benchmark ở trên). Map sang tiếng Việt CHỈ để
+#  HIỂN THỊ — benchmark vẫn dùng chuỗi gốc để không lệch.
+_SECTOR_VI: dict[str, str] = {
+    "technology": "Công nghệ", "information technology": "Công nghệ",
+    "banks": "Ngân hàng", "financial services": "Dịch vụ tài chính",
+    "real estate": "Bất động sản", "basic resources": "Tài nguyên cơ bản",
+    "food & beverage": "Thực phẩm & đồ uống", "retail": "Bán lẻ",
+    "construction & materials": "Xây dựng & vật liệu",
+    "industrial goods & services": "Hàng & dịch vụ công nghiệp",
+    "oil & gas": "Dầu khí", "utilities": "Tiện ích", "chemicals": "Hóa chất",
+    "health care": "Chăm sóc sức khỏe", "insurance": "Bảo hiểm",
+    "travel & leisure": "Du lịch & giải trí", "media": "Truyền thông",
+    "telecommunications": "Viễn thông", "automobiles & parts": "Ô tô & phụ tùng",
+    "personal & household goods": "Hàng cá nhân & gia dụng",
+}
+
+
+def _sector_display(sector: str) -> str:
+    return _SECTOR_VI.get((sector or "").strip().lower(), sector)
+
 _FUNDAMENTAL_LABELS = ["Tăng trưởng", "ROE", "Biên LN", "D/E", "Dòng tiền", "P/E", "P/B", "Cổ tức"]
 
 
@@ -126,7 +146,8 @@ def analyze(
 
     progress("scoring", "Chấm điểm 14 tiêu chí và dựng kết luận", 90)
     data = fundamentals or FundamentalData()
-    default_pe, default_pb = _benchmark(sector)
+    default_pe, default_pb = _benchmark(sector)  # benchmark theo ngành tiếng Anh (gốc)
+    sector_vi = _sector_display(sector)           # tên ngành hiển thị (tiếng Việt)
     metrics = Metrics(
         growth=data.growth, roe=data.roe, margin=data.margin, de=data.de, ocf=data.ocf,
         pe=data.pe,
@@ -140,8 +161,8 @@ def analyze(
 
     result = StockAnalysis(
         ticker=ticker,
-        name=f"{name} — {sector}" if sector != "—" else name,
-        sector=sector,
+        name=f"{name} — {sector_vi}" if sector != "—" else name,
+        sector=sector_vi,
         price=technical.price,
         asof=technical.asof,
         sources=used,
