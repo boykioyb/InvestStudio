@@ -22,6 +22,7 @@ async function onLogout(): Promise<void> {
 <template>
   <div class="auth-nav">
     <template v-if="isLoggedIn">
+      <NotificationBell />
       <span class="who" :title="user?.email"><User /> {{ user?.display_name }}</span>
       <button type="button" class="chip" @click="onLogout">Thoát</button>
     </template>

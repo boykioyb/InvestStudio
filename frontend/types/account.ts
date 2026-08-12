@@ -45,3 +45,12 @@ export interface IndexStatus {
   running: boolean
   last_message: string
 }
+
+export interface Notification {
+  id: number
+  ticker: string
+  kind: string
+  message: string
+  is_read: boolean
+  created_at: string
+}
