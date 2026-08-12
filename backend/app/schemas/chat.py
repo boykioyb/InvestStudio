@@ -31,6 +31,14 @@ class ChatResponse(BaseModel):
     )
 
 
+class ChatHistoryItem(BaseModel):
+    """Một lượt hỏi–đáp đã lưu, để tải lại lịch sử."""
+
+    question: str
+    answer: str
+    citations: list[Citation] = []
+
+
 class IndexStatus(BaseModel):
     documents: int = Field(..., description="Số đoạn văn bản đang có trong kho")
     tickers: int = Field(..., description="Số mã đã được lập chỉ mục")

@@ -16,7 +16,7 @@ from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, UserOut
+from app.schemas.auth import ChangePasswordRequest, LoginRequest, RegisterRequest, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -81,3 +81,14 @@ def logout(response: Response) -> dict[str, str]:
 @router.get("/me", response_model=UserOut, summary="Thông tin tài khoản đang đăng nhập")
 def me(user: User = Depends(get_current_user)) -> User:
     return user
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT,
+             summary="Đổi mật khẩu (đang đăng nhập)")
+def change_password(payload: ChangePasswordRequest,
+                    user: User = Depends(get_current_user),
+                    db: Session = Depends(get_db)) -> None:
+    if not verify_password(payload.old_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Mật khẩu hiện tại không đúng.")
+    user.password_hash = hash_password(payload.new_password)
+    db.commit()

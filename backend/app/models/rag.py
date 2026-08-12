@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, Index, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -61,4 +61,18 @@ class RagDocument(Base):
     source_key: Mapped[str] = mapped_column(String(200), unique=True, index=True, nullable=False)
     meta: Mapped[dict] = mapped_column(JSONB, default=dict)
     embedding: Mapped[list[float]] = mapped_column(Vector(_DIM), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatMessage(Base):
+    """Một lượt hỏi–đáp RAG đã lưu, để tải lại lịch sử hội thoại của người dùng."""
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+    citations: Mapped[list] = mapped_column(JSONB, default=list)  # [{ticker,doc_type,title,snippet}]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

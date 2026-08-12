@@ -15,9 +15,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.celery_app import celery_app
 from app.db.session import get_db
-from app.models.rag import IndexJob
+from app.models.rag import ChatMessage, IndexJob
 from app.models.user import User
-from app.schemas.chat import ChatRequest, ChatResponse, IndexStatus
+from app.schemas.chat import ChatHistoryItem, ChatRequest, ChatResponse, Citation, IndexStatus
 from app.services.rag import chat, store
 from app.services.rag.gemini import GeminiError
 from app.services.rag.tasks import reindex_task
@@ -29,8 +29,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 def ask(payload: ChatRequest, user: User = Depends(get_current_user),
         db: Session = Depends(get_db)) -> ChatResponse:
     ticker = payload.ticker.upper().strip() if payload.ticker else None
+    question = payload.question.strip()
     try:
-        return chat.answer_question(db, payload.question.strip(), ticker)
+        resp = chat.answer_question(db, question, ticker)
     except GeminiError as exc:
         #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
         #  ghi log phía máy chủ để còn gỡ lỗi.
@@ -38,6 +39,24 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Trợ lý tạm thời không phản hồi được. Vui lòng thử lại sau.") from exc
+
+    #  Lưu lượt hỏi–đáp để người dùng tải lại lịch sử hội thoại.
+    db.add(ChatMessage(user_id=user.id, question=question, answer=resp.answer,
+                       citations=[c.model_dump() for c in resp.citations]))
+    db.commit()
+    return resp
+
+
+@router.get("/history", response_model=list[ChatHistoryItem],
+            summary="Lịch sử hỏi–đáp gần đây (cũ → mới)")
+def history(user: User = Depends(get_current_user),
+            db: Session = Depends(get_db)) -> list[ChatHistoryItem]:
+    rows = list(db.scalars(
+        select(ChatMessage).where(ChatMessage.user_id == user.id)
+        .order_by(ChatMessage.created_at.desc()).limit(30)
+    ))[::-1]
+    return [ChatHistoryItem(question=r.question, answer=r.answer,
+                            citations=[Citation(**c) for c in (r.citations or [])]) for r in rows]
 
 
 def _status(db: Session) -> IndexStatus:
