@@ -56,6 +56,18 @@ export function useWatchlist() {
     }
   }
 
+  async function update(id: number, payload: Partial<WatchlistItemInput>): Promise<boolean> {
+    error.value = ''
+    try {
+      const updated = await call<WatchlistItem>(`/${id}`, { method: 'PATCH', body: payload })
+      items.value = items.value.map((item) => (item.id === id ? updated : item))
+      return true
+    } catch (err) {
+      error.value = messageOf(err, 'Không cập nhật được mục theo dõi.')
+      return false
+    }
+  }
+
   async function remove(id: number): Promise<void> {
     error.value = ''
     try {
@@ -73,5 +85,5 @@ export function useWatchlist() {
     if (found) await remove(found.id)
   }
 
-  return { items, loaded, pending, error, has, load, add, remove, removeByTicker }
+  return { items, loaded, pending, error, has, load, add, update, remove, removeByTicker }
 }

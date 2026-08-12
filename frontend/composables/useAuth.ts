@@ -82,6 +82,23 @@ export function useAuth() {
     }
   }
 
+  async function changePassword(oldPassword: string, newPassword: string): Promise<boolean> {
+    pending.value = true
+    error.value = ''
+    try {
+      await call('/api/auth/change-password', {
+        method: 'POST',
+        body: { old_password: oldPassword, new_password: newPassword }
+      })
+      return true
+    } catch (err) {
+      error.value = messageOf(err, 'Đổi mật khẩu không thành công.')
+      return false
+    } finally {
+      pending.value = false
+    }
+  }
+
   async function logout(): Promise<void> {
     try {
       await call('/api/auth/logout', { method: 'POST' })
@@ -91,5 +108,6 @@ export function useAuth() {
     user.value = null
   }
 
-  return { user, ready, pending, error, isLoggedIn, fetchMe, ensureLoaded, register, login, logout }
+  return { user, ready, pending, error, isLoggedIn, fetchMe, ensureLoaded, register, login,
+           changePassword, logout }
 }

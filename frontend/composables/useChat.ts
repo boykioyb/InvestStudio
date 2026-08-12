@@ -49,6 +49,19 @@ export function useChat() {
     }
   }
 
+  async function loadHistory(): Promise<void> {
+    try {
+      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>('/history')
+      turns.value = rows.map((h) => ({
+        question: h.question,
+        response: { answer: h.answer, citations: h.citations, note: '' },
+        error: ''
+      }))
+    } catch {
+      /* chưa đăng nhập hoặc chưa có lịch sử — bỏ qua */
+    }
+  }
+
   async function fetchStatus(): Promise<void> {
     try {
       status.value = await call<IndexStatus>('/status')
@@ -66,5 +79,5 @@ export function useChat() {
     }
   }
 
-  return { turns, pending, status, ask, fetchStatus, reindex }
+  return { turns, pending, status, ask, loadHistory, fetchStatus, reindex }
 }

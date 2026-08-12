@@ -8,7 +8,7 @@
  */
 import { Star } from 'lucide-vue-next'
 
-const props = defineProps<{ ticker: string }>()
+const props = defineProps<{ ticker: string; compact?: boolean }>()
 
 const { isLoggedIn, ensureLoaded } = useAuth()
 const { has, load, loaded, add, removeByTicker } = useWatchlist()
@@ -43,13 +43,13 @@ async function toggle(): Promise<void> {
   <button
     type="button"
     class="fav"
-    :class="{ on: active }"
+    :class="{ on: active, compact }"
     :disabled="busy"
     :title="active ? `Bỏ theo dõi ${code}` : `Theo dõi ${code}`"
-    @click="toggle"
+    @click.stop="toggle"
   >
     <Star aria-hidden="true" :fill="active ? 'currentColor' : 'none'" />
-    <span class="lb">{{ active ? 'Đang theo dõi' : 'Theo dõi' }}</span>
+    <span v-if="!compact" class="lb">{{ active ? 'Đang theo dõi' : 'Theo dõi' }}</span>
   </button>
 </template>
 
@@ -83,5 +83,24 @@ async function toggle(): Promise<void> {
 .fav:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/*  Chế độ gọn: chỉ icon, không viền — dùng trong ô bảng danh sách. */
+.fav.compact {
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  padding: 3px;
+  color: var(--muted);
+}
+
+.fav.compact.on {
+  color: var(--warn);
+  background: none;
+}
+
+.fav.compact:hover:not(:disabled) {
+  color: var(--warn);
+  background: var(--panel2);
 }
 </style>

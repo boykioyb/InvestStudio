@@ -111,6 +111,7 @@ function analyze(row: ScreenerRow): void {
                   </span>
                 </button>
               </th>
+              <th scope="col" class="star-col"><span class="sr-only">Theo dõi</span></th>
             </tr>
           </thead>
           <tbody>
@@ -130,6 +131,7 @@ function analyze(row: ScreenerRow): void {
               >
                 {{ cell(row, c) }}<template v-if="isStale(row, c)">*</template>
               </td>
+              <td class="star-col"><FavoriteButton :ticker="row.symbol" compact /></td>
             </tr>
           </tbody>
         </table>
@@ -341,6 +343,12 @@ td.down {
 td.stale {
   color: var(--muted);
   font-style: italic;
+}
+
+.star-col {
+  width: 42px;
+  text-align: center;
+  padding: 0 4px;
 }
 
 .sr-only {

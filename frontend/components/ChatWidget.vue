@@ -8,7 +8,7 @@
 import { LogIn, MessageCircle, Send, X } from 'lucide-vue-next'
 
 const route = useRoute()
-const { turns, pending, ask } = useChat()
+const { turns, pending, ask, loadHistory } = useChat()
 const { isLoggedIn, ensureLoaded } = useAuth()
 const activeTicker = useActiveTicker()
 
@@ -16,7 +16,11 @@ const open = ref(false)
 const question = ref('')
 const scoped = ref(true) // mặc định: giới hạn trong mã đang xem
 
-onMounted(ensureLoaded)
+onMounted(async () => {
+  await ensureLoaded()
+  //  Đã đăng nhập + chưa có lượt nào trong phiên → tải lại lịch sử hội thoại.
+  if (isLoggedIn.value && !turns.value.length) await loadHistory()
+})
 
 //  Ẩn widget ở những nơi thừa: trang trợ lý toàn màn hình và trang đăng nhập/ký.
 const hidden = computed(() => ['/tro-ly', '/dang-nhap', '/dang-ky'].includes(route.path))

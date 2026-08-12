@@ -7,7 +7,7 @@
 import { MessageCircle, Search, Star } from 'lucide-vue-next'
 
 const { isLoggedIn, ensureLoaded } = useAuth()
-const { turns, pending, status, ask, fetchStatus, reindex } = useChat()
+const { turns, pending, status, ask, loadHistory, fetchStatus, reindex } = useChat()
 
 const question = ref('')
 const ticker = ref('')
@@ -29,6 +29,7 @@ onMounted(async () => {
     return
   }
   await fetchStatus()
+  if (!turns.value.length) await loadHistory()  // tải lại hội thoại đã lưu
   //  Khi đang lập chỉ mục thì tự làm mới trạng thái cho người dùng thấy tiến độ.
   poll = setInterval(() => {
     if (status.value?.running) void fetchStatus()
