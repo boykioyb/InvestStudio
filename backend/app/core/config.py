@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
 
+    # ── Giới hạn tần suất đăng nhập (chống dò mật khẩu) ──────────────────────
+    rate_limit_redis_url: str = "redis://localhost:6379/2"
+    login_max_attempts: int = 10          # số lần/cửa sổ cho mỗi IP
+    login_window_seconds: int = 300       # cửa sổ 5 phút
+
 
 @lru_cache
 def get_settings() -> Settings:

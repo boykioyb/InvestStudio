@@ -6,11 +6,12 @@ gửi cookie kèm mỗi request cùng origin (qua proxy /api của Nuxt).
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core import ratelimit
 from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
@@ -35,8 +36,9 @@ def _set_auth_cookie(response: Response, user_id: int) -> None:
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED,
              summary="Đăng ký tài khoản mới")
-def register(payload: RegisterRequest, response: Response,
+def register(payload: RegisterRequest, request: Request, response: Response,
              db: Session = Depends(get_db)) -> User:
+    ratelimit.enforce(request, "register")  # chống đăng ký spam theo IP
     email = payload.email.lower().strip()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Email này đã được đăng ký.")
@@ -55,7 +57,9 @@ def register(payload: RegisterRequest, response: Response,
 
 
 @router.post("/login", response_model=UserOut, summary="Đăng nhập")
-def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
+def login(payload: LoginRequest, request: Request, response: Response,
+          db: Session = Depends(get_db)) -> User:
+    ratelimit.enforce(request, "login")  # chặn dò mật khẩu theo IP
     email = payload.email.lower().strip()
     user = db.scalar(select(User).where(User.email == email))
     #  Cùng một thông báo cho "sai email" và "sai mật khẩu" — không tiết lộ
@@ -63,6 +67,7 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Email hoặc mật khẩu không đúng.")
 
+    ratelimit.clear(request, "login")  # đăng nhập đúng → xóa bộ đếm cho IP này
     _set_auth_cookie(response, user.id)
     return user
 

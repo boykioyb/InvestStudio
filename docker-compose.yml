@@ -26,6 +26,8 @@ x-app-env: &app-env
   # Celery: Redis làm broker (/0) và result backend (/1)
   APP_CELERY_BROKER_URL: redis://redis:6379/0
   APP_CELERY_RESULT_BACKEND: redis://redis:6379/1
+  # Redis (/2) cho giới hạn tần suất đăng nhập
+  APP_RATE_LIMIT_REDIS_URL: redis://redis:6379/2
   TZ: Asia/Ho_Chi_Minh
 
 services:
