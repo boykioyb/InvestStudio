@@ -137,7 +137,6 @@ useHead({
       <NuxtLink to="/danh-sach" class="chip nav"><List /> Danh sách mã</NuxtLink>
       <NuxtLink to="/theo-doi" class="chip nav"><Star /> Theo dõi</NuxtLink>
       <NuxtLink to="/tro-ly" class="chip nav"><MessageCircle /> Trợ lý</NuxtLink>
-      <FavoriteButton v-if="data?.ticker" :ticker="data.ticker" />
 
       <div class="quick">
         <button

@@ -28,6 +28,7 @@ function pickRange(next: RangeKey) {
       <div class="id">
         <h2 class="ticker" :class="textClass(data.score.verdict.level)">{{ data.ticker }}</h2>
         <p class="name" :title="data.name">{{ data.name }}</p>
+        <FavoriteButton :ticker="data.ticker" class="follow" />
       </div>
       <div class="px">
         <span class="px-val tnum">{{ price(data.price) }}</span>
@@ -116,6 +117,10 @@ function pickRange(next: RangeKey) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+}
+
+.follow {
+  margin-top: 8px;
 }
 
 .ticker {
