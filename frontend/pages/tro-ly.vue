@@ -102,7 +102,8 @@ async function startReindex(): Promise<void> {
         <div v-if="turn.error" class="msg error">{{ turn.error }}</div>
 
         <div v-else-if="turn.response" class="answer">
-          <p class="a-text">{{ turn.response.answer }}</p>
+          <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="a-text" />
+          <p v-else class="a-text typing">Đang trả lời…</p>
 
           <details v-if="turn.response.citations.length" class="cites">
             <summary>{{ turn.response.citations.length }} nguồn tham chiếu</summary>
@@ -241,8 +242,12 @@ h1 {
 
 .a-text {
   margin: 0;
-  white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.typing {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .cites {

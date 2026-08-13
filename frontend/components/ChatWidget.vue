@@ -84,7 +84,8 @@ function submit(): void {
             <p class="q"><b>Bạn:</b> {{ turn.question }}</p>
             <div v-if="turn.error" class="a err">{{ turn.error }}</div>
             <div v-else-if="turn.response" class="a">
-              <p class="txt">{{ turn.response.answer }}</p>
+              <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="txt" />
+              <p v-else class="txt typing">Đang trả lời…</p>
               <details v-if="turn.response.citations.length" class="cites">
                 <summary>{{ turn.response.citations.length }} nguồn</summary>
                 <ul>
@@ -224,8 +225,12 @@ function submit(): void {
 
 .a .txt {
   margin: 0;
-  white-space: pre-wrap;
   line-height: 1.55;
+}
+
+.typing {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .a.err {
