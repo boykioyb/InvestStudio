@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 Level = Literal["good", "warn", "bad"]
 Trend = Literal["up", "side", "down"]
 OcfSign = Literal["+", "±", "-"]
-SourceMode = Literal["auto", "vnstock", "cafef"]
+SourceMode = Literal["auto", "vci", "cafef"]
 
 
 class Metrics(BaseModel):

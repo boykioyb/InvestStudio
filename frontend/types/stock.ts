@@ -13,7 +13,7 @@ export type ItemLevel = 0 | 1 | 2
 export type QualitativeOption = 0 | 1 | 2
 
 /** Nguồn dữ liệu muốn dùng. */
-export type SourceOption = 'auto' | 'vnstock' | 'cafef'
+export type SourceOption = 'auto' | 'vci' | 'cafef'
 
 /**
  * Lời giải thích do MÁY CHỦ soạn sẵn cho một tiêu chí / tầm nhìn.

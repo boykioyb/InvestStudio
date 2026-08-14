@@ -23,7 +23,7 @@ from typing import Optional
 
 from app.schemas.stock import Alert, AlertFeed, Level
 from app.services import feed, market
-from app.services.providers import vnstock_source
+from app.services.providers import vci_adapter
 from app.services.providers.base import ProviderError
 
 _EFFECT_LABEL = {
@@ -168,7 +168,7 @@ def _adjustment(event, is_cash: bool, price: Optional[float]) -> tuple[str, str]
 def _price_alerts(ticker: str) -> list[Alert]:
     """Bất thường ĐÃ XẢY RA trong dữ liệu giá — sự thật đo được, không phải dự báo."""
     try:
-        candles = vnstock_source.fetch_ohlcv(ticker, 365)
+        candles = vci_adapter.fetch_ohlcv(ticker, 365)
     except ProviderError:
         return []
     if len(candles) < 25:
@@ -322,7 +322,7 @@ def fetch_alerts(ticker: str) -> AlertFeed:
     price: Optional[float] = None
     asof = ""
     try:
-        candles = vnstock_source.fetch_ohlcv(ticker, 10)
+        candles = vci_adapter.fetch_ohlcv(ticker, 10)
         if candles:
             price, asof = candles[-1].close, candles[-1].date
     except ProviderError:

@@ -37,8 +37,9 @@ class User(Base):
 class WatchlistItem(Base):
     """Một mã người dùng ghim để theo dõi nhanh.
 
-    `target_price` / `target_score` là NGƯỠNG người dùng tự đặt để theo dõi —
-    hiện chỉ LƯU LẠI, chưa có job nền tự bắn cảnh báo (để giai đoạn sau).
+    `target_price` / `target_score` là NGƯỠNG người dùng tự đặt để theo dõi.
+    Job nền `watchlist.check_alerts` (Celery Beat, mỗi 30') so ngưỡng này với
+    giá/điểm hiện tại rồi tạo `Notification` (xem `core/celery_app.py`).
     """
 
     __tablename__ = "watchlist_items"

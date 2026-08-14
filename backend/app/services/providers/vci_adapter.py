@@ -1,11 +1,11 @@
-"""Provider khối cơ bản + kỹ thuật — nay là ADAPTER MỎNG trên `vci_direct`.
+"""Provider khối cơ bản + kỹ thuật — ADAPTER MỎNG trên `vci_direct`.
 
 Đã CAI vnstock/vnai hoàn toàn ở tầng này: kỹ thuật (OHLCV), cơ bản (chỉ số/BCTC)
 và hồ sơ (tên/ngành) đều gọi thẳng API VCI qua `vci_direct` — không còn dính trần
-20 req/phút hay bị vnai giết tiến trình. Giữ tên file để các nơi import khỏi đổi.
+20 req/phút hay bị vnai giết tiến trình.
 
 Chỉ số cơ bản lấy CHUẨN (RATIO_YEAR năm gần nhất + TTM mới nhất), tránh bug cũ của
-`Finance.ratio()` vnstock đọc trúng dòng nhãn năm rác.
+`Finance.ratio()` vnstock cũ đọc trúng dòng nhãn năm rác.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _PRICE_LOOKBACK_DAYS = 180
 
 
 def fetch_technical(ticker: str) -> TechnicalData:
-    #  Đã CAI vnstock cho khối kỹ thuật: lấy OHLCV thẳng từ VCI (không qua vnai).
+    #  Khối kỹ thuật: lấy OHLCV thẳng từ VCI (không qua vnstock/vnai).
     try:
         candles = vci_direct.ohlcv(ticker, _PRICE_LOOKBACK_DAYS)
     except VciError as exc:

@@ -1,8 +1,8 @@
 """Orchestrator: gộp dữ liệu nhiều nguồn → Metrics → gọi bộ chấm điểm.
 
 Tách theo KHỐI, mỗi khối có nguồn chính + dự phòng riêng:
-  · Kỹ thuật  : CafeF (JSON sạch, nhanh) → vnstock
-  · Cơ bản    : vnstock VCI → vnstock KBS
+  · Kỹ thuật  : CafeF (JSON sạch, nhanh) → VCI (Vietcap, gọi thẳng httpx)
+  · Cơ bản    : VCI → KBS
 Nhờ vậy hỏng một nguồn vẫn ra được phần còn lại; tiêu chí thật sự thiếu sẽ
 được đánh dấu `available=False` và tính 0đ (xem scoring.py).
 """
@@ -12,7 +12,7 @@ from typing import Callable, Optional
 
 from app.schemas.stock import Metrics, SourceMode, StockAnalysis
 from app.services import scoring
-from app.services.providers import cafef, vnstock_source
+from app.services.providers import cafef, vci_adapter
 from app.services.providers.base import FundamentalData, ProviderError, TechnicalData
 
 # P/E ngành & P/B hợp lý — ƯỚC LƯỢNG benchmark thị trường VN, không phải số crawl.
@@ -111,14 +111,14 @@ def analyze(
 
     # --- Khối kỹ thuật (bắt buộc) ---
     progress("technical", "Lấy lịch sử giá và tính chỉ báo kỹ thuật", 10)
-    if source == "vnstock":
-        tech_sources = [("vnstock", lambda: vnstock_source.fetch_technical(ticker))]
+    if source == "vci":
+        tech_sources = [("VCI", lambda: vci_adapter.fetch_technical(ticker))]
     elif source == "cafef":
         tech_sources = [("CafeF", lambda: cafef.fetch_technical(ticker))]
     else:
         tech_sources = [
             ("CafeF", lambda: cafef.fetch_technical(ticker)),
-            ("vnstock", lambda: vnstock_source.fetch_technical(ticker)),
+            ("VCI", lambda: vci_adapter.fetch_technical(ticker)),
         ]
     technical: Optional[TechnicalData] = _first_success(tech_sources, used, "giá/kỹ thuật")  # type: ignore[assignment]
     if technical is None:
@@ -134,10 +134,10 @@ def analyze(
                 "đủ chỉ số cơ bản.")
     else:
         progress("company", "Đọc hồ sơ doanh nghiệp và ngành", 45)
-        name, sector = vnstock_source.fetch_company(ticker)
+        name, sector = vci_adapter.fetch_company(ticker)
         progress("fundamentals", "Lấy báo cáo tài chính (KQKD, cân đối, lưu chuyển tiền)", 55)
         fundamentals = _first_success(  # type: ignore[assignment]
-            [(f"vnstock/{src}", lambda src=src: vnstock_source.fetch_fundamentals(ticker, src))
+            [(src, lambda src=src: vci_adapter.fetch_fundamentals(ticker, src))
              for src in ("VCI", "KBS")],
             used, "cơ bản")
         if fundamentals is None:

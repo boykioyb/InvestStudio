@@ -1,12 +1,13 @@
 """Lập chỉ mục dữ liệu VN30 + tin tức vào kho vector cho RAG.
 
-Nguồn dữ liệu: ưu tiên **VCI trực tiếp** (`providers/vci_direct.py`) — không qua
-vnstock/vnai nên KHÔNG dính trần 20 req/phút và KHÔNG bị giết tiến trình; cả rổ
-VN30 (giá + tin) lấy xong trong vài giây. Nếu VCI lỗi (đổi API…) thì tự **quay
-về vnstock** (screener/feed) với giãn cách + retry như cũ.
+Nguồn dữ liệu: ưu tiên **VCI trực tiếp theo lô** (`providers/vci_direct.py`) —
+không qua vnstock/vnai nên KHÔNG dính trần 20 req/phút và KHÔNG bị giết tiến
+trình; cả rổ VN30 (giá + tin) lấy xong trong vài giây. Nếu đường lô lỗi (đổi
+API…) thì rơi về **đường dự phòng từng-mã** qua `screener`/`feed` — vẫn VCI
+nhưng có giãn cách + retry cho chắc.
 
 Vòng lặp nằm ở `run_index(...)`; việc chạy nền do Celery lo (xem `tasks.py`).
-`deep=True` mới gọi `analyze()` cho điểm số/ROE (vẫn qua vnstock → có giãn cách).
+`deep=True` mới gọi `analyze()` cho điểm số/ROE (crawl nhiều request → có giãn cách).
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ from app.services.rag.gemini import embed_texts
 
 Reporter = Callable[[str], None]
 
-#  Dấu hiệu lỗi đã chạm trần nguồn (chỉ còn dùng cho đường vnstock fallback).
+#  Dấu hiệu lỗi đã chạm trần nguồn (chỉ còn dùng cho đường dự phòng từng-mã).
 _RATE_HINTS = ("rate limit", "giới hạn", "quota", "429", "too many", "tối đa")
 
 
@@ -38,7 +39,7 @@ def _looks_rate_limited(exc: Exception) -> bool:
 
 
 def _with_retry(fn: Callable, report: Reporter, *, tries: int = 3, cooldown: int = 65):
-    """Đường vnstock: chạm trần thì nghỉ rồi thử lại (vnai hay giết tiến trình)."""
+    """Đường dự phòng: chạm trần thì nghỉ rồi thử lại cho chắc."""
     for attempt in range(tries):
         try:
             return fn()
@@ -140,7 +141,7 @@ def _load_rows(symbols: Optional[list[str]], report: Reporter):
             rows.append((code, row.name if row else code, row))
         return rows, True
     except VciError as exc:
-        report(f"VCI lỗi ({exc}) — quay về vnstock.")
+        report(f"VCI theo lô lỗi ({exc}) — chuyển đường dự phòng từng-mã.")
         if symbols:
             return [(c.upper(), c.upper(), None) for c in symbols], False
         listing = _with_retry(
@@ -149,7 +150,7 @@ def _load_rows(symbols: Optional[list[str]], report: Reporter):
 
 
 def _news_doc_text(symbol: str, use_vci: bool) -> str:
-    """Nội dung doc tin cho một mã. Ưu tiên VCI, hỏng thì rơi về vnstock feed."""
+    """Nội dung doc tin cho một mã. Ưu tiên VCI, hỏng thì rơi về feed dự phòng."""
     if use_vci:
         try:
             return _news_text_vci(symbol, vci_direct.news(symbol, days=180, size=30))
@@ -173,7 +174,7 @@ def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
         rows, use_vci = _load_rows(symbols, report)
         done = store.existing_source_keys(db, "news:") if skip_existing else set()
         report(f"Bắt đầu lập chỉ mục {len(rows)} mã "
-               f"({'VCI trực tiếp' if use_vci else 'vnstock'}; bỏ qua {len(done)} mã đã có)…")
+               f"({'VCI theo lô' if use_vci else 'dự phòng từng-mã'}; bỏ qua {len(done)} mã đã có)…")
 
         for index, (symbol, name, row) in enumerate(rows, start=1):
             if include_news and skip_existing and f"news:{symbol}" in done:
@@ -190,7 +191,7 @@ def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
             if deep:
                 if (doc := _analysis_doc(symbol, name, report)):
                     docs.append(doc)
-                _throttle()  # analyze() vẫn qua vnstock → luôn giãn cách
+                _throttle()  # analyze() crawl nhiều request → luôn giãn cách
             if include_news:
                 if (text := _news_doc_text(symbol, use_vci)):
                     docs.append({
@@ -198,7 +199,7 @@ def run_index(symbols: Optional[list[str]], include_news: bool, deep: bool,
                         "title": f"Tin tức {symbol}", "content": text,
                         "meta": {"name": name}, "embedding": [],
                     })
-                if not use_vci:  # chỉ giãn cách khi phải dùng vnstock
+                if not use_vci:  # chỉ giãn cách khi đi đường dự phòng từng-mã
                     _throttle()
 
             total += _embed_and_store(db, docs)

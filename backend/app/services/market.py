@@ -24,7 +24,7 @@ from app.schemas.stock import (
     TradingBoard,
 )
 from app.services.history import RANGES
-from app.services.providers import vnstock_source
+from app.services.providers import vci_adapter
 from app.services.providers.base import Candle, ProviderError
 
 _BILLION = 1_000_000_000
@@ -179,7 +179,7 @@ def fetch_money_flow(ticker: str, range_key: RangeKey) -> MoneyFlow:
     days, label = RANGES[range_key]
 
     #  Cần thêm lịch sử phía trước để MFI có đủ 14 phiên khởi động.
-    candles = vnstock_source.fetch_ohlcv(ticker, days + 40)
+    candles = vci_adapter.fetch_ohlcv(ticker, days + 40)
     if len(candles) < 2:
         raise ProviderError(f"Không đủ dữ liệu giá cho {ticker} để tính dòng tiền.")
 
@@ -258,7 +258,7 @@ def fetch_stats(ticker: str, range_key: RangeKey) -> StockStats:
     """Thống kê tự tính từ lịch sử giá: biên độ, biến động, phiên tăng/giảm."""
     ticker = ticker.upper().strip()
     days, label = RANGES[range_key]
-    candles = vnstock_source.fetch_ohlcv(ticker, days)
+    candles = vci_adapter.fetch_ohlcv(ticker, days)
     if len(candles) < 2:
         raise ProviderError(f"Không đủ dữ liệu giá cho {ticker} trong khung {label.lower()}.")
 
