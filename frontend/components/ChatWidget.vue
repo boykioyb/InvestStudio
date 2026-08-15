@@ -91,24 +91,30 @@ function submit(): void {
           </p>
 
           <article v-for="(turn, i) in turns" :key="i" class="turn">
-            <p class="q"><b>Bạn:</b> {{ turn.question }}</p>
+            <div class="msg user">
+              <div class="bubble">{{ turn.question }}</div>
+            </div>
+
             <ul v-if="turn.steps && turn.steps.length" class="steps">
               <li v-for="(s, k) in turn.steps" :key="k">🔧 {{ s.label }}</li>
             </ul>
-            <div v-if="turn.error" class="a err">{{ turn.error }}</div>
-            <div v-else-if="turn.response" class="a">
-              <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="txt" />
-              <p v-else class="txt typing">Đang trả lời…</p>
-              <details v-if="turn.response.citations.length" class="cites">
-                <summary>{{ turn.response.citations.length }} nguồn</summary>
-                <ul>
-                  <li v-for="(c, j) in turn.response.citations" :key="j">
-                    <b>{{ c.ticker }}</b> · {{ c.title }}
-                  </li>
-                </ul>
-              </details>
+
+            <div class="msg bot">
+              <div v-if="turn.error" class="bubble err">{{ turn.error }}</div>
+              <div v-else-if="turn.response" class="bubble">
+                <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="txt" />
+                <p v-else class="txt typing">Đang trả lời…</p>
+                <details v-if="turn.response.citations.length" class="cites">
+                  <summary>{{ turn.response.citations.length }} nguồn</summary>
+                  <ul>
+                    <li v-for="(c, j) in turn.response.citations" :key="j">
+                      <b>{{ c.ticker }}</b> · {{ c.title }}
+                    </li>
+                  </ul>
+                </details>
+              </div>
+              <div v-else class="bubble typing">Đang trả lời…</div>
             </div>
-            <p v-else class="a note">Đang trả lời…</p>
           </article>
         </div>
 
@@ -223,15 +229,64 @@ function submit(): void {
 }
 
 .turn {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/*  Hàng tin nhắn: câu hỏi dồn phải, câu trả lời dồn trái. */
+.msg {
+  display: flex;
+}
+
+.msg.user {
+  justify-content: flex-end;
+}
+
+.msg.bot {
+  justify-content: flex-start;
+}
+
+/*  Bong bóng chung. */
+.bubble {
+  max-width: 85%;
+  padding: 8px 11px;
+  font-size: 13px;
+  line-height: 1.55;
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+}
+
+/*  Câu hỏi: nền xanh nhạt (accent), góc dưới-phải vát. */
+.msg.user .bubble {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text);
+  border-bottom-right-radius: 4px;
+}
+
+/*  Câu trả lời: nền panel trung tính, góc dưới-trái vát. */
+.msg.bot .bubble {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+/*  Gọn lề đoạn đầu/cuối của markdown trong bong bóng. */
+.msg.bot .bubble :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.msg.bot .bubble :deep(p:last-child) {
+  margin-bottom: 0;
 }
 
 /*  Các bước công cụ agent đã/đang chạy — nhỏ, mờ, không lấn câu trả lời. */
 .steps {
   list-style: none;
-  margin: 0 0 6px;
-  padding: 0;
+  margin: 0;
+  padding: 0 2px;
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
@@ -242,18 +297,8 @@ function submit(): void {
   color: var(--muted);
 }
 
-.q {
-  margin: 0 0 6px;
-  font-size: 13px;
-}
-
-.a {
-  font-size: 13px;
-}
-
-.a .txt {
+.txt {
   margin: 0;
-  line-height: 1.55;
 }
 
 .typing {
@@ -261,8 +306,9 @@ function submit(): void {
   font-style: italic;
 }
 
-.a.err {
+.bubble.err {
   color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
 }
 
 .cites {

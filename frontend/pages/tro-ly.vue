@@ -97,29 +97,37 @@ async function startReindex(): Promise<void> {
     <!-- Hội thoại -->
     <div v-if="turns.length" class="thread">
       <article v-for="(turn, i) in turns" :key="i" class="turn">
-        <p class="q-line"><span class="who">Bạn</span> {{ turn.question }}</p>
-
-        <div v-if="turn.error" class="msg error">{{ turn.error }}</div>
-
-        <div v-else-if="turn.response" class="answer">
-          <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="a-text" />
-          <p v-else class="a-text typing">Đang trả lời…</p>
-
-          <details v-if="turn.response.citations.length" class="cites">
-            <summary>{{ turn.response.citations.length }} nguồn tham chiếu</summary>
-            <ul>
-              <li v-for="(c, j) in turn.response.citations" :key="j">
-                <span class="tag lv-na">{{ c.ticker }} · {{ c.doc_type }}</span>
-                <b>{{ c.title }}</b>
-                <span class="snip">{{ c.snippet }}</span>
-              </li>
-            </ul>
-          </details>
-
-          <p class="note tiny">{{ turn.response.note }}</p>
+        <div class="chat-row me">
+          <div class="bubble me">{{ turn.question }}</div>
         </div>
 
-        <p v-else class="note">Đang chờ trả lời…</p>
+        <ul v-if="turn.steps && turn.steps.length" class="steps">
+          <li v-for="(s, k) in turn.steps" :key="k">🔧 {{ s.label }}</li>
+        </ul>
+
+        <div v-if="turn.error" class="chat-row bot">
+          <div class="bubble bot err">{{ turn.error }}</div>
+        </div>
+        <div v-else-if="turn.response" class="chat-row bot">
+          <div class="bubble bot">
+            <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="a-text" />
+            <p v-else class="a-text typing">Đang trả lời…</p>
+
+            <details v-if="turn.response.citations.length" class="cites">
+              <summary>{{ turn.response.citations.length }} nguồn tham chiếu</summary>
+              <ul>
+                <li v-for="(c, j) in turn.response.citations" :key="j">
+                  <span class="tag lv-na">{{ c.ticker }} · {{ c.doc_type }}</span>
+                  <b>{{ c.title }}</b>
+                  <span class="snip">{{ c.snippet }}</span>
+                </li>
+              </ul>
+            </details>
+          </div>
+        </div>
+        <div v-else class="chat-row bot">
+          <div class="bubble bot typing">Đang chờ trả lời…</div>
+        </div>
       </article>
     </div>
 
@@ -214,40 +222,88 @@ h1 {
 .thread {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   margin-top: 8px;
 }
 
+/*  Mỗi lượt = hàng câu hỏi (phải) + steps + hàng trả lời (trái), kiểu Messenger. */
 .turn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-row {
+  display: flex;
+}
+
+.chat-row.me {
+  justify-content: flex-end;
+}
+
+.chat-row.bot {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 74%;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  border-radius: 18px;
+  overflow-wrap: anywhere;
+}
+
+/*  Câu hỏi: bong bóng xanh đặc, chữ trắng (kiểu Messenger). */
+.bubble.me {
+  background: color-mix(in srgb, var(--accent) 88%, black);
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+
+/*  Câu trả lời: bong bóng xám trung tính, góc dưới-trái vát. */
+.bubble.bot {
+  background: var(--panel2);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel);
-  padding: 14px 16px;
+  color: var(--text);
+  border-bottom-left-radius: 5px;
 }
 
-.q-line {
-  margin: 0 0 10px;
-  font-weight: 600;
+.bubble.bot :deep(p:first-child) {
+  margin-top: 0;
 }
 
-.who {
-  display: inline-block;
-  font-size: 10.5px;
-  font-weight: 800;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-right: 6px;
+.bubble.bot :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.bubble.err {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
 }
 
 .a-text {
   margin: 0;
-  line-height: 1.6;
 }
 
 .typing {
   color: var(--muted);
   font-style: italic;
+}
+
+/*  Bước công cụ agent — nhỏ, mờ, canh trái dưới câu hỏi. */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.steps li {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .cites {
@@ -279,10 +335,5 @@ h1 {
 
 .snip {
   color: var(--muted);
-}
-
-.tiny {
-  margin-top: 10px;
-  font-size: 11px;
 }
 </style>
