@@ -64,6 +64,26 @@ class RagDocument(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Conversation(Base):
+    """Một 'câu chuyện' (thread) hỏi–đáp riêng của người dùng — như ChatGPT/Messenger.
+
+    Mỗi cuộc gom nhiều `ChatMessage`. `ticker` là mã bối cảnh lúc mở cuộc (tùy chọn).
+    Xoá cuộc → xoá luôn tin nhắn con (CASCADE).
+    """
+
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), default="")
+    ticker: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    #  Cập nhật mỗi khi có tin nhắn mới → danh sách xếp theo cuộc gần nhất.
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class ChatMessage(Base):
     """Một lượt hỏi–đáp RAG đã lưu, để tải lại lịch sử hội thoại của người dùng."""
 
@@ -72,6 +92,9 @@ class ChatMessage(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    #  Thuộc cuộc trò chuyện nào (NULL = tin nhắn phẳng cũ / từ widget nổi).
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), index=True, nullable=True)
     #  Mã đang xem lúc hỏi (NULL = câu hỏi chung, không gắn mã). Cho phép tải lại
     #  lịch sử ĐÚNG theo mã ở widget nổi mà không lẫn hội thoại của mã khác.
     ticker: Mapped[str | None] = mapped_column(String(12), index=True, nullable=True)

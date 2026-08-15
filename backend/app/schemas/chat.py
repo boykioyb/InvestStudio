@@ -31,6 +31,23 @@ class ChatRequest(BaseModel):
     ticker: Optional[str] = Field(None, max_length=12)
     #  Vài lượt gần nhất của hội thoại hiện tại (để giữ ngữ cảnh nối tiếp).
     history: list[ChatTurnInput] = Field(default_factory=list)
+    #  Thuộc cuộc trò chuyện nào; None + start_conversation=True → tạo cuộc mới.
+    conversation_id: Optional[int] = None
+    start_conversation: bool = Field(
+        False, description="True = tạo cuộc trò chuyện mới cho lượt này (trang Trợ lý)")
+
+
+class ConversationOut(BaseModel):
+    """Một câu chuyện trong danh sách bên trái trang Trợ lý."""
+
+    id: int
+    title: str
+    ticker: Optional[str] = None
+    updated_at: str = Field(..., description="ISO thời điểm cập nhật gần nhất")
+
+
+class ConversationRename(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
 
 
 class Citation(BaseModel):
@@ -44,6 +61,8 @@ class Citation(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    #  Cuộc trò chuyện chứa lượt này (mới tạo hoặc đang tiếp) — để FE bám theo.
+    conversation_id: Optional[int] = None
     citations: list[Citation] = []
     steps: list[AgentStep] = Field(
         default_factory=list,

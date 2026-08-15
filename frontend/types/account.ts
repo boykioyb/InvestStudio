@@ -41,9 +41,18 @@ export interface AgentStep {
 
 export interface ChatResponse {
   answer: string
+  conversation_id?: number | null
   citations: Citation[]
   steps?: AgentStep[]
   note: string
+}
+
+/** Một câu chuyện (thread) trong danh sách bên trái trang Trợ lý. */
+export interface ConversationOut {
+  id: number
+  title: string
+  ticker?: string | null
+  updated_at: string
 }
 
 export interface IndexStatus {

@@ -1,15 +1,20 @@
 <script setup lang="ts">
 /**
- * Trợ lý hỏi–đáp RAG. Cần đăng nhập.
- * Hỏi bằng ngôn ngữ tự nhiên; câu trả lời do backend tổng hợp từ dữ liệu VN30 +
- * tin tức đã lập chỉ mục, kèm nguồn để người dùng tự kiểm chứng.
+ * Trợ lý hỏi–đáp RAG (Agentic). Cần đăng nhập.
+ * Bố cục kiểu Messenger: thanh bên trái = danh sách CÂU CHUYỆN; bên phải = khung chat.
+ * Chỉ gọi composable; không chứa logic nghiệp vụ.
  */
-import { MessageCircle, Search, Star } from 'lucide-vue-next'
+import { MessageCircle, Pencil, Plus, Search, Star, Trash2 } from 'lucide-vue-next'
+import type { ConversationOut } from '~/types/account'
 
 definePageMeta({ middleware: 'auth' })
 
 const { ensureLoaded } = useAuth()
-const { turns, pending, status, askStream, loadHistory, fetchStatus, reindex } = useChat()
+const {
+  turns, pending, status, conversations, activeConvId,
+  askStream, fetchStatus, reindex,
+  loadConversations, openConversation, newConversation, renameConversation, deleteConversation
+} = useChat()
 
 const question = ref('')
 const ticker = ref('')
@@ -19,7 +24,7 @@ let poll: ReturnType<typeof setInterval> | null = null
 useHead({ title: 'Trợ lý hỏi–đáp — InvestStudio' })
 
 const examples = [
-  'Mã nào trong VN30 có ROE cao nhất?',
+  'Mã nào trong VN30 vốn hóa lớn nhất?',
   'FPT có tin tức gì đáng chú ý gần đây?',
   'So sánh định giá P/E của VCB và CTG.'
 ]
@@ -27,8 +32,9 @@ const examples = [
 onMounted(async () => {
   await ensureLoaded()  // middleware đã đảm bảo đăng nhập
   await fetchStatus()
-  if (!turns.value.length) await loadHistory()  // tải lại hội thoại đã lưu
-  //  Khi đang lập chỉ mục thì tự làm mới trạng thái cho người dùng thấy tiến độ.
+  await loadConversations()
+  //  Mở sẵn cuộc gần nhất để có gì đó để xem; chưa có thì để khung trống.
+  if (conversations.value.length) await openConversation(conversations.value[0].id)
   poll = setInterval(() => {
     if (status.value?.running) void fetchStatus()
   }, 4000)
@@ -41,7 +47,18 @@ onBeforeUnmount(() => {
 function submit(): void {
   const q = question.value
   question.value = ''
-  askStream(q, ticker.value)
+  //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới ngay ở lượt hỏi này.
+  askStream(q, ticker.value,
+    activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
+}
+
+function onRename(c: ConversationOut): void {
+  const t = window.prompt('Đổi tên câu chuyện:', c.title)
+  if (t && t.trim()) void renameConversation(c.id, t.trim())
+}
+
+function onDelete(c: ConversationOut): void {
+  if (window.confirm(`Xoá câu chuyện "${c.title}"? Không thể hoàn tác.`)) void deleteConversation(c.id)
 }
 
 async function startReindex(): Promise<void> {
@@ -60,79 +77,100 @@ async function startReindex(): Promise<void> {
       </div>
     </header>
 
-    <!-- Trạng thái kho dữ liệu -->
-    <div class="card status">
-      <div>
-        <p class="sec-title">Kho dữ liệu RAG</p>
-        <p v-if="status" class="note">
-          <b>{{ status.documents }}</b> đoạn văn bản · <b>{{ status.tickers }}</b> mã đã lập chỉ mục.
-          <span v-if="status.last_message"> — {{ status.last_message }}</span>
-        </p>
-        <p v-else class="note">Chưa lấy được trạng thái.</p>
-      </div>
-      <button type="button" class="btn" :disabled="status?.running" @click="startReindex">
-        {{ status?.running ? 'Đang lập chỉ mục…' : 'Lập chỉ mục VN30 + tin' }}
-      </button>
-    </div>
-    <p v-if="reindexMsg" class="msg ok">{{ reindexMsg }}</p>
-
-    <!-- Ô hỏi -->
-    <div class="card">
-      <form class="askbar" @submit.prevent="submit">
-        <input v-model="ticker" type="text" maxlength="12" class="tk"
-               placeholder="Mã (tùy chọn)" aria-label="Giới hạn theo mã"
-               autocapitalize="characters" spellcheck="false" />
-        <input v-model="question" type="text" class="q" required
-               placeholder="Hỏi điều gì đó về cổ phiếu…" aria-label="Câu hỏi" />
-        <button class="btn primary" type="submit" :disabled="pending">
-          {{ pending ? 'Đang hỏi…' : 'Hỏi →' }}
+    <div class="chat-layout">
+      <!-- Thanh bên: danh sách câu chuyện -->
+      <aside class="sidebar">
+        <button type="button" class="btn primary new" @click="newConversation">
+          <Plus :size="16" /> Cuộc mới
         </button>
-      </form>
-      <div class="samples">
-        <button v-for="ex in examples" :key="ex" type="button" class="sample"
-                :disabled="pending" @click="question = ex">{{ ex }}</button>
-      </div>
-    </div>
 
-    <!-- Hội thoại -->
-    <div v-if="turns.length" class="thread">
-      <article v-for="(turn, i) in turns" :key="i" class="turn">
-        <div class="chat-row me">
-          <div class="bubble me">{{ turn.question }}</div>
-        </div>
-
-        <ul v-if="turn.steps && turn.steps.length" class="steps">
-          <li v-for="(s, k) in turn.steps" :key="k">🔧 {{ s.label }}</li>
+        <ul class="conv-list">
+          <li v-for="c in conversations" :key="c.id"
+              :class="['conv', { active: c.id === activeConvId }]"
+              @click="openConversation(c.id)">
+            <span class="conv-title">{{ c.title }}</span>
+            <span class="conv-actions">
+              <button type="button" title="Đổi tên" @click.stop="onRename(c)"><Pencil :size="14" /></button>
+              <button type="button" title="Xoá" @click.stop="onDelete(c)"><Trash2 :size="14" /></button>
+            </span>
+          </li>
+          <li v-if="!conversations.length" class="empty">Chưa có câu chuyện nào.</li>
         </ul>
 
-        <div v-if="turn.error" class="chat-row bot">
-          <div class="bubble bot err">{{ turn.error }}</div>
+        <!-- Kho dữ liệu + lập chỉ mục (gọn ở chân) -->
+        <div class="idx">
+          <p v-if="status" class="note tiny">
+            <b>{{ status.documents }}</b> đoạn · <b>{{ status.tickers }}</b> mã đã lập chỉ mục
+          </p>
+          <button type="button" class="btn idx-btn" :disabled="status?.running" @click="startReindex">
+            {{ status?.running ? 'Đang lập chỉ mục…' : 'Lập chỉ mục VN30 + tin' }}
+          </button>
+          <p v-if="reindexMsg" class="note tiny">{{ reindexMsg }}</p>
         </div>
-        <div v-else-if="turn.response" class="chat-row bot">
-          <div class="bubble bot">
-            <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="a-text" />
-            <p v-else class="a-text typing">Đang trả lời…</p>
+      </aside>
 
-            <details v-if="turn.response.citations.length" class="cites">
-              <summary>{{ turn.response.citations.length }} nguồn tham chiếu</summary>
-              <ul>
-                <li v-for="(c, j) in turn.response.citations" :key="j">
-                  <span class="tag lv-na">{{ c.ticker }} · {{ c.doc_type }}</span>
-                  <b>{{ c.title }}</b>
-                  <span class="snip">{{ c.snippet }}</span>
-                </li>
-              </ul>
-            </details>
-          </div>
+      <!-- Khung chat -->
+      <section class="main">
+        <div v-if="turns.length" class="thread">
+          <article v-for="(turn, i) in turns" :key="i" class="turn">
+            <div class="chat-row me">
+              <div class="bubble me">{{ turn.question }}</div>
+            </div>
+
+            <ul v-if="turn.steps && turn.steps.length" class="steps">
+              <li v-for="(s, k) in turn.steps" :key="k">🔧 {{ s.label }}</li>
+            </ul>
+
+            <div v-if="turn.error" class="chat-row bot">
+              <div class="bubble bot err">{{ turn.error }}</div>
+            </div>
+            <div v-else-if="turn.response" class="chat-row bot">
+              <div class="bubble bot">
+                <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="a-text" />
+                <p v-else class="a-text typing">Đang trả lời…</p>
+
+                <details v-if="turn.response.citations.length" class="cites">
+                  <summary>{{ turn.response.citations.length }} nguồn tham chiếu</summary>
+                  <ul>
+                    <li v-for="(c, j) in turn.response.citations" :key="j">
+                      <span class="tag lv-na">{{ c.ticker }} · {{ c.doc_type }}</span>
+                      <b>{{ c.title }}</b>
+                      <span class="snip">{{ c.snippet }}</span>
+                    </li>
+                  </ul>
+                </details>
+              </div>
+            </div>
+            <div v-else class="chat-row bot">
+              <div class="bubble bot typing">Đang chờ trả lời…</div>
+            </div>
+          </article>
         </div>
-        <div v-else class="chat-row bot">
-          <div class="bubble bot typing">Đang chờ trả lời…</div>
+        <p v-else class="empty-thread">
+          {{ activeConvId
+            ? 'Câu chuyện này chưa có tin nhắn.'
+            : 'Bắt đầu một câu chuyện mới — hỏi bất cứ điều gì về cổ phiếu.' }}
+        </p>
+
+        <form class="askbar" @submit.prevent="submit">
+          <input v-model="ticker" type="text" maxlength="12" class="tk"
+                 placeholder="Mã (tùy chọn)" aria-label="Giới hạn theo mã"
+                 autocapitalize="characters" spellcheck="false" />
+          <input v-model="question" type="text" class="q" required
+                 placeholder="Hỏi điều gì đó về cổ phiếu…" aria-label="Câu hỏi" />
+          <button class="btn primary" type="submit" :disabled="pending">
+            {{ pending ? 'Đang hỏi…' : 'Hỏi →' }}
+          </button>
+        </form>
+        <div class="samples">
+          <button v-for="ex in examples" :key="ex" type="button" class="sample"
+                  :disabled="pending" @click="question = ex">{{ ex }}</button>
         </div>
-      </article>
+      </section>
     </div>
 
     <p class="disclaimer">
-      Trợ lý chỉ tổng hợp dữ liệu đã lập chỉ mục và có thể sai — luôn đối chiếu nguồn gốc.
+      Trợ lý tổng hợp dữ liệu (có thể sai) — luôn đối chiếu nguồn.
       Đây là công cụ hỗ trợ tư duy, <b>không phải khuyến nghị đầu tư</b>.
     </p>
   </div>
@@ -158,75 +196,150 @@ h1 {
   font-size: 12.5px;
 }
 
-.status {
+/*  Bố cục 2 cột: danh sách câu chuyện | khung chat. */
+.chat-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 14px;
+  height: calc(100dvh - 150px);
+  min-height: 440px;
+  margin-top: 12px;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px;
+  overflow: hidden;
+}
+
+.new {
+  justify-content: center;
+  gap: 6px;
+}
+
+.conv-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conv {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.askbar {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.askbar .tk {
-  width: 130px;
-  flex: none;
-  text-transform: uppercase;
-}
-
-.askbar .q {
-  flex: 1;
-  min-width: 200px;
-}
-
-.askbar input {
-  background: var(--panel2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  border-radius: 9px;
-  padding: 10px 12px;
-  font-size: 14px;
-}
-
-.askbar input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.samples {
-  display: flex;
   gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.sample {
-  border: 1px dashed var(--line);
-  background: transparent;
-  color: var(--muted);
-  border-radius: 16px;
-  padding: 4px 10px;
-  font-size: 11.5px;
+  padding: 8px 10px;
+  border-radius: 9px;
   cursor: pointer;
+  font-size: 13px;
 }
 
-.sample:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
+.conv:hover {
+  background: var(--panel2);
+}
+
+.conv.active {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.conv-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.conv:hover .conv-actions,
+.conv.active .conv-actions {
+  opacity: 1;
+}
+
+.conv-actions button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+}
+
+.conv-actions button:hover {
+  color: var(--text);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 8px 10px;
+}
+
+.idx {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.idx-btn {
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.tiny {
+  font-size: 11px;
+  margin: 0;
+}
+
+/* ── Khung chat ───────────────────────────────────────────────────────────── */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 8px;
 }
 
-/*  Mỗi lượt = hàng câu hỏi (phải) + steps + hàng trả lời (trái), kiểu Messenger. */
+.empty-thread {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--muted);
+  padding: 24px;
+}
+
+/*  Mỗi lượt = câu hỏi (phải) + steps + trả lời (trái), kiểu Messenger. */
 .turn {
   display: flex;
   flex-direction: column;
@@ -246,7 +359,7 @@ h1 {
 }
 
 .bubble {
-  max-width: 74%;
+  max-width: 78%;
   padding: 10px 14px;
   font-size: 14px;
   line-height: 1.6;
@@ -254,14 +367,12 @@ h1 {
   overflow-wrap: anywhere;
 }
 
-/*  Câu hỏi: bong bóng xanh đặc, chữ trắng (kiểu Messenger). */
 .bubble.me {
   background: color-mix(in srgb, var(--accent) 88%, black);
   color: #fff;
   border-bottom-right-radius: 5px;
 }
 
-/*  Câu trả lời: bong bóng xám trung tính, góc dưới-trái vát. */
 .bubble.bot {
   background: var(--panel2);
   border: 1px solid var(--line);
@@ -291,7 +402,6 @@ h1 {
   font-style: italic;
 }
 
-/*  Bước công cụ agent — nhỏ, mờ, canh trái dưới câu hỏi. */
 .steps {
   list-style: none;
   margin: 0;
@@ -335,5 +445,82 @@ h1 {
 
 .snip {
   color: var(--muted);
+}
+
+/* ── Ô hỏi ───────────────────────────────────────────────────────────────── */
+.askbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding: 10px;
+}
+
+.askbar .tk {
+  width: 120px;
+  flex: none;
+  text-transform: uppercase;
+}
+
+.askbar .q {
+  flex: 1;
+  min-width: 160px;
+}
+
+.askbar input {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.askbar input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.samples {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 10px 10px;
+}
+
+.sample {
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.sample:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.disclaimer {
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .chat-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .sidebar {
+    max-height: 240px;
+  }
+
+  .thread {
+    min-height: 340px;
+  }
 }
 </style>

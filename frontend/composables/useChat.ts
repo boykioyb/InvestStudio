@@ -1,4 +1,4 @@
-import type { AgentStep, ChatResponse, IndexStatus } from '~/types/account'
+import type { AgentStep, ChatResponse, ConversationOut, IndexStatus } from '~/types/account'
 
 /** Một lượt hỏi–đáp để hiển thị lịch sử hội thoại trên trang trợ lý. */
 export interface ChatTurn {
@@ -7,6 +7,12 @@ export interface ChatTurn {
   error: string
   /** Các bước công cụ agent đang chạy (cập nhật trực tiếp khi stream). */
   steps?: AgentStep[]
+}
+
+/** Tuỳ chọn cuộc trò chuyện khi hỏi (trang Trợ lý). Widget nổi bỏ trống → phẳng. */
+export interface AskOptions {
+  conversationId?: number | null
+  startConversation?: boolean
 }
 
 //  Số lượt gần nhất gửi kèm để agent giữ ngữ cảnh nối tiếp ("ROE của nó?").
@@ -23,6 +29,9 @@ export function useChat() {
   const turns = ref<ChatTurn[]>([])
   const pending = ref(false)
   const status = ref<IndexStatus | null>(null)
+  //  Danh sách câu chuyện + cuộc đang mở (chỉ dùng ở trang Trợ lý).
+  const conversations = ref<ConversationOut[]>([])
+  const activeConvId = ref<number | null>(null)
 
   function messageOf(err: unknown, fallback: string): string {
     const detail = (err as { data?: { detail?: unknown } })?.data?.detail
@@ -42,7 +51,15 @@ export function useChat() {
       .map((t) => ({ question: t.question, answer: (t.response?.answer || '').slice(0, 1200) }))
   }
 
-  async function ask(question: string, ticker = ''): Promise<void> {
+  /** Sau một lượt có gắn cuộc: bám theo id cuộc + làm mới danh sách (đổi tên/thứ tự). */
+  async function afterConversationTurn(resp: ChatResponse | null): Promise<void> {
+    if (resp?.conversation_id) {
+      activeConvId.value = resp.conversation_id
+      await loadConversations()
+    }
+  }
+
+  async function ask(question: string, ticker = '', opts: AskOptions = {}): Promise<void> {
     const q = question.trim()
     if (!q) return
     const history = historyPayload()
@@ -52,10 +69,15 @@ export function useChat() {
     try {
       turn.response = await call<ChatResponse>('', {
         method: 'POST',
-        body: { question: q, ticker: ticker.trim().toUpperCase() || null, history },
+        body: {
+          question: q, ticker: ticker.trim().toUpperCase() || null, history,
+          conversation_id: opts.conversationId ?? null,
+          start_conversation: !!opts.startConversation
+        },
         //  Agent có thể gọi nhiều vòng Gemini + phân tích mã nên cho chờ lâu.
         timeout: 90_000
       })
+      await afterConversationTurn(turn.response)
     } catch (err) {
       turn.error = messageOf(err, 'Trợ lý chưa trả lời được. Thử lại sau.')
     } finally {
@@ -64,11 +86,11 @@ export function useChat() {
   }
 
   /** Hỏi và nhận câu trả lời THEO LUỒNG (SSE). Không có EventSource → dùng ask thường. */
-  function askStream(question: string, ticker = ''): void {
+  function askStream(question: string, ticker = '', opts: AskOptions = {}): void {
     const q = question.trim()
     if (!q) return
     if (typeof EventSource === 'undefined') {
-      void ask(q, ticker)
+      void ask(q, ticker, opts)
       return
     }
     const history = historyPayload()
@@ -80,6 +102,8 @@ export function useChat() {
     const tk = ticker.trim().toUpperCase()
     if (tk) params.set('ticker', tk)
     if (history.length) params.set('history', JSON.stringify(history))
+    if (opts.conversationId != null) params.set('conversation_id', String(opts.conversationId))
+    if (opts.startConversation) params.set('start_conversation', 'true')
 
     const source = new EventSource(`${apiBase}/api/chat/stream?${params.toString()}`, {
       withCredentials: true
@@ -104,6 +128,7 @@ export function useChat() {
     source.addEventListener('final', (ev) => {
       done = true
       try { turn.response = JSON.parse((ev as MessageEvent).data) } catch { /* giữ phần đã nhận */ }
+      void afterConversationTurn(turn.response)
       finish()
     })
     source.addEventListener('error', (ev) => {
@@ -132,6 +157,53 @@ export function useChat() {
     }
   }
 
+  /** Danh sách câu chuyện của người dùng (mới → cũ). */
+  async function loadConversations(): Promise<void> {
+    try {
+      conversations.value = await call<ConversationOut[]>('/conversations')
+    } catch {
+      conversations.value = []
+    }
+  }
+
+  /** Mở một câu chuyện: nạp toàn bộ tin nhắn của nó vào khung chat. */
+  async function openConversation(id: number): Promise<void> {
+    activeConvId.value = id
+    try {
+      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>(`/conversations/${id}/messages`)
+      turns.value = rows.map((h) => ({
+        question: h.question,
+        response: { answer: h.answer, citations: h.citations, note: '' },
+        error: ''
+      }))
+    } catch {
+      turns.value = []
+    }
+  }
+
+  /** Bắt đầu câu chuyện mới: xoá khung + bỏ cuộc đang mở (cuộc sẽ tạo ở lượt hỏi đầu). */
+  function newConversation(): void {
+    activeConvId.value = null
+    turns.value = []
+  }
+
+  async function renameConversation(id: number, title: string): Promise<void> {
+    const t = title.trim()
+    if (!t) return
+    try {
+      await call(`/conversations/${id}`, { method: 'PATCH', body: { title: t } })
+      await loadConversations()
+    } catch { /* bỏ qua */ }
+  }
+
+  async function deleteConversation(id: number): Promise<void> {
+    try {
+      await call(`/conversations/${id}`, { method: 'DELETE' })
+    } catch { /* bỏ qua */ }
+    if (activeConvId.value === id) newConversation()
+    await loadConversations()
+  }
+
   async function fetchStatus(): Promise<void> {
     try {
       status.value = await call<IndexStatus>('/status')
@@ -149,5 +221,9 @@ export function useChat() {
     }
   }
 
-  return { turns, pending, status, ask, askStream, loadHistory, fetchStatus, reindex }
+  return {
+    turns, pending, status, conversations, activeConvId,
+    ask, askStream, loadHistory, fetchStatus, reindex,
+    loadConversations, openConversation, newConversation, renameConversation, deleteConversation
+  }
 }
