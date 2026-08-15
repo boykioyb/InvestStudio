@@ -21,15 +21,16 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.schemas.chat import AgentStep, ChatResponse, ChatTurnInput, Citation
-from app.services import analyzer, screener
+from app.services import alerts, analyzer, details, history, market, screener
 from app.services.providers.base import ProviderError
 from app.services.rag import chat, gemini, store
 from app.services.rag.gemini import GeminiError, embed_texts
 
 _SYSTEM = (
-    "Bạn là trợ lý phân tích cổ phiếu Việt Nam của InvestStudio. Bạn có các CÔNG CỤ "
-    "để lấy dữ liệu THẬT: phân tích chấm điểm một mã, xếp hạng rổ chỉ số, và tìm "
-    "trong kho tri thức đã lập chỉ mục (tin tức, tổng quan).\n"
+    "Bạn là trợ lý phân tích cổ phiếu Việt Nam của InvestStudio. Bạn có nhiều CÔNG CỤ "
+    "lấy dữ liệu THẬT: phân tích/chấm điểm một mã; chỉ số & báo cáo tài chính; bảng "
+    "giá, dòng tiền & lịch sử giá; cảnh báo; xếp hạng rổ; và tìm kho tri thức (tin "
+    "tức, tổng quan). Chọn đúng công cụ cho câu hỏi; có thể gọi nhiều công cụ.\n"
     "QUY TẮC:\n"
     "1) Mọi CON SỐ trong câu trả lời phải đến từ kết quả công cụ — TUYỆT ĐỐI không bịa.\n"
     "2) Công cụ trả lỗi/thiếu dữ liệu thì nói thẳng là chưa có, gợi ý người dùng phân "
@@ -44,6 +45,8 @@ _SYSTEM = (
 #  Khai báo công cụ cho Gemini (JSON Schema kiểu VIẾT HOA theo yêu cầu function calling).
 _SORT_KEYS = ["market_cap", "value", "volume", "change_pct", "price", "foreign_net"]
 _GROUPS = ["VN30", "VN100", "HNX30", "HOSE"]
+_RANGES = ["1m", "3m", "1y", "3y"]
+_STATEMENTS = ["income", "balance", "cashflow"]
 
 TOOL_DECLARATIONS: list[dict] = [
     {
@@ -88,6 +91,83 @@ TOOL_DECLARATIONS: list[dict] = [
                           "description": "giam = cao→thấp (mặc định), tang = thấp→cao"},
             },
             "required": ["ro"],
+        },
+    },
+    {
+        "name": "chi_so",
+        "description": ("Bảng chỉ số tài chính mới nhất của một mã (định giá, sinh lời, "
+                        "thanh khoản-đòn bẩy, hiệu quả, và nhóm ngân hàng nếu là bank). "
+                        "Dùng khi hỏi sâu về một chỉ số cụ thể ngoài các chỉ số phan_tich_ma đã có."),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {"ma": {"type": "STRING", "description": "Mã chứng khoán"}},
+            "required": ["ma"],
+        },
+    },
+    {
+        "name": "bao_cao_tai_chinh",
+        "description": ("Báo cáo tài chính theo năm (đơn vị tỷ đồng): KQKD (income), "
+                        "cân đối kế toán (balance), hoặc lưu chuyển tiền tệ (cashflow)."),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "ma": {"type": "STRING", "description": "Mã chứng khoán"},
+                "loai": {"type": "STRING", "enum": _STATEMENTS,
+                         "description": "income = KQKD, balance = cân đối, cashflow = lưu chuyển tiền"},
+            },
+            "required": ["ma", "loai"],
+        },
+    },
+    {
+        "name": "bang_gia",
+        "description": ("Ảnh chụp bảng giá phiên hiện tại: tham chiếu/trần/sàn, giá & khối "
+                        "lượng khớp, và khối ngoại (đánh dấu nếu là số phiên cũ). Dùng cho "
+                        "câu hỏi về giá/khối ngoại trong phiên."),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {"ma": {"type": "STRING", "description": "Mã chứng khoán"}},
+            "required": ["ma"],
+        },
+    },
+    {
+        "name": "dong_tien",
+        "description": ("Chỉ báo dòng tiền theo NGÀY: MFI, OBV, số phiên/khối lượng tăng-giảm. "
+                        "Dùng cho câu hỏi về xu hướng dòng tiền, tích lũy/phân phối."),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "ma": {"type": "STRING", "description": "Mã chứng khoán"},
+                "khung": {"type": "STRING", "enum": _RANGES,
+                          "description": "Khung thời gian (mặc định 3m)"},
+            },
+            "required": ["ma"],
+        },
+    },
+    {
+        "name": "lich_su_gia",
+        "description": ("Thống kê lịch sử giá trong một khung: số phiên, cao/thấp nhất, "
+                        "giá đầu kỳ & gần nhất, %thay đổi, khối lượng trung bình. Dùng cho "
+                        "câu hỏi về hiệu suất giá ('tăng/giảm bao nhiêu %', 'đỉnh/đáy')."),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "ma": {"type": "STRING", "description": "Mã chứng khoán"},
+                "khung": {"type": "STRING", "enum": _RANGES,
+                          "description": "Khung thời gian (mặc định 3m)"},
+            },
+            "required": ["ma"],
+        },
+    },
+    {
+        "name": "canh_bao",
+        "description": ("Các cảnh báo cho một mã theo 3 mức chắc chắn: mechanical (số học "
+                        "chắc chắn, VD điều chỉnh giá ngày GDKHQ), observed (đo được: KL đột "
+                        "biến, biến động mạnh), info (chỉ là thông tin, KHÔNG suy hướng giá). "
+                        "Luôn giữ đúng nhãn độ chắc chắn khi trả lời."),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {"ma": {"type": "STRING", "description": "Mã chứng khoán"}},
+            "required": ["ma"],
         },
     },
 ]
@@ -157,10 +237,121 @@ def _make_dispatch(db: Session, default_ticker: Optional[str], citations: list[C
         return {"ro": ro, "sap_xep": sort, "chieu": order,
                 "so_ma": listing.count, "top": top}
 
+    def _ma(args: dict) -> str:
+        return str(args.get("ma") or default_ticker or "").strip().upper()
+
+    def _range(args: dict) -> str:
+        r = str(args.get("khung") or "3m")
+        return r if r in _RANGES else "3m"
+
+    def _chi_so(args: dict) -> dict:
+        ma = _ma(args)
+        if not ma:
+            return {"loi": "Thiếu mã."}
+        try:
+            table = details.fetch_ratios(ma)
+        except ProviderError as exc:
+            return {"loi": f"Không lấy được chỉ số {ma}: {exc}"}
+        citations.append(Citation(ticker=ma, doc_type="ratios",
+                                  title=f"Chỉ số {ma}", snippet=table.period_label))
+        return {"ma": ma, "ky": table.period_label, "nhom": [
+            {"ten": g.name,
+             "chi_so": {i.label: i.value for i in g.items if i.value is not None}}
+            for g in table.groups]}
+
+    def _bao_cao_tai_chinh(args: dict) -> dict:
+        ma = _ma(args)
+        if not ma:
+            return {"loi": "Thiếu mã."}
+        loai = str(args.get("loai") or "income")
+        loai = loai if loai in _STATEMENTS else "income"
+        try:
+            stm = details.fetch_statement(ma, loai)  # type: ignore[arg-type]
+        except ProviderError as exc:
+            return {"loi": f"Không lấy được báo cáo {loai} của {ma}: {exc}"}
+        citations.append(Citation(ticker=ma, doc_type="statement",
+                                  title=stm.title, snippet=f"{len(stm.rows)} dòng · {stm.unit}"))
+        out: dict = {"ma": ma, "bao_cao": stm.title, "don_vi": stm.unit, "ky": stm.periods,
+                     "dong": [{"khoan_muc": r.label, "gia_tri": r.values} for r in stm.rows[:40]]}
+        if len(stm.rows) > 40:
+            out["ghi_chu"] = f"Đã cắt bớt, còn {len(stm.rows) - 40} dòng nữa."
+        return out
+
+    def _bang_gia(args: dict) -> dict:
+        ma = _ma(args)
+        if not ma:
+            return {"loi": "Thiếu mã."}
+        try:
+            board = market.fetch_board(ma)
+        except ProviderError as exc:
+            return {"loi": f"Không lấy được bảng giá {ma}: {exc}"}
+        citations.append(Citation(ticker=ma, doc_type="board",
+                                  title=f"Bảng giá {ma}", snippet=board.asof or ""))
+        fo = board.foreign
+        return {"ma": ma, "asof": board.asof, "tham_chieu": board.reference,
+                "tran": board.ceiling, "san": board.floor, "khop": board.match_price,
+                "kl_khop": board.match_volume, "thay_doi_pct": board.change_pct,
+                "khoi_ngoai": None if not fo else {
+                    "mua_ty": fo.buy_value, "ban_ty": fo.sell_value, "rong_ty": fo.net_value,
+                    "la_so_phien_cu": fo.stale, "ghi_chu": fo.note},
+                "ghi_chu": board.note}
+
+    def _dong_tien(args: dict) -> dict:
+        ma = _ma(args)
+        if not ma:
+            return {"loi": "Thiếu mã."}
+        try:
+            flow = market.fetch_money_flow(ma, _range(args))  # type: ignore[arg-type]
+        except ProviderError as exc:
+            return {"loi": f"Không lấy được dòng tiền {ma}: {exc}"}
+        citations.append(Citation(ticker=ma, doc_type="moneyflow",
+                                  title=f"Dòng tiền {ma}", snippet=flow.mfi_state or ""))
+        return {"ma": ma, "khung": flow.range, "mfi": flow.mfi_latest,
+                "mfi_nhan_dinh": flow.mfi_state, "obv_thay_doi_pct": flow.obv_change_pct,
+                "phien_tang": flow.up_sessions, "phien_giam": flow.down_sessions,
+                "kl_tang": flow.up_volume, "kl_giam": flow.down_volume, "ghi_chu": flow.note}
+
+    def _lich_su_gia(args: dict) -> dict:
+        ma = _ma(args)
+        if not ma:
+            return {"loi": "Thiếu mã."}
+        try:
+            hist = history.fetch_history(ma, _range(args))  # type: ignore[arg-type]
+        except ProviderError as exc:
+            return {"loi": f"Không lấy được lịch sử giá {ma}: {exc}"}
+        st = hist.stats
+        citations.append(Citation(ticker=ma, doc_type="history",
+                                  title=f"Lịch sử giá {ma} ({hist.label})",
+                                  snippet=f"{st.sessions} phiên"))
+        return {"ma": ma, "khung": hist.label, "so_phien": st.sessions,
+                "thap_nhat": st.low, "cao_nhat": st.high, "dau_ky": st.first,
+                "gan_nhat": st.last, "thay_doi_pct": st.change_pct, "kl_tb": st.avg_volume}
+
+    def _canh_bao(args: dict) -> dict:
+        ma = _ma(args)
+        if not ma:
+            return {"loi": "Thiếu mã."}
+        try:
+            feed = alerts.fetch_alerts(ma)
+        except ProviderError as exc:
+            return {"loi": f"Không lấy được cảnh báo {ma}: {exc}"}
+        if feed.alerts:
+            citations.append(Citation(ticker=ma, doc_type="alerts",
+                                      title=f"Cảnh báo {ma}", snippet=f"{len(feed.alerts)} mục"))
+        return {"ma": ma, "asof": feed.asof, "ghi_chu": feed.note, "canh_bao": [
+            {"tieu_de": a.title, "chi_tiet": a.detail, "do_chac_chan": a.effect_label,
+             "muc": a.level, "ngay": a.date} for a in feed.alerts]}
+
     handlers = {
         "tim_kiem_tri_thuc": _tim_kiem_tri_thuc,
         "phan_tich_ma": _phan_tich_ma,
         "xep_hang_ro": _xep_hang_ro,
+        "chi_so": _chi_so,
+        "bao_cao_tai_chinh": _bao_cao_tai_chinh,
+        "bang_gia": _bang_gia,
+        "dong_tien": _dong_tien,
+        "lich_su_gia": _lich_su_gia,
+        "canh_bao": _canh_bao,
     }
 
     def dispatch(name: str, args: dict) -> dict:
@@ -193,8 +384,18 @@ def _augment(question: str, ticker: Optional[str]) -> str:
 
 
 def _step_label(tool: str, args: dict) -> str:
-    if tool == "phan_tich_ma":
-        return f"Phân tích mã {str(args.get('ma') or '').upper()}".strip()
+    ma = str(args.get("ma") or "").upper()
+    labels = {
+        "phan_tich_ma": f"Phân tích mã {ma}",
+        "chi_so": f"Xem chỉ số {ma}",
+        "bao_cao_tai_chinh": f"Đọc báo cáo tài chính {ma}",
+        "bang_gia": f"Xem bảng giá {ma}",
+        "dong_tien": f"Xem dòng tiền {ma}",
+        "lich_su_gia": f"Xem lịch sử giá {ma}",
+        "canh_bao": f"Kiểm tra cảnh báo {ma}",
+    }
+    if tool in labels:
+        return labels[tool].strip()
     if tool == "xep_hang_ro":
         return f"Xếp hạng rổ {str(args.get('ro') or '').upper()}".strip()
     if tool == "tim_kiem_tri_thuc":
