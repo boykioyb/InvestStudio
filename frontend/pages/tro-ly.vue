@@ -4,22 +4,46 @@
  * Bố cục kiểu Messenger: thanh bên trái = danh sách CÂU CHUYỆN; bên phải = khung chat.
  * Chỉ gọi composable; không chứa logic nghiệp vụ.
  */
-import { MessageCircle, Pencil, Plus, Search, Star, Trash2 } from 'lucide-vue-next'
+import { MessageCircle, Paperclip, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-vue-next'
 import type { ConversationOut } from '~/types/account'
 
 definePageMeta({ middleware: 'auth' })
 
+const config = useRuntimeConfig()
+const apiBase = String(config.public.apiBase || '').replace(/\/+$/, '')
+
 const { ensureLoaded } = useAuth()
 const {
-  turns, pending, status, conversations, activeConvId,
+  turns, pending, status, conversations, activeConvId, pendingAttachments,
   askStream, fetchStatus, reindex,
-  loadConversations, openConversation, newConversation, renameConversation, deleteConversation
+  loadConversations, openConversation, newConversation, renameConversation, deleteConversation,
+  uploadAttachment, removePendingAttachment
 } = useChat()
 
 const question = ref('')
 const ticker = ref('')
 const reindexMsg = ref('')
+const uploadErr = ref('')
+const fileInput = ref<HTMLInputElement | null>(null)
 let poll: ReturnType<typeof setInterval> | null = null
+
+function attUrl(id: number): string {
+  return `${apiBase}/api/chat/attachments/${id}`
+}
+
+function isImage(mime: string): boolean {
+  return mime.startsWith('image/')
+}
+
+async function onPickFiles(e: Event): Promise<void> {
+  const input = e.target as HTMLInputElement
+  uploadErr.value = ''
+  for (const f of Array.from(input.files || [])) {
+    const err = await uploadAttachment(f)
+    if (err) uploadErr.value = err
+  }
+  input.value = ''  // cho phép chọn lại cùng tệp
+}
 
 useHead({ title: 'Trợ lý hỏi–đáp — InvestStudio' })
 
@@ -114,7 +138,16 @@ async function startReindex(): Promise<void> {
         <div v-if="turns.length" class="thread">
           <article v-for="(turn, i) in turns" :key="i" class="turn">
             <div class="chat-row me">
-              <div class="bubble me">{{ turn.question }}</div>
+              <div class="bubble me">
+                <div v-if="turn.attachments && turn.attachments.length" class="atts">
+                  <a v-for="(a, ai) in turn.attachments" :key="ai" :href="attUrl(a.id)"
+                     target="_blank" rel="noopener" class="att">
+                    <img v-if="isImage(a.mime)" :src="attUrl(a.id)" :alt="a.filename" class="att-img" />
+                    <span v-else class="att-file">📄 {{ a.filename }}</span>
+                  </a>
+                </div>
+                {{ turn.question }}
+              </div>
             </div>
 
             <ul v-if="turn.steps && turn.steps.length" class="steps">
@@ -152,7 +185,27 @@ async function startReindex(): Promise<void> {
             : 'Bắt đầu một câu chuyện mới — hỏi bất cứ điều gì về cổ phiếu.' }}
         </p>
 
+        <!-- Xem trước tệp đã đính (chưa gửi) -->
+        <div v-if="pendingAttachments.length" class="preview">
+          <span v-for="a in pendingAttachments" :key="a.id" class="chip">
+            <img v-if="isImage(a.mime)" :src="attUrl(a.id)" :alt="a.filename" class="chip-img" />
+            <span v-else class="chip-file">📄</span>
+            <span class="chip-name">{{ a.filename }}</span>
+            <button type="button" class="chip-x" title="Bỏ" @click="removePendingAttachment(a.id)">
+              <X :size="12" />
+            </button>
+          </span>
+        </div>
+        <p v-if="uploadErr" class="upload-err">{{ uploadErr }}</p>
+
         <form class="askbar" @submit.prevent="submit">
+          <button type="button" class="btn attach" title="Đính kèm ảnh/PDF"
+                  @click="fileInput?.click()">
+            <Paperclip :size="16" />
+          </button>
+          <input ref="fileInput" type="file" class="hidden-file" multiple
+                 accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                 @change="onPickFiles" />
           <input v-model="ticker" type="text" maxlength="12" class="tk"
                  placeholder="Mã (tùy chọn)" aria-label="Giới hạn theo mã"
                  autocapitalize="characters" spellcheck="false" />
@@ -479,6 +532,96 @@ h1 {
 .askbar input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.attach {
+  flex: none;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.hidden-file {
+  display: none;
+}
+
+/*  Tệp đính trong bong bóng hỏi. */
+.atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.att {
+  display: inline-flex;
+}
+
+.att-img {
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: 10px;
+  display: block;
+}
+
+.att-file {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+}
+
+/*  Xem trước tệp chờ gửi. */
+.preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 6px 4px 4px;
+  font-size: 12px;
+  max-width: 190px;
+}
+
+.chip-img {
+  width: 26px;
+  height: 26px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 0;
+}
+
+.chip-x:hover {
+  color: var(--bad);
+}
+
+.upload-err {
+  color: var(--bad);
+  font-size: 12px;
+  margin: 6px 10px 0;
 }
 
 .samples {

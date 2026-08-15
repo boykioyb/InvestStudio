@@ -55,6 +55,22 @@ export interface ConversationOut {
   updated_at: string
 }
 
+/** Tệp đã upload (trả từ /chat/upload) — có url để xem trước. */
+export interface AttachmentOut {
+  id: number
+  filename: string
+  mime: string
+  size: number
+  url: string
+}
+
+/** Tệp đính kèm gắn với một lượt hỏi (để hiển thị lại). */
+export interface AttachmentRef {
+  id: number
+  filename: string
+  mime: string
+}
+
 export interface IndexStatus {
   documents: number
   tickers: number

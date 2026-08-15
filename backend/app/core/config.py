@@ -67,6 +67,15 @@ class Settings(BaseSettings):
     #  Số lượt hội thoại gần nhất frontend gửi kèm để agent giữ ngữ cảnh ("nó"…).
     rag_history_turns: int = 6
 
+    # ── Đính kèm (attachment) ────────────────────────────────────────────────
+    upload_dir: str = "/app/uploads"       # thư mục lưu tệp (khớp volume trong compose)
+    upload_max_bytes: int = 10_485_760     # 10 MB/tệp
+    upload_max_per_message: int = 4        # số tệp tối đa mỗi câu hỏi
+    #  Chỉ nhận ảnh + PDF — thứ Gemini đọc được (multimodal). Chặn tệp lạ.
+    upload_allowed_mimes: tuple[str, ...] = (
+        "image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

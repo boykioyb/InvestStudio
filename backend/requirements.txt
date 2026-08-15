@@ -13,6 +13,7 @@ psycopg[binary]>=3.2       # driver PostgreSQL (dialect postgresql+psycopg)
 bcrypt>=4.2                # băm mật khẩu (password hashing)
 pyjwt>=2.9                 # JWT (JSON Web Token — token xác thực)
 email-validator>=2.1       # kiểm tra định dạng email cho Pydantic EmailStr
+python-multipart>=0.0.9    # FastAPI cần để nhận upload tệp (multipart/form-data)
 
 # ── RAG (Retrieval-Augmented Generation — sinh câu trả lời có truy xuất) ───────
 pgvector>=0.3              # kiểu cột vector cho SQLAlchemy + PostgreSQL

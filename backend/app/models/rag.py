@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -101,4 +101,26 @@ class ChatMessage(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     citations: Mapped[list] = mapped_column(JSONB, default=list)  # [{ticker,doc_type,title,snippet}]
+    #  Tệp đính kèm của lượt hỏi (để hiển thị lại khi tải lịch sử): [{id,filename,mime}]
+    attachments: Mapped[list] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Attachment(Base):
+    """Tệp đính kèm (ảnh/PDF) người dùng gửi kèm câu hỏi cho trợ lý.
+
+    Lưu trên ĐĨA (volume `uploads`); DB chỉ giữ metadata + `stored_name` (tên tệp
+    thật trên đĩa, dạng uuid). Xoá user → xoá bản ghi (CASCADE); tệp trên đĩa được
+    dọn khi xoá qua API.
+    """
+
+    __tablename__ = "attachments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)  # tên gốc do user đặt
+    mime: Mapped[str] = mapped_column(String(80), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)          # byte
+    stored_name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -76,6 +76,7 @@ services:
         condition: service_healthy
     volumes:
       - vnstock-cache:/root/.vnstock   # giữ cache/cfg vnstock giữa các lần chạy
+      - uploads:/app/uploads           # tệp đính kèm của trợ lý (ảnh/PDF)
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -130,3 +131,4 @@ services:
 volumes:
   vnstock-cache:
   pg-data:
+  uploads:

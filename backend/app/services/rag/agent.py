@@ -415,8 +415,12 @@ def _dedup(citations: list[Citation]) -> list[Citation]:
 
 
 def answer_question(db: Session, question: str, ticker: Optional[str] = None,
-                    history: Optional[list[ChatTurnInput]] = None) -> ChatResponse:
-    """Trả lời bằng agent. Agent tắt/hỏng → lui về RAG một-nhịp (`chat.py`)."""
+                    history: Optional[list[ChatTurnInput]] = None,
+                    attachments: Optional[list[tuple[bytes, str]]] = None) -> ChatResponse:
+    """Trả lời bằng agent. Agent tắt/hỏng → lui về RAG một-nhịp (`chat.py`).
+
+    `attachments` = danh sách (bytes, mime) ảnh/PDF gửi kèm (multimodal).
+    """
     settings = get_settings()
     if not settings.rag_agent_enabled:
         return chat.answer_question(db, question, ticker)
@@ -428,7 +432,8 @@ def answer_question(db: Session, question: str, ticker: Optional[str] = None,
         answer = ""
         for kind, data in gemini.run_agent(
                 _SYSTEM, _to_history(history), _augment(question, ticker),
-                TOOL_DECLARATIONS, dispatch, settings.rag_agent_max_steps):
+                TOOL_DECLARATIONS, dispatch, settings.rag_agent_max_steps,
+                attachment_parts=attachments):
             if kind == "step":
                 steps.append(AgentStep(tool=data["tool"],
                                        label=_step_label(data["tool"], data["args"])))
@@ -443,11 +448,12 @@ def answer_question(db: Session, question: str, ticker: Optional[str] = None,
 
 
 def answer_stream(db: Session, question: str, ticker: Optional[str] = None,
-                  history: Optional[list[ChatTurnInput]] = None):
+                  history: Optional[list[ChatTurnInput]] = None,
+                  attachments: Optional[list[tuple[bytes, str]]] = None):
     """Generator: yield ('step', {...}) mỗi bước công cụ, rồi ('final', ChatResponse).
 
     Agent tắt → uỷ thác cho `chat.answer_stream` (yield 'delta'/'final'). Agent hỏng
-    giữa chừng → lui về RAG một-nhịp.
+    giữa chừng → lui về RAG một-nhịp. `attachments` = (bytes, mime) ảnh/PDF.
     """
     settings = get_settings()
     if not settings.rag_agent_enabled:
@@ -461,7 +467,8 @@ def answer_stream(db: Session, question: str, ticker: Optional[str] = None,
     try:
         for kind, data in gemini.run_agent(
                 _SYSTEM, _to_history(history), _augment(question, ticker),
-                TOOL_DECLARATIONS, dispatch, settings.rag_agent_max_steps):
+                TOOL_DECLARATIONS, dispatch, settings.rag_agent_max_steps,
+                attachment_parts=attachments):
             if kind == "step":
                 step = AgentStep(tool=data["tool"],
                                  label=_step_label(data["tool"], data["args"]))

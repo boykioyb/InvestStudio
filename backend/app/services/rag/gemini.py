@@ -84,6 +84,7 @@ def run_agent(
     tool_declarations: list[dict],
     dispatch: Callable[[str, dict], dict],
     max_steps: int = 5,
+    attachment_parts: list[tuple[bytes, str]] | None = None,
 ) -> Iterator[tuple[str, dict | str]]:
     """Vòng lặp Agentic (gọi hàm — function calling).
 
@@ -117,7 +118,11 @@ def run_agent(
         types.Content(role=role, parts=[types.Part.from_text(text=text)])
         for role, text in history
     ]
-    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=question)]))
+    #  Lượt hỏi hiện tại: chữ + (nếu có) các tệp ảnh/PDF cho Gemini đọc (multimodal).
+    user_parts = [types.Part.from_text(text=question)]
+    for data, mime in (attachment_parts or []):
+        user_parts.append(types.Part.from_bytes(data=data, mime_type=mime))
+    contents.append(types.Content(role="user", parts=user_parts))
 
     try:
         for _ in range(max_steps):

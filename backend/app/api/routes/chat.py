@@ -10,8 +10,8 @@ import json
 import sys
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -20,9 +20,11 @@ from app.core import ratelimit
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models.rag import ChatMessage, Conversation, IndexJob
+from app.models.rag import Attachment, ChatMessage, Conversation, IndexJob
 from app.models.user import User
 from app.schemas.chat import (
+    AttachmentOut,
+    AttachmentRef,
     ChatHistoryItem,
     ChatRequest,
     ChatResponse,
@@ -33,6 +35,7 @@ from app.schemas.chat import (
     IndexStatus,
 )
 from app.services.rag import agent, store
+from app.services.rag import attachments as attach_store
 from app.services.rag.gemini import GeminiError
 from app.services.rag.tasks import reindex_task
 
@@ -66,12 +69,36 @@ def _resolve_conversation(db: Session, user: User, *, conversation_id: Optional[
     return None
 
 
+def _load_attachments(db: Session, user: User, ids: list[int]):
+    """Trả về (parts, refs): parts = [(bytes, mime)] cho Gemini; refs = metadata lưu kèm.
+
+    Chỉ lấy tệp thuộc user (chống đọc tệp người khác); cắt theo trần số tệp/câu.
+    """
+    if not ids:
+        return [], []
+    ids = ids[:get_settings().upload_max_per_message]
+    rows = db.scalars(select(Attachment).where(
+        Attachment.id.in_(ids), Attachment.user_id == user.id))
+    parts: list[tuple[bytes, str]] = []
+    refs: list[dict] = []
+    for att in rows:
+        try:
+            data = attach_store.read_bytes(att.stored_name)
+        except FileNotFoundError:
+            continue
+        parts.append((data, att.mime))
+        refs.append({"id": att.id, "filename": att.filename, "mime": att.mime})
+    return parts, refs
+
+
 def _save_turn(db: Session, user: User, conv: Optional[Conversation], *,
-               ticker: Optional[str], question: str, resp: ChatResponse) -> None:
+               ticker: Optional[str], question: str, resp: ChatResponse,
+               attachments: Optional[list[dict]] = None) -> None:
     """Lưu lượt hỏi–đáp + cập nhật thời điểm cuộc trò chuyện (nếu có)."""
     db.add(ChatMessage(user_id=user.id, conversation_id=(conv.id if conv else None),
                        ticker=ticker, question=question, answer=resp.answer,
-                       citations=[c.model_dump() for c in resp.citations]))
+                       citations=[c.model_dump() for c in resp.citations],
+                       attachments=attachments or []))
     if conv is not None:
         conv.updated_at = func.now()
     db.commit()
@@ -86,8 +113,9 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
     conv = _resolve_conversation(db, user, conversation_id=payload.conversation_id,
                                  start_conversation=payload.start_conversation,
                                  question=question, ticker=ticker)
+    parts, refs = _load_attachments(db, user, payload.attachment_ids)
     try:
-        resp = agent.answer_question(db, question, ticker, payload.history)
+        resp = agent.answer_question(db, question, ticker, payload.history, parts or None)
     except GeminiError as exc:
         #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
         #  ghi log phía máy chủ để còn gỡ lỗi.
@@ -97,7 +125,7 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
             detail="Trợ lý tạm thời không phản hồi được. Vui lòng thử lại sau.") from exc
 
     resp.conversation_id = conv.id if conv else None
-    _save_turn(db, user, conv, ticker=ticker, question=question, resp=resp)
+    _save_turn(db, user, conv, ticker=ticker, question=question, resp=resp, attachments=refs)
     return resp
 
 
@@ -122,6 +150,7 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                history: Optional[str] = Query(None, description="JSON các lượt gần nhất"),
                conversation_id: Optional[int] = Query(None),
                start_conversation: bool = Query(False),
+               attachment_ids: Optional[str] = Query(None, description="Id các tệp, cách nhau dấu phẩy"),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> StreamingResponse:
     ratelimit.enforce_daily(str(user.id), "rag", get_settings().rag_daily_quota)
@@ -132,11 +161,13 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
     conv = _resolve_conversation(db, user, conversation_id=conversation_id,
                                  start_conversation=start_conversation, question=q, ticker=tk)
     cid = conv.id if conv else None
+    att_ids = [int(x) for x in (attachment_ids or "").split(",") if x.strip().isdigit()]
+    parts, refs = _load_attachments(db, user, att_ids)
 
     def gen():
         final = None
         try:
-            for kind, payload in agent.answer_stream(db, q, tk, hist):
+            for kind, payload in agent.answer_stream(db, q, tk, hist, parts or None):
                 if kind == "delta":
                     yield _sse("delta", {"text": payload})
                 elif kind == "step":
@@ -151,13 +182,20 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
             return
         #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời).
         if final is not None:
-            _save_turn(db, user, conv, ticker=tk, question=q, resp=final)
+            _save_turn(db, user, conv, ticker=tk, question=q, resp=final, attachments=refs)
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers={
         "Cache-Control": "no-cache, no-transform",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no",
     })
+
+
+def _history_item(row: ChatMessage) -> ChatHistoryItem:
+    return ChatHistoryItem(
+        question=row.question, answer=row.answer,
+        citations=[Citation(**c) for c in (row.citations or [])],
+        attachments=[AttachmentRef(**a) for a in (row.attachments or [])])
 
 
 @router.get("/history", response_model=list[ChatHistoryItem],
@@ -172,8 +210,7 @@ def history(ticker: Optional[str] = Query(None, max_length=12,
     if ticker:
         stmt = stmt.where(ChatMessage.ticker == ticker.upper().strip())
     rows = list(db.scalars(stmt.order_by(ChatMessage.created_at.desc()).limit(30)))[::-1]
-    return [ChatHistoryItem(question=r.question, answer=r.answer,
-                            citations=[Citation(**c) for c in (r.citations or [])]) for r in rows]
+    return [_history_item(r) for r in rows]
 
 
 def _conv_out(conv: Conversation) -> ConversationOut:
@@ -197,8 +234,7 @@ def conversation_messages(conversation_id: int, user: User = Depends(get_current
     _get_conversation(db, user, conversation_id)  # xác thực sở hữu
     rows = db.scalars(select(ChatMessage).where(ChatMessage.conversation_id == conversation_id)
                       .order_by(ChatMessage.created_at.asc()))
-    return [ChatHistoryItem(question=r.question, answer=r.answer,
-                            citations=[Citation(**c) for c in (r.citations or [])]) for r in rows]
+    return [_history_item(r) for r in rows]
 
 
 @router.patch("/conversations/{conversation_id}", response_model=ConversationOut,
@@ -219,6 +255,44 @@ def delete_conversation(conversation_id: int, user: User = Depends(get_current_u
     conv = _get_conversation(db, user, conversation_id)
     db.delete(conv)  # CASCADE xoá chat_messages con
     db.commit()
+
+
+@router.post("/upload", response_model=AttachmentOut,
+             summary="Tải lên tệp đính kèm (ảnh/PDF) để gửi kèm câu hỏi")
+def upload_attachment(file: UploadFile = File(...),
+                      user: User = Depends(get_current_user),
+                      db: Session = Depends(get_db)) -> AttachmentOut:
+    settings = get_settings()
+    mime = file.content_type or ""
+    if mime not in settings.upload_allowed_mimes:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                            detail="Chỉ nhận ảnh (PNG/JPG/WebP/GIF) hoặc PDF.")
+    data = file.file.read()
+    if len(data) > settings.upload_max_bytes:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail=f"Tệp quá lớn (tối đa {settings.upload_max_bytes // 1_048_576} MB).")
+    stored = attach_store.save_bytes(data, mime)
+    att = Attachment(user_id=user.id, filename=(file.filename or "tệp")[:255],
+                     mime=mime, size=len(data), stored_name=stored)
+    db.add(att)
+    db.commit()
+    db.refresh(att)
+    return AttachmentOut(id=att.id, filename=att.filename, mime=att.mime, size=att.size,
+                         url=f"/api/chat/attachments/{att.id}")
+
+
+@router.get("/attachments/{attachment_id}", summary="Tải/hiển thị một tệp đính kèm")
+def get_attachment(attachment_id: int, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)) -> Response:
+    att = db.get(Attachment, attachment_id)
+    if att is None or att.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Không tìm thấy tệp.")
+    try:
+        data = attach_store.read_bytes(att.stored_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tệp đã bị xoá khỏi đĩa.") from exc
+    return Response(content=data, media_type=att.mime,
+                    headers={"Content-Disposition": f'inline; filename="{att.filename}"'})
 
 
 def _status(db: Session) -> IndexStatus:

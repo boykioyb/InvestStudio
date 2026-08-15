@@ -1,4 +1,6 @@
-import type { AgentStep, ChatResponse, ConversationOut, IndexStatus } from '~/types/account'
+import type {
+  AgentStep, AttachmentOut, AttachmentRef, ChatResponse, ConversationOut, IndexStatus
+} from '~/types/account'
 
 /** Một lượt hỏi–đáp để hiển thị lịch sử hội thoại trên trang trợ lý. */
 export interface ChatTurn {
@@ -7,6 +9,8 @@ export interface ChatTurn {
   error: string
   /** Các bước công cụ agent đang chạy (cập nhật trực tiếp khi stream). */
   steps?: AgentStep[]
+  /** Tệp đính kèm của lượt hỏi (ảnh/PDF) — để hiển thị trong bong bóng. */
+  attachments?: AttachmentRef[]
 }
 
 /** Tuỳ chọn cuộc trò chuyện khi hỏi (trang Trợ lý). Widget nổi bỏ trống → phẳng. */
@@ -32,6 +36,8 @@ export function useChat() {
   //  Danh sách câu chuyện + cuộc đang mở (chỉ dùng ở trang Trợ lý).
   const conversations = ref<ConversationOut[]>([])
   const activeConvId = ref<number | null>(null)
+  //  Tệp đã upload nhưng CHƯA gửi (chờ đính vào câu hỏi kế tiếp).
+  const pendingAttachments = ref<AttachmentOut[]>([])
 
   function messageOf(err: unknown, fallback: string): string {
     const detail = (err as { data?: { detail?: unknown } })?.data?.detail
@@ -51,6 +57,35 @@ export function useChat() {
       .map((t) => ({ question: t.question, answer: (t.response?.answer || '').slice(0, 1200) }))
   }
 
+  /** Upload một tệp (ảnh/PDF); OK → thêm vào chờ-gửi. Trả chuỗi lỗi ('' nếu thành công). */
+  async function uploadAttachment(file: File): Promise<string> {
+    const form = new FormData()
+    form.append('file', file)
+    try {
+      const out = await $fetch<AttachmentOut>(`${apiBase}/api/chat/upload`, {
+        method: 'POST', body: form, credentials: 'include'
+      })
+      pendingAttachments.value = [...pendingAttachments.value, out]
+      return ''
+    } catch (err) {
+      return messageOf(err, 'Tải tệp thất bại.')
+    }
+  }
+
+  function removePendingAttachment(id: number): void {
+    pendingAttachments.value = pendingAttachments.value.filter((a) => a.id !== id)
+  }
+
+  /** Chốt attachment cho lượt sắp gửi: trả refs (để hiển thị) + ids, rồi xoá chờ-gửi. */
+  function takeAttachments(): { refs: AttachmentRef[]; ids: number[] } {
+    const atts = pendingAttachments.value
+    pendingAttachments.value = []
+    return {
+      refs: atts.map((a) => ({ id: a.id, filename: a.filename, mime: a.mime })),
+      ids: atts.map((a) => a.id)
+    }
+  }
+
   /** Sau một lượt có gắn cuộc: bám theo id cuộc + làm mới danh sách (đổi tên/thứ tự). */
   async function afterConversationTurn(resp: ChatResponse | null): Promise<void> {
     if (resp?.conversation_id) {
@@ -63,7 +98,8 @@ export function useChat() {
     const q = question.trim()
     if (!q) return
     const history = historyPayload()
-    const turn: ChatTurn = { question: q, response: null, error: '', steps: [] }
+    const { refs, ids } = takeAttachments()
+    const turn: ChatTurn = { question: q, response: null, error: '', steps: [], attachments: refs }
     turns.value = [...turns.value, turn]
     pending.value = true
     try {
@@ -72,7 +108,8 @@ export function useChat() {
         body: {
           question: q, ticker: ticker.trim().toUpperCase() || null, history,
           conversation_id: opts.conversationId ?? null,
-          start_conversation: !!opts.startConversation
+          start_conversation: !!opts.startConversation,
+          attachment_ids: ids
         },
         //  Agent có thể gọi nhiều vòng Gemini + phân tích mã nên cho chờ lâu.
         timeout: 90_000
@@ -94,7 +131,8 @@ export function useChat() {
       return
     }
     const history = historyPayload()
-    const turn: ChatTurn = { question: q, response: { answer: '', citations: [], note: '' }, error: '', steps: [] }
+    const { refs, ids } = takeAttachments()
+    const turn: ChatTurn = { question: q, response: { answer: '', citations: [], note: '' }, error: '', steps: [], attachments: refs }
     turns.value = [...turns.value, turn]
     pending.value = true
 
@@ -104,6 +142,7 @@ export function useChat() {
     if (history.length) params.set('history', JSON.stringify(history))
     if (opts.conversationId != null) params.set('conversation_id', String(opts.conversationId))
     if (opts.startConversation) params.set('start_conversation', 'true')
+    if (ids.length) params.set('attachment_ids', ids.join(','))
 
     const source = new EventSource(`${apiBase}/api/chat/stream?${params.toString()}`, {
       withCredentials: true
@@ -146,11 +185,12 @@ export function useChat() {
     const tk = ticker.trim().toUpperCase()
     const qs = tk ? `?ticker=${encodeURIComponent(tk)}` : ''
     try {
-      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>(`/history${qs}`)
+      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations']; attachments?: AttachmentRef[] }>>(`/history${qs}`)
       turns.value = rows.map((h) => ({
         question: h.question,
         response: { answer: h.answer, citations: h.citations, note: '' },
-        error: ''
+        error: '',
+        attachments: h.attachments || []
       }))
     } catch {
       /* chưa đăng nhập hoặc chưa có lịch sử — bỏ qua */
@@ -170,11 +210,12 @@ export function useChat() {
   async function openConversation(id: number): Promise<void> {
     activeConvId.value = id
     try {
-      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>(`/conversations/${id}/messages`)
+      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations']; attachments?: AttachmentRef[] }>>(`/conversations/${id}/messages`)
       turns.value = rows.map((h) => ({
         question: h.question,
         response: { answer: h.answer, citations: h.citations, note: '' },
-        error: ''
+        error: '',
+        attachments: h.attachments || []
       }))
     } catch {
       turns.value = []
@@ -222,8 +263,9 @@ export function useChat() {
   }
 
   return {
-    turns, pending, status, conversations, activeConvId,
+    turns, pending, status, conversations, activeConvId, pendingAttachments,
     ask, askStream, loadHistory, fetchStatus, reindex,
-    loadConversations, openConversation, newConversation, renameConversation, deleteConversation
+    loadConversations, openConversation, newConversation, renameConversation, deleteConversation,
+    uploadAttachment, removePendingAttachment
   }
 }

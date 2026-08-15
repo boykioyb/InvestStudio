@@ -35,6 +35,26 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[int] = None
     start_conversation: bool = Field(
         False, description="True = tạo cuộc trò chuyện mới cho lượt này (trang Trợ lý)")
+    #  Id các tệp đã upload (qua /chat/upload) để gửi kèm câu hỏi (ảnh/PDF).
+    attachment_ids: list[int] = Field(default_factory=list)
+
+
+class AttachmentOut(BaseModel):
+    """Tệp đã upload — trả về cho FE để xem trước & gửi kèm."""
+
+    id: int
+    filename: str
+    mime: str
+    size: int
+    url: str = Field(..., description="Đường dẫn tải/hiển thị tệp (cùng origin)")
+
+
+class AttachmentRef(BaseModel):
+    """Tệp đính kèm gắn với một lượt hỏi (lưu trong ChatMessage, để hiển thị lại)."""
+
+    id: int
+    filename: str
+    mime: str
 
 
 class ConversationOut(BaseModel):
@@ -80,6 +100,7 @@ class ChatHistoryItem(BaseModel):
     question: str
     answer: str
     citations: list[Citation] = []
+    attachments: list[AttachmentRef] = []
 
 
 class IndexStatus(BaseModel):
