@@ -8,7 +8,7 @@
 import { LogIn, MessageCircle, Send, X } from 'lucide-vue-next'
 
 const route = useRoute()
-const { turns, pending, askStream } = useChat()
+const { turns, pending, askStream, loadHistory } = useChat()
 const { isLoggedIn, ensureLoaded } = useAuth()
 const activeTicker = useActiveTicker()
 
@@ -16,16 +16,27 @@ const open = ref(false)
 const question = ref('')
 const scoped = ref(true) // mặc định: giới hạn trong mã đang xem
 
-onMounted(ensureLoaded)
+//  Chỉ coi là "đang xem mã" khi ở trang phân tích và đã có mã.
+const ticker = computed(() => (route.path === '/' ? activeTicker.value : ''))
+
+//  Đồng bộ hội thoại theo mã đang xem: có mã → tải lịch sử ĐÚNG mã đó (không
+//  lẫn mã khác); không có mã → để trống. Chưa đăng nhập thì loadHistory tự bỏ qua.
+async function syncHistory(): Promise<void> {
+  turns.value = []
+  if (isLoggedIn.value && ticker.value) await loadHistory(ticker.value)
+}
+
+onMounted(async () => {
+  await ensureLoaded()
+  await syncHistory()
+})
 
 //  Ẩn widget ở những nơi thừa: trang trợ lý toàn màn hình và trang đăng nhập/ký.
 const hidden = computed(() => ['/tro-ly', '/dang-nhap', '/dang-ky'].includes(route.path))
 
-//  Chỉ coi là "đang xem mã" khi ở trang phân tích và đã có mã.
-const ticker = computed(() => (route.path === '/' ? activeTicker.value : ''))
-
-//  Đổi mã đang xem → bắt đầu hội thoại MỚI (không lẫn tin nhắn của mã cũ).
-watch(ticker, () => { turns.value = [] })
+//  Đổi mã đang xem HOẶC vừa đăng nhập → nạp lại đúng hội thoại của mã.
+watch(ticker, syncHistory)
+watch(isLoggedIn, syncHistory)
 
 const examples = computed(() =>
   ticker.value
@@ -81,6 +92,9 @@ function submit(): void {
 
           <article v-for="(turn, i) in turns" :key="i" class="turn">
             <p class="q"><b>Bạn:</b> {{ turn.question }}</p>
+            <ul v-if="turn.steps && turn.steps.length" class="steps">
+              <li v-for="(s, k) in turn.steps" :key="k">🔧 {{ s.label }}</li>
+            </ul>
             <div v-if="turn.error" class="a err">{{ turn.error }}</div>
             <div v-else-if="turn.response" class="a">
               <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="txt" />
@@ -211,6 +225,21 @@ function submit(): void {
 .turn {
   border-bottom: 1px solid var(--line);
   padding-bottom: 8px;
+}
+
+/*  Các bước công cụ agent đã/đang chạy — nhỏ, mờ, không lấn câu trả lời. */
+.steps {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.steps li {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .q {

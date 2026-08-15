@@ -33,9 +33,16 @@ export interface Citation {
   snippet: string
 }
 
+/** Một bước công cụ agent đã chạy (để UI hiện 'đang làm gì'). */
+export interface AgentStep {
+  tool: string
+  label: string
+}
+
 export interface ChatResponse {
   answer: string
   citations: Citation[]
+  steps?: AgentStep[]
   note: string
 }
 

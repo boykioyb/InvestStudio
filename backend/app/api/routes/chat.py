@@ -22,8 +22,15 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.rag import ChatMessage, IndexJob
 from app.models.user import User
-from app.schemas.chat import ChatHistoryItem, ChatRequest, ChatResponse, Citation, IndexStatus
-from app.services.rag import chat, store
+from app.schemas.chat import (
+    ChatHistoryItem,
+    ChatRequest,
+    ChatResponse,
+    ChatTurnInput,
+    Citation,
+    IndexStatus,
+)
+from app.services.rag import agent, store
 from app.services.rag.gemini import GeminiError
 from app.services.rag.tasks import reindex_task
 
@@ -37,7 +44,7 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
     ticker = payload.ticker.upper().strip() if payload.ticker else None
     question = payload.question.strip()
     try:
-        resp = chat.answer_question(db, question, ticker)
+        resp = agent.answer_question(db, question, ticker, payload.history)
     except GeminiError as exc:
         #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
         #  ghi log phía máy chủ để còn gỡ lỗi.
@@ -46,8 +53,9 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Trợ lý tạm thời không phản hồi được. Vui lòng thử lại sau.") from exc
 
-    #  Lưu lượt hỏi–đáp để người dùng tải lại lịch sử hội thoại.
-    db.add(ChatMessage(user_id=user.id, question=question, answer=resp.answer,
+    #  Lưu lượt hỏi–đáp (kèm mã đang xem) để tải lại lịch sử ĐÚNG theo mã.
+    db.add(ChatMessage(user_id=user.id, ticker=ticker, question=question,
+                       answer=resp.answer,
                        citations=[c.model_dump() for c in resp.citations]))
     db.commit()
     return resp
@@ -57,21 +65,36 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _parse_history(raw: Optional[str]) -> list[ChatTurnInput]:
+    """Lịch sử hội thoại đi qua query param (SSE là GET) → JSON. Hỏng thì bỏ qua."""
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        return [ChatTurnInput(**item) for item in data][-20:]
+    except Exception:  # noqa: BLE001 - client gửi rác thì coi như không có lịch sử
+        return []
+
+
 @router.get("/stream", summary="Hỏi trợ lý (RAG) — phát câu trả lời theo luồng (SSE)")
 def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                ticker: Optional[str] = Query(None, max_length=12),
+               history: Optional[str] = Query(None, description="JSON các lượt gần nhất"),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> StreamingResponse:
     ratelimit.enforce_daily(str(user.id), "rag", get_settings().rag_daily_quota)
     tk = ticker.upper().strip() if ticker else None
     q = question.strip()
+    hist = _parse_history(history)
 
     def gen():
         final = None
         try:
-            for kind, payload in chat.answer_stream(db, q, tk):
+            for kind, payload in agent.answer_stream(db, q, tk, hist):
                 if kind == "delta":
                     yield _sse("delta", {"text": payload})
+                elif kind == "step":
+                    yield _sse("step", payload)
                 else:
                     final = payload
                     yield _sse("final", payload.model_dump(mode="json"))
@@ -79,9 +102,10 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
             print(f"[chat] stream GeminiError: {exc}", file=sys.stderr)
             yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
             return
-        #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời).
+        #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời), kèm mã đang xem.
         if final is not None:
-            db.add(ChatMessage(user_id=user.id, question=q, answer=final.answer,
+            db.add(ChatMessage(user_id=user.id, ticker=tk, question=q,
+                               answer=final.answer,
                                citations=[c.model_dump() for c in final.citations]))
             db.commit()
 
@@ -94,12 +118,14 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
 
 @router.get("/history", response_model=list[ChatHistoryItem],
             summary="Lịch sử hỏi–đáp gần đây (cũ → mới)")
-def history(user: User = Depends(get_current_user),
+def history(ticker: Optional[str] = Query(None, max_length=12,
+                                          description="Lọc theo mã (widget nổi); bỏ trống = tất cả"),
+            user: User = Depends(get_current_user),
             db: Session = Depends(get_db)) -> list[ChatHistoryItem]:
-    rows = list(db.scalars(
-        select(ChatMessage).where(ChatMessage.user_id == user.id)
-        .order_by(ChatMessage.created_at.desc()).limit(30)
-    ))[::-1]
+    stmt = select(ChatMessage).where(ChatMessage.user_id == user.id)
+    if ticker:
+        stmt = stmt.where(ChatMessage.ticker == ticker.upper().strip())
+    rows = list(db.scalars(stmt.order_by(ChatMessage.created_at.desc()).limit(30)))[::-1]
     return [ChatHistoryItem(question=r.question, answer=r.answer,
                             citations=[Citation(**c) for c in (r.citations or [])]) for r in rows]
 

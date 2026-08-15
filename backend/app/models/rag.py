@@ -72,6 +72,9 @@ class ChatMessage(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    #  Mã đang xem lúc hỏi (NULL = câu hỏi chung, không gắn mã). Cho phép tải lại
+    #  lịch sử ĐÚNG theo mã ở widget nổi mà không lẫn hội thoại của mã khác.
+    ticker: Mapped[str | None] = mapped_column(String(12), index=True, nullable=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     answer: Mapped[str] = mapped_column(Text, nullable=False)
     citations: Mapped[list] = mapped_column(JSONB, default=list)  # [{ticker,doc_type,title,snippet}]

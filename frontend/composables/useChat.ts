@@ -1,11 +1,16 @@
-import type { ChatResponse, IndexStatus } from '~/types/account'
+import type { AgentStep, ChatResponse, IndexStatus } from '~/types/account'
 
 /** Một lượt hỏi–đáp để hiển thị lịch sử hội thoại trên trang trợ lý. */
 export interface ChatTurn {
   question: string
   response: ChatResponse | null
   error: string
+  /** Các bước công cụ agent đang chạy (cập nhật trực tiếp khi stream). */
+  steps?: AgentStep[]
 }
+
+//  Số lượt gần nhất gửi kèm để agent giữ ngữ cảnh nối tiếp ("ROE của nó?").
+const HISTORY_TURNS = 6
 
 /**
  * Trợ lý RAG: gửi câu hỏi, xem trạng thái kho dữ liệu, kích hoạt lập chỉ mục.
@@ -29,18 +34,27 @@ export function useChat() {
     return $fetch<T>(`${apiBase}/api/chat${path}`, { credentials: 'include', ...options })
   }
 
+  /** Các lượt đã hoàn tất gần nhất, dạng {question, answer} để gửi kèm câu hỏi mới. */
+  function historyPayload(): Array<{ question: string; answer: string }> {
+    return turns.value
+      .filter((t) => t.response && !t.error)
+      .slice(-HISTORY_TURNS)
+      .map((t) => ({ question: t.question, answer: (t.response?.answer || '').slice(0, 1200) }))
+  }
+
   async function ask(question: string, ticker = ''): Promise<void> {
     const q = question.trim()
     if (!q) return
-    const turn: ChatTurn = { question: q, response: null, error: '' }
+    const history = historyPayload()
+    const turn: ChatTurn = { question: q, response: null, error: '', steps: [] }
     turns.value = [...turns.value, turn]
     pending.value = true
     try {
       turn.response = await call<ChatResponse>('', {
         method: 'POST',
-        body: { question: q, ticker: ticker.trim().toUpperCase() || null },
-        //  Backend phải nhúng câu hỏi + gọi Gemini nên cho phép chờ lâu.
-        timeout: 60_000
+        body: { question: q, ticker: ticker.trim().toUpperCase() || null, history },
+        //  Agent có thể gọi nhiều vòng Gemini + phân tích mã nên cho chờ lâu.
+        timeout: 90_000
       })
     } catch (err) {
       turn.error = messageOf(err, 'Trợ lý chưa trả lời được. Thử lại sau.')
@@ -57,13 +71,15 @@ export function useChat() {
       void ask(q, ticker)
       return
     }
-    const turn: ChatTurn = { question: q, response: { answer: '', citations: [], note: '' }, error: '' }
+    const history = historyPayload()
+    const turn: ChatTurn = { question: q, response: { answer: '', citations: [], note: '' }, error: '', steps: [] }
     turns.value = [...turns.value, turn]
     pending.value = true
 
     const params = new URLSearchParams({ question: q })
     const tk = ticker.trim().toUpperCase()
     if (tk) params.set('ticker', tk)
+    if (history.length) params.set('history', JSON.stringify(history))
 
     const source = new EventSource(`${apiBase}/api/chat/stream?${params.toString()}`, {
       withCredentials: true
@@ -73,6 +89,13 @@ export function useChat() {
       source.close()
       pending.value = false
     }
+    //  Mỗi bước công cụ agent chạy → hiện ngay ("🔧 Phân tích mã FPT…").
+    source.addEventListener('step', (ev) => {
+      try {
+        const s = JSON.parse((ev as MessageEvent).data) as AgentStep
+        if (turn.steps) turn.steps = [...turn.steps, s]
+      } catch { /* bỏ gói hỏng */ }
+    })
     source.addEventListener('delta', (ev) => {
       try {
         if (turn.response) turn.response.answer += JSON.parse((ev as MessageEvent).data).text
@@ -93,9 +116,12 @@ export function useChat() {
     })
   }
 
-  async function loadHistory(): Promise<void> {
+  /** Tải lịch sử đã lưu. Có `ticker` → chỉ lấy hội thoại của mã đó (widget nổi). */
+  async function loadHistory(ticker = ''): Promise<void> {
+    const tk = ticker.trim().toUpperCase()
+    const qs = tk ? `?ticker=${encodeURIComponent(tk)}` : ''
     try {
-      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>('/history')
+      const rows = await call<Array<{ question: string; answer: string; citations: ChatResponse['citations'] }>>(`/history${qs}`)
       turns.value = rows.map((h) => ({
         question: h.question,
         response: { answer: h.answer, citations: h.citations, note: '' },

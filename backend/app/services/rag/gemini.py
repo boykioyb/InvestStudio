@@ -6,6 +6,7 @@ tính năng RAG mới bắt buộc phải có `APP_GEMINI_API_KEY`.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Callable, Iterator
 
 from app.core.config import get_settings
 
@@ -74,6 +75,77 @@ def generate_answer_stream(system_instruction: str, prompt: str):
         raise
     except Exception as exc:  # pragma: no cover
         raise GeminiError(f"Gemini sinh câu trả lời (stream) lỗi: {exc}") from exc
+
+
+def run_agent(
+    system_instruction: str,
+    history: list[tuple[str, str]],
+    question: str,
+    tool_declarations: list[dict],
+    dispatch: Callable[[str, dict], dict],
+    max_steps: int = 5,
+) -> Iterator[tuple[str, dict | str]]:
+    """Vòng lặp Agentic (gọi hàm — function calling).
+
+    Model tự chọn tool → ta chạy `dispatch(name, args)` → nạp kết quả lại cho
+    model → lặp tới khi model chốt câu trả lời (hoặc chạm `max_steps`).
+
+    - `history`: các lượt trước dạng `[(role, text)]`, role ∈ {"user", "model"}.
+    - `tool_declarations`: mỗi tool là dict `{name, description, parameters}` với
+      `parameters` là JSON Schema (kiểu VIẾT HOA: OBJECT/STRING… theo yêu cầu Gemini).
+    - `dispatch(name, args) -> dict`: chạy tool thật, trả kết quả JSON cho model đọc.
+
+    Là GENERATOR: yield `("step", {"tool", "args"})` mỗi lần gọi tool, rồi yield
+    đúng một `("answer", text)` ở cuối. Mọi thao tác chạm SDK Gemini nằm gọn ở đây.
+    """
+    from google.genai import types
+
+    settings = get_settings()
+    client = _client()
+
+    tool = types.Tool(function_declarations=[
+        types.FunctionDeclaration(
+            name=decl["name"], description=decl["description"],
+            parameters=decl["parameters"],
+        )
+        for decl in tool_declarations
+    ])
+    agent_config = types.GenerateContentConfig(
+        system_instruction=system_instruction, tools=[tool], temperature=0.2)
+
+    contents = [
+        types.Content(role=role, parts=[types.Part.from_text(text=text)])
+        for role, text in history
+    ]
+    contents.append(types.Content(role="user", parts=[types.Part.from_text(text=question)]))
+
+    try:
+        for _ in range(max_steps):
+            resp = client.models.generate_content(
+                model=settings.gemini_chat_model, contents=contents, config=agent_config)
+            calls = list(resp.function_calls or [])
+            if not calls:
+                yield ("answer", (resp.text or "").strip())
+                return
+            #  Giữ lại lượt model (chứa các function_call) rồi trả kết quả từng tool.
+            contents.append(resp.candidates[0].content)
+            for call in calls:
+                args = dict(call.args or {})
+                yield ("step", {"tool": call.name, "args": args})
+                result = dispatch(call.name, args)
+                contents.append(types.Content(role="user", parts=[
+                    types.Part.from_function_response(
+                        name=call.name, response={"result": result})]))
+        #  Chạm trần số bước → ép model chốt (bỏ tools để không gọi thêm nữa).
+        final = client.models.generate_content(
+            model=settings.gemini_chat_model, contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction, temperature=0.2))
+        yield ("answer", (final.text or "").strip())
+    except GeminiError:
+        raise
+    except Exception as exc:  # pragma: no cover - lỗi mạng/hạn mức/định dạng từ Gemini
+        raise GeminiError(f"Gemini agent lỗi: {exc}") from exc
 
 
 def generate_answer(system_instruction: str, prompt: str) -> str:

@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     login_window_seconds: int = 300       # cửa sổ 5 phút
     rag_daily_quota: int = 100            # số lượt hỏi trợ lý/user/ngày (chống cháy Gemini)
 
+    # ── Agentic RAG (trợ lý tự chọn công cụ) ─────────────────────────────────
+    #  Bật vòng lặp agent: model tự gọi tool (phân tích/xếp hạng/tìm tri thức)
+    #  rồi tổng hợp. Tắt → lui về RAG một-nhịp cũ (retrieve → answer).
+    rag_agent_enabled: bool = True
+    #  Trần số vòng gọi tool cho MỖI câu hỏi — chặn lặp vô tận + đốt quota Gemini
+    #  (1 câu vẫn tính 1 đơn vị quota, nhưng mỗi vòng là 1 lần gọi model).
+    rag_agent_max_steps: int = 5
+    #  Số lượt hội thoại gần nhất frontend gửi kèm để agent giữ ngữ cảnh ("nó"…).
+    rag_history_turns: int = 6
+
 
 @lru_cache
 def get_settings() -> Settings:
