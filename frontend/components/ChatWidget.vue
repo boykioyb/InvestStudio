@@ -5,38 +5,48 @@
  * Khi đang mở một mã (trang phân tích), tự lấy mã đó làm ngữ cảnh — hỏi là hỏi
  * ngay trên mã đang xem. Chỉ hiển thị và gọi composable; không chứa logic.
  */
-import { LogIn, MessageCircle, Send, X } from 'lucide-vue-next'
+import { List, LogIn, MessageCircle, Plus, Send, Trash2, X } from 'lucide-vue-next'
+import type { ConversationOut } from '~/types/account'
 
 const route = useRoute()
-const { turns, pending, askStream, loadHistory } = useChat()
+const {
+  turns, pending, askStream,
+  conversations, activeConvId, loadConversations, openConversation, newConversation, deleteConversation
+} = useChat()
 const { isLoggedIn, ensureLoaded } = useAuth()
 const activeTicker = useActiveTicker()
 
 const open = ref(false)
 const question = ref('')
-const scoped = ref(true) // mặc định: giới hạn trong mã đang xem
+const scoped = ref(true)      // mặc định: giới hạn trong mã đang xem
+const showList = ref(false)   // bật panel danh sách câu chuyện
 
 //  Chỉ coi là "đang xem mã" khi ở trang phân tích và đã có mã.
 const ticker = computed(() => (route.path === '/' ? activeTicker.value : ''))
 
-//  Đồng bộ hội thoại theo mã đang xem: có mã → tải lịch sử ĐÚNG mã đó (không
-//  lẫn mã khác); không có mã → để trống. Chưa đăng nhập thì loadHistory tự bỏ qua.
-async function syncHistory(): Promise<void> {
-  turns.value = []
-  if (isLoggedIn.value && ticker.value) await loadHistory(ticker.value)
+//  Nạp danh sách câu chuyện; có thì mở cuộc gần nhất, chưa có thì để cuộc mới trống.
+async function syncConversations(): Promise<void> {
+  if (!isLoggedIn.value) {
+    conversations.value = []
+    newConversation()
+    return
+  }
+  await loadConversations()
+  if (conversations.value.length) await openConversation(conversations.value[0].id)
+  else newConversation()
 }
 
 onMounted(async () => {
   await ensureLoaded()
-  await syncHistory()
+  await syncConversations()
 })
 
 //  Ẩn widget ở những nơi thừa: trang trợ lý toàn màn hình và trang đăng nhập/ký.
 const hidden = computed(() => ['/tro-ly', '/dang-nhap', '/dang-ky'].includes(route.path))
 
-//  Đổi mã đang xem HOẶC vừa đăng nhập → nạp lại đúng hội thoại của mã.
-watch(ticker, syncHistory)
-watch(isLoggedIn, syncHistory)
+watch(isLoggedIn, syncConversations)
+//  Mở widget → làm mới danh sách (không đụng cuộc đang xem).
+watch(open, (v) => { if (v && isLoggedIn.value) void loadConversations() })
 
 const examples = computed(() =>
   ticker.value
@@ -47,8 +57,23 @@ const examples = computed(() =>
 function submit(): void {
   const q = question.value
   question.value = ''
-  //  Có mã đang xem + đang bật giới hạn → hỏi trong đúng mã đó. Trả lời theo luồng.
-  askStream(q, ticker.value && scoped.value ? ticker.value : '')
+  //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới. Có mã + giới hạn → hỏi trong mã đó.
+  askStream(q, ticker.value && scoped.value ? ticker.value : '',
+    activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
+}
+
+async function openFromList(id: number): Promise<void> {
+  await openConversation(id)
+  showList.value = false
+}
+
+function newChat(): void {
+  newConversation()
+  showList.value = false
+}
+
+function onDelete(c: ConversationOut): void {
+  if (window.confirm(`Xoá câu chuyện "${c.title}"?`)) void deleteConversation(c.id)
 }
 </script>
 
@@ -70,11 +95,34 @@ function submit(): void {
     <section v-else class="panel" role="dialog" aria-label="Trợ lý hỏi đáp">
       <header class="head">
         <div class="title">
+          <button v-if="isLoggedIn" type="button" class="hbtn" title="Câu chuyện"
+                  @click="showList = !showList"><List :size="18" /></button>
           <MessageCircle /> Trợ lý
           <span v-if="ticker" class="ctx">· {{ ticker }}</span>
         </div>
-        <button type="button" class="x" aria-label="Đóng" @click="open = false"><X /></button>
+        <div class="head-actions">
+          <button v-if="isLoggedIn" type="button" class="hbtn" title="Cuộc mới"
+                  @click="newChat"><Plus :size="18" /></button>
+          <button type="button" class="x" aria-label="Đóng" @click="open = false"><X /></button>
+        </div>
       </header>
+
+      <!-- Panel danh sách câu chuyện (trượt đè lên khung chat) -->
+      <div v-if="isLoggedIn && showList" class="conv-panel">
+        <button type="button" class="btn primary conv-new" @click="newChat">
+          <Plus :size="16" /> Cuộc mới
+        </button>
+        <ul class="conv-list">
+          <li v-for="c in conversations" :key="c.id"
+              :class="['conv', { active: c.id === activeConvId }]" @click="openFromList(c.id)">
+            <span class="conv-title">{{ c.title }}</span>
+            <button type="button" class="conv-del" title="Xoá" @click.stop="onDelete(c)">
+              <Trash2 :size="14" />
+            </button>
+          </li>
+          <li v-if="!conversations.length" class="empty">Chưa có câu chuyện nào.</li>
+        </ul>
+      </div>
 
       <!-- Chưa đăng nhập -->
       <div v-if="!isLoggedIn" class="body center">
@@ -175,6 +223,7 @@ function submit(): void {
 }
 
 .panel {
+  position: relative;
   width: min(380px, calc(100vw - 36px));
   height: min(560px, calc(100dvh - 100px));
   display: flex;
@@ -196,6 +245,9 @@ function submit(): void {
 }
 
 .title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 800;
   font-size: 14px;
 }
@@ -204,12 +256,117 @@ function submit(): void {
   color: var(--accent);
 }
 
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hbtn {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 6px;
+}
+
+.hbtn:hover {
+  color: var(--text);
+  background: var(--panel2);
+}
+
 .x {
   background: none;
   border: 0;
   color: var(--muted);
   font-size: 16px;
   cursor: pointer;
+}
+
+/*  Panel danh sách câu chuyện — đè lên khung chat, ngay dưới header. */
+.conv-panel {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+
+.conv-new {
+  justify-content: center;
+  gap: 6px;
+}
+
+.conv-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conv {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.conv:hover {
+  background: var(--panel2);
+}
+
+.conv.active {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.conv-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-del {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  opacity: 0;
+}
+
+.conv:hover .conv-del,
+.conv.active .conv-del {
+  opacity: 1;
+}
+
+.conv-del:hover {
+  color: var(--bad);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 8px 10px;
 }
 
 .body {
