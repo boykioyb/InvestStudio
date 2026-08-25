@@ -308,7 +308,8 @@ function onDelete(c: ConversationOut): void {
   right: 0;
   bottom: 0;
   z-index: 5;
-  background: var(--panel);
+  /* Drawer phủ đè khung chat → nền đặc, tránh xuyên nội dung phía sau. */
+  background: var(--panel-solid);
   border-top: 1px solid var(--line);
   display: flex;
   flex-direction: column;
