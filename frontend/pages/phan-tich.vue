@@ -69,9 +69,28 @@ const options = computed<AnalyzeOptions>(() => ({
   source: source.value
 }))
 
-async function submit() {
+const route = useRoute()
+const { isLoggedIn, ensureLoaded } = useAuth()
+const { items: watchItems, loaded: watchLoaded, load: loadWatchlist } = useWatchlist()
+
+/** Chạy phân tích thật cho một mã (đồng bộ ô nhập để màn loading hiện đúng mã). */
+async function runAnalysis(code: string) {
   showAdvanced.value = false
-  await analyze(ticker.value, options.value)
+  ticker.value = code
+  await analyze(code, options.value)
+}
+
+//  Bấm "Phân tích" / gợi ý: ĐỔI URL để địa chỉ luôn khớp mã đang xem — watcher
+//  bên dưới sẽ kích hoạt phân tích. Cùng mã (chỉ đổi tùy chọn) thì chạy lại thẳng
+//  vì query không đổi nên navigate sẽ không tạo điều hướng mới.
+function submit() {
+  const code = ticker.value.trim().toUpperCase()
+  if (!code) return
+  if (String(route.query.ma || '').toUpperCase() === code) {
+    void runAnalysis(code)
+  } else {
+    void navigateTo({ path: '/phan-tich', query: { ma: code } })
+  }
 }
 
 function pick(code: string) {
@@ -79,27 +98,28 @@ function pick(code: string) {
   submit()
 }
 
-//  Khởi tạo màn hình:
-//   1) Có ?ma=FPT (mở từ Danh sách/Theo dõi) → phân tích ngay mã đó.
-//   2) Không có → nếu đã đăng nhập và có mã theo dõi, tự phân tích MÃ GẦN NHẤT.
-//   3) Chưa đăng nhập / chưa theo dõi mã nào → giữ nguyên màn trống.
-const route = useRoute()
-const { isLoggedIn, ensureLoaded } = useAuth()
-const { items: watchItems, loaded: watchLoaded, load: loadWatchlist } = useWatchlist()
+//  Nguồn sự thật là ?ma trên URL: đổi mã (từ trang khác, gõ tay, hay nút Phân
+//  tích) đều đi qua đây → phân tích đúng một lần.
+watch(() => route.query.ma, (value) => {
+  const code = String(value || '').trim().toUpperCase()
+  if (code) void runAnalysis(code)
+})
 
+//  Khởi tạo:
+//   1) Có ?ma → phân tích ngay.
+//   2) Không có → đã đăng nhập & có mã theo dõi thì chuyển URL sang mã GẦN NHẤT.
+//   3) Chưa đăng nhập / chưa theo dõi → giữ màn trống.
 onMounted(async () => {
   const code = String(route.query.ma || '').trim().toUpperCase()
   if (code) {
-    pick(code)
+    void runAnalysis(code)
     return
   }
-
   await ensureLoaded()
   if (!isLoggedIn.value) return
   if (!watchLoaded.value) await loadWatchlist()
-  //  Danh sách trả về đã sắp theo created_at giảm dần → phần tử đầu là mã mới theo dõi nhất.
   const recent = watchItems.value[0]
-  if (recent) pick(recent.ticker)
+  if (recent) void navigateTo({ path: '/phan-tich', query: { ma: recent.ticker } })
 })
 
 useHead({
@@ -212,7 +232,7 @@ useHead({
     <main class="stage">
       <p v-if="error" class="msg error" role="alert"><b>Không phân tích được.</b> {{ error }}</p>
 
-      <div v-else-if="pending && !data" class="center loading">
+      <div v-else-if="pending" class="center loading">
         <p class="loading-head">
           Đang phân tích <b>{{ ticker.toUpperCase() }}</b>
         </p>
