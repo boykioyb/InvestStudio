@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronUp, List, MessageCircle, Search, Star } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp } from 'lucide-vue-next'
 import type { AnalyzeOptions, QualitativeOption, SourceOption } from '~/types/stock'
 
 const { data, pending, error, progress, analyze } = useStockAnalysis()
@@ -112,11 +112,11 @@ useHead({
 </script>
 
 <template>
-  <div class="app">
-    <!-- ---------- Thanh trên: tiêu đề + tìm kiếm + tùy chọn ---------- -->
+  <div class="page">
+    <AppHeader />
+    <div class="app">
+    <!-- ---------- Thanh công cụ: tìm kiếm + gợi ý + tùy chọn ---------- -->
     <header class="bar">
-      <h1 class="brand"><Search /> Phân tích mã</h1>
-
       <form class="search" @submit.prevent="submit">
         <input
           v-model="ticker"
@@ -133,10 +133,6 @@ useHead({
           {{ pending ? 'Đang chạy…' : 'Phân tích →' }}
         </button>
       </form>
-
-      <NuxtLink to="/danh-sach" class="chip nav"><List /> Danh sách mã</NuxtLink>
-      <NuxtLink to="/theo-doi" class="chip nav"><Star /> Theo dõi</NuxtLink>
-      <NuxtLink to="/tro-ly" class="chip nav"><MessageCircle /> Trợ lý</NuxtLink>
 
       <div class="quick">
         <button
@@ -159,8 +155,6 @@ useHead({
       >
         <ChevronUp v-if="showAdvanced" /><ChevronDown v-else /> Tùy chọn
       </button>
-
-      <AuthNav />
     </header>
 
     <!-- ---------- Tùy chọn nâng cao: thả xuống, không đẩy bố cục ---------- -->
@@ -288,14 +282,22 @@ useHead({
       sai lệch — hãy đối chiếu báo cáo tài chính gốc. Đây là <b>công cụ hỗ trợ tư duy</b>,
       <b>không phải khuyến nghị đầu tư</b>.
     </footer>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Khung cao đúng một màn hình: chỉ nội dung trong panel mới cuộn khi quá hẹp.
+/* Khung 1 màn hình: AppHeader (global) ở trên, phần phân tích lấp phần còn lại.
    Dùng dvh để thanh công cụ của trình duyệt di động không cắt mất nội dung. */
-.app {
+.page {
   height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -594,9 +596,13 @@ useHead({
    Bố cục 2 cột: tóm tắt + quyết định ở trên (phần cần xem trước),
    bảng 14 tiêu chí trải hết bề ngang bên dưới cho dễ đọc. */
 @media (max-width: 1179px) {
-  .app {
+  .page {
     height: auto;
     min-height: 100dvh;
+  }
+
+  .app {
+    flex: none;
     overflow: visible;
     gap: 10px;
   }
