@@ -3,6 +3,9 @@
 </script>
 
 <template>
+  <!-- Nền toàn cục: aurora + lưới mờ (chỉ trình bày, không chặn tương tác). -->
+  <div class="app-aura" aria-hidden="true" />
+  <div class="app-grid" aria-hidden="true" />
   <NuxtPage />
   <!-- Trợ lý RAG nổi ở góc — dùng được ở mọi trang, tự bắt mã đang xem. -->
   <ChatWidget />

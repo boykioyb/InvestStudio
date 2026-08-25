@@ -54,6 +54,20 @@ const examples = computed(() =>
     : ['Mã nào vốn hóa lớn nhất VN30?', 'So sánh P/E của VCB và CTG']
 )
 
+//  Câu chờ khi trợ lý đang trả lời — thêm ngữ cảnh mã đang xem cho sinh động.
+const typingPhrases = computed(() => {
+  const base = [
+    'Đang suy nghĩ',
+    'Đang tra cứu dữ liệu',
+    'Đang đọc báo cáo tài chính',
+    'Đang xem tin tức mới nhất',
+    'Đang tổng hợp thông tin',
+  ]
+  return ticker.value
+    ? [`Đang phân tích ${ticker.value}`, ...base]
+    : base
+})
+
 function submit(): void {
   const q = question.value
   question.value = ''
@@ -139,7 +153,7 @@ function onDelete(c: ConversationOut): void {
           </p>
 
           <article v-for="(turn, i) in turns" :key="i" class="turn">
-            <div class="msg user">
+            <div class="line user">
               <div class="bubble">{{ turn.question }}</div>
             </div>
 
@@ -147,11 +161,11 @@ function onDelete(c: ConversationOut): void {
               <li v-for="(s, k) in turn.steps" :key="k">🔧 {{ s.label }}</li>
             </ul>
 
-            <div class="msg bot">
+            <div class="line bot">
               <div v-if="turn.error" class="bubble err">{{ turn.error }}</div>
               <div v-else-if="turn.response" class="bubble">
                 <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="txt" />
-                <p v-else class="txt typing">Đang trả lời…</p>
+                <TypingIndicator v-else :phrases="typingPhrases" />
                 <details v-if="turn.response.citations.length" class="cites">
                   <summary>{{ turn.response.citations.length }} nguồn</summary>
                   <ul>
@@ -161,7 +175,7 @@ function onDelete(c: ConversationOut): void {
                   </ul>
                 </details>
               </div>
-              <div v-else class="bubble typing">Đang trả lời…</div>
+              <div v-else class="bubble"><TypingIndicator :phrases="typingPhrases" /></div>
             </div>
           </article>
         </div>
@@ -228,8 +242,9 @@ function onDelete(c: ConversationOut): void {
   height: min(560px, calc(100dvh - 100px));
   display: flex;
   flex-direction: column;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  /* Panel NỔI đè lên nội dung trang → phải đặc, không dùng --panel (kính) kẻo xuyên chữ. */
+  background: var(--panel-solid);
+  border: 1px solid var(--line-hi);
   border-radius: var(--radius);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -391,16 +406,18 @@ function onDelete(c: ConversationOut): void {
   gap: 6px;
 }
 
-/*  Hàng tin nhắn: câu hỏi dồn phải, câu trả lời dồn trái. */
-.msg {
+/*  Hàng tin nhắn: câu hỏi dồn phải, câu trả lời dồn trái.
+    Dùng class riêng .line (không phải .msg) để tránh dính style
+    hộp thông báo (.msg) toàn cục ở main.css. */
+.line {
   display: flex;
 }
 
-.msg.user {
+.line.user {
   justify-content: flex-end;
 }
 
-.msg.bot {
+.line.bot {
   justify-content: flex-start;
 }
 
@@ -415,7 +432,7 @@ function onDelete(c: ConversationOut): void {
 }
 
 /*  Câu hỏi: nền xanh nhạt (accent), góc dưới-phải vát. */
-.msg.user .bubble {
+.line.user .bubble {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--text);
@@ -423,7 +440,7 @@ function onDelete(c: ConversationOut): void {
 }
 
 /*  Câu trả lời: nền panel trung tính, góc dưới-trái vát. */
-.msg.bot .bubble {
+.line.bot .bubble {
   background: var(--panel2);
   border: 1px solid var(--line);
   color: var(--text);
@@ -431,11 +448,11 @@ function onDelete(c: ConversationOut): void {
 }
 
 /*  Gọn lề đoạn đầu/cuối của markdown trong bong bóng. */
-.msg.bot .bubble :deep(p:first-child) {
+.line.bot .bubble :deep(p:first-child) {
   margin-top: 0;
 }
 
-.msg.bot .bubble :deep(p:last-child) {
+.line.bot .bubble :deep(p:last-child) {
   margin-bottom: 0;
 }
 
@@ -456,11 +473,6 @@ function onDelete(c: ConversationOut): void {
 
 .txt {
   margin: 0;
-}
-
-.typing {
-  color: var(--muted);
-  font-style: italic;
 }
 
 .bubble.err {

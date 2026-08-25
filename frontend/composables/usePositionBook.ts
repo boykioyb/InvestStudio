@@ -46,6 +46,14 @@ export function usePositionBook() {
     }
   }
 
+  /** Toàn bộ mã đang có vị thế trong máy này — cho trang tổng quan danh mục. */
+  function listAll(): { ticker: string; lots: PositionLot[]; account?: string }[] {
+    const all = readAll()
+    return Object.entries(all)
+      .filter(([, v]) => v?.lots?.length)
+      .map(([ticker, v]) => ({ ticker, lots: v.lots, account: v.account }))
+  }
+
   function load(ticker: string): void {
     const saved = readAll()[ticker.toUpperCase()]
     lots.value = saved?.lots ? [...saved.lots] : []
@@ -110,5 +118,5 @@ export function usePositionBook() {
     }
   }
 
-  return { lots, accountValue, review, pending, error, load, addLot, removeLot, clear, saveAccount, evaluate }
+  return { lots, accountValue, review, pending, error, listAll, load, addLot, removeLot, clear, saveAccount, evaluate }
 }

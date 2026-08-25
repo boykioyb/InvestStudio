@@ -325,8 +325,9 @@ onBeforeUnmount(() => {
 .info-pop {
   position: fixed;
   z-index: 100;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  /* Popover nổi đè nội dung → nền đặc. */
+  background: var(--panel-solid);
+  border: 1px solid var(--line-hi);
   border-radius: var(--radius);
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
   display: flex;

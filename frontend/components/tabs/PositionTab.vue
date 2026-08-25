@@ -20,6 +20,10 @@ watch(() => props.ticker, (t) => t && load(t), { immediate: true })
 const num = (v: number | null | undefined, digits = 2) =>
   v === null || v === undefined ? '—' : v.toLocaleString('vi-VN', { maximumFractionDigits: digits })
 
+/** Tiền lưu theo đơn vị nghìn đồng (do giá nhập là nghìn đ/cp) → hiển thị ra VND thật. */
+const money = (v: number | null | undefined) =>
+  v === null || v === undefined ? '—' : (v * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })
+
 /** Hiển thị ngày kiểu Việt Nam; dữ liệu vẫn lưu dạng ISO. */
 function viDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
@@ -124,9 +128,9 @@ function submitLot() {
             <span class="hint">{{ review.asof }}</span>
           </div>
           <div class="tile">
-            <span class="k">Lãi / lỗ</span>
+            <span class="k">Lãi / lỗ (đ)</span>
             <span class="v tnum" :class="signClass(review.pnl)">
-              {{ review.pnl > 0 ? '+' : '' }}{{ num(review.pnl, 0) }}
+              {{ review.pnl > 0 ? '+' : '' }}{{ money(review.pnl) }}
             </span>
             <span class="hint" :class="signClass(review.pnl_pct)">
               {{ review.pnl_pct > 0 ? '+' : '' }}{{ num(review.pnl_pct) }}%
@@ -175,8 +179,8 @@ function submitLot() {
                 <th class="lbl">Ngày</th>
                 <th class="num">Giá</th>
                 <th class="num">SL</th>
-                <th class="num">Vốn</th>
-                <th class="num">Lãi/lỗ</th>
+                <th class="num">Vốn (đ)</th>
+                <th class="num">Lãi/lỗ (đ)</th>
                 <th class="num">%</th>
               </tr>
             </thead>
@@ -185,9 +189,9 @@ function submitLot() {
                 <td class="lbl">{{ l.date ? viDate(l.date) : '—' }}</td>
                 <td class="num tnum">{{ num(l.price) }}</td>
                 <td class="num tnum">{{ num(l.quantity, 0) }}</td>
-                <td class="num tnum">{{ num(l.cost, 0) }}</td>
+                <td class="num tnum">{{ money(l.cost) }}</td>
                 <td class="num tnum" :class="signClass(l.pnl)">
-                  {{ l.pnl > 0 ? '+' : '' }}{{ num(l.pnl, 0) }}
+                  {{ l.pnl > 0 ? '+' : '' }}{{ money(l.pnl) }}
                 </td>
                 <td class="num tnum" :class="signClass(l.pnl_pct)">
                   {{ l.pnl_pct > 0 ? '+' : '' }}{{ num(l.pnl_pct) }}%

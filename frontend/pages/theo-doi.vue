@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { List, MessageCircle, Search, Star, Target, TrendingUp } from 'lucide-vue-next'
+import { Star, Target, TrendingUp } from 'lucide-vue-next'
 import type { WatchlistItem } from '~/types/account'
 
 /** Trang danh sách mã theo dõi. Cần đăng nhập (middleware chặn nếu chưa). */
@@ -72,7 +72,7 @@ async function quickAdd(): Promise<void> {
 
 /** Mở màn hình phân tích của mã (giống bấm dòng ở trang Danh sách). */
 function analyze(ticker: string): void {
-  void navigateTo({ path: '/', query: { ma: ticker } })
+  void navigateTo({ path: '/phan-tich', query: { ma: ticker } })
 }
 
 function fmtPrice(value: number | null): string {
@@ -81,14 +81,11 @@ function fmtPrice(value: number | null): string {
 </script>
 
 <template>
-  <div class="wrap">
+  <div>
+    <AppHeader />
+    <div class="wrap">
     <header class="head">
       <h1><Star /> Mã đang theo dõi</h1>
-      <div class="row nav">
-        <NuxtLink to="/" class="btn"><Search /> Phân tích</NuxtLink>
-        <NuxtLink to="/danh-sach" class="btn"><List /> Danh sách</NuxtLink>
-        <NuxtLink to="/tro-ly" class="btn"><MessageCircle /> Trợ lý</NuxtLink>
-      </div>
     </header>
 
     <div class="acctline">
@@ -154,6 +151,7 @@ function fmtPrice(value: number | null): string {
       Danh sách theo dõi chỉ để mở nhanh. Đây là công cụ hỗ trợ tư duy,
       <b>không phải khuyến nghị đầu tư</b>.
     </p>
+    </div>
   </div>
 </template>
 

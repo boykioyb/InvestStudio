@@ -4,7 +4,7 @@ import type { RangeKey, StockAnalysis } from '~/types/stock'
 /** Cột tóm tắt: mã, điểm tổng, kết luận, giá và biểu đồ giá thật nhiều khung. */
 const props = defineProps<{ data: StockAnalysis }>()
 
-const { textClass, fillClass } = useLevel()
+const { textClass } = useLevel()
 const { price, date } = useFormat()
 const { history, range, pending: loadingChart, error: chartError, load } = usePriceHistory()
 
@@ -20,6 +20,39 @@ const series = computed(() =>
 function pickRange(next: RangeKey) {
   if (next !== range.value || !history.value) load(props.data.ticker, next)
 }
+
+/* ── Vòng điểm số (chỉ trình bày) ──────────────────────────────────────── */
+const GAUGE_R = 52
+const GAUGE_C = 2 * Math.PI * GAUGE_R
+const clamped = computed(() => Math.min(100, Math.max(0, props.data.score.total)))
+const shown = ref(0)
+const dashoffset = computed(() => GAUGE_C * (1 - shown.value / 100))
+const gaugeColor = computed(() => {
+  const lv = props.data.score.verdict.level
+  return lv === 'good' ? 'var(--good)' : lv === 'bad' ? 'var(--bad)'
+    : lv === 'warn' ? 'var(--warn)' : 'var(--muted)'
+})
+
+let raf = 0
+function animateTo(target: number): void {
+  cancelAnimationFrame(raf)
+  const reduce = import.meta.client && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  if (reduce || !import.meta.client) { shown.value = target; return }
+  const t0 = performance.now()
+  const dur = 1200
+  const step = (t: number): void => {
+    const p = Math.min(1, (t - t0) / dur)
+    shown.value = target * (1 - Math.pow(1 - p, 3))
+    if (p < 1) raf = requestAnimationFrame(step)
+    else shown.value = target
+  }
+  raf = requestAnimationFrame(step)
+}
+
+onMounted(() => animateTo(clamped.value))
+//  Đổi mã → điểm mới thì chạy lại hiệu ứng đếm.
+watch(clamped, (v) => animateTo(v))
+onBeforeUnmount(() => cancelAnimationFrame(raf))
 </script>
 
 <template>
@@ -36,21 +69,26 @@ function pickRange(next: RangeKey) {
       </div>
     </header>
 
-    <div class="score">
-      <div class="score-num tnum" :class="textClass(data.score.verdict.level)">
-        {{ data.score.total }}<span class="score-max">/100</span>
+    <div class="gauge-block">
+      <div class="gauge" :style="{ '--gc': gaugeColor }" role="img"
+           :aria-label="`Điểm ${data.score.total} trên 100`">
+        <svg viewBox="0 0 120 120">
+          <circle class="g-track" cx="60" cy="60" r="52" />
+          <circle
+            class="g-prog" cx="60" cy="60" r="52" transform="rotate(-90 60 60)"
+            :stroke-dasharray="GAUGE_C" :stroke-dashoffset="dashoffset"
+          />
+        </svg>
+        <div class="g-center">
+          <span class="g-num tnum" :class="textClass(data.score.verdict.level)">{{ Math.round(shown) }}</span>
+          <span class="g-max">/100</span>
+        </div>
       </div>
       <div class="score-side">
         <p class="verdict" :class="textClass(data.score.verdict.level)">
           {{ data.score.verdict.text }}
         </p>
-        <span class="track" aria-hidden="true">
-          <span
-            class="fill"
-            :class="fillClass(data.score.verdict.level)"
-            :style="{ width: `${Math.min(100, Math.max(0, data.score.total))}%` }"
-          />
-        </span>
+        <p class="score-cap hint">điểm sức khỏe tổng hợp · 14 tiêu chí</p>
       </div>
     </div>
 
@@ -158,24 +196,61 @@ function pickRange(next: RangeKey) {
   color: var(--muted);
 }
 
-.score {
+.gauge-block {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 14px;
+  padding: 12px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
-.score-num {
-  font-size: 42px;
+.gauge {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  flex: none;
+}
+
+.gauge svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.g-track {
+  fill: none;
+  stroke: var(--panel-hi);
+  stroke-width: 11;
+}
+
+.g-prog {
+  fill: none;
+  stroke: var(--gc);
+  stroke-width: 11;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px var(--gc));
+}
+
+.g-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.g-num {
+  font-size: 36px;
   font-weight: 900;
   line-height: 1;
 }
 
-.score-max {
-  font-size: 15px;
+.g-max {
+  font-size: 11px;
   color: var(--muted);
+  margin-top: 1px;
 }
 
 .score-side {
@@ -184,25 +259,14 @@ function pickRange(next: RangeKey) {
 }
 
 .verdict {
-  margin: 0 0 6px;
-  font-size: 12.5px;
-  font-weight: 700;
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 800;
   line-height: 1.35;
 }
 
-.track {
-  display: block;
-  height: 6px;
-  border-radius: 4px;
-  background: var(--line);
-  overflow: hidden;
-}
-
-.fill {
-  display: block;
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+.score-cap {
+  margin: 0;
 }
 
 /* Biểu đồ giãn lấp hết khoảng trống giữa điểm số và phần chú thích */

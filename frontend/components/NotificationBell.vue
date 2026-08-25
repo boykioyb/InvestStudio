@@ -90,8 +90,9 @@ async function toggle(): Promise<void> {
   width: min(340px, calc(100vw - 24px));
   max-height: 60vh;
   overflow-y: auto;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  /* Dropdown nổi đè nội dung → nền đặc, tránh xuyên chữ. */
+  background: var(--panel-solid);
+  border: 1px solid var(--line-hi);
   border-radius: 12px;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
   z-index: 70;

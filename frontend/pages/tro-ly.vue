@@ -115,7 +115,7 @@ async function startReindex(): Promise<void> {
     <header class="head">
       <h1><MessageCircle /> Trợ lý hỏi–đáp</h1>
       <div class="row nav">
-        <NuxtLink to="/" class="btn"><Search /> Phân tích</NuxtLink>
+        <NuxtLink to="/phan-tich" class="btn"><Search /> Phân tích</NuxtLink>
         <NuxtLink to="/theo-doi" class="btn"><Star /> Theo dõi</NuxtLink>
       </div>
     </header>
@@ -195,7 +195,7 @@ async function startReindex(): Promise<void> {
             <div v-else-if="turn.response" class="chat-row bot">
               <div class="bubble bot">
                 <MarkdownText v-if="turn.response.answer" :text="turn.response.answer" class="a-text" />
-                <p v-else class="a-text typing">Đang trả lời…</p>
+                <TypingIndicator v-else />
 
                 <details v-if="turn.response.citations.length" class="cites">
                   <summary>{{ turn.response.citations.length }} nguồn tham chiếu</summary>
@@ -210,7 +210,7 @@ async function startReindex(): Promise<void> {
               </div>
             </div>
             <div v-else class="chat-row bot">
-              <div class="bubble bot typing">Đang chờ trả lời…</div>
+              <div class="bubble bot"><TypingIndicator /></div>
             </div>
           </article>
         </div>
@@ -572,11 +572,6 @@ h1 {
 
 .a-text {
   margin: 0;
-}
-
-.typing {
-  color: var(--muted);
-  font-style: italic;
 }
 
 .steps {
