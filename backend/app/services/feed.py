@@ -11,6 +11,7 @@ tất cả đều gắn nhãn rõ ràng là "tìm", tuyệt đối không trình
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 from urllib.parse import quote_plus
 
@@ -45,6 +46,27 @@ def _disclosure_links(ticker: str) -> list[NewsLink]:
 def _clean(value: Any, fallback: str = "") -> str:
     text = str(value or "").strip()
     return fallback if text.lower() in ("", "nan", "none", "nat") else text
+
+
+def _norm_title(title: str) -> str:
+    """Chuẩn hoá tiêu đề để lọc trùng giữa 2 nguồn (bỏ dấu câu, gộp khoảng trắng)."""
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", title.lower())).strip()
+
+
+def _to_news_item(ticker: str, item: dict) -> Optional[NewsItem]:
+    """Một tin thô (từ VCI hoặc Google News) → NewsItem, kèm link phù hợp."""
+    title = _clean(item.get("title"))
+    if not title:
+        return None
+    links: list[NewsLink] = []
+    #  Có URL bài gốc (Google News luôn có, VCI hầu như không) → dùng thẳng.
+    link = _clean(item.get("link"))
+    if link:
+        source = _clean(item.get("source"))
+        label = f"Đọc bài gốc · {source}" if source else "Đọc bài gốc"
+        links.append(NewsLink(label=label, url=link, kind="official"))
+    links += _search_links(ticker, title)
+    return NewsItem(title=title, date=_date(item.get("date")), links=links)
 
 
 def _date(value: Any) -> str:
@@ -84,7 +106,8 @@ def _event_items(events: list[dict]) -> list[EventItem]:
 
 def fetch_news(ticker: str) -> NewsFeed:
     """Tin công bố + sự kiện doanh nghiệp gần đây (lấy thẳng VCI, không qua vnstock)."""
-    from app.services.providers import vci_direct
+    from app.services.providers import google_news, vci_direct
+    from app.services.providers.google_news import GoogleNewsError
     from app.services.providers.vci_direct import VciError
 
     ticker = ticker.upper().strip()
@@ -92,20 +115,25 @@ def fetch_news(ticker: str) -> NewsFeed:
     def safe(getter):
         try:
             return getter()
-        except VciError:
+        except (VciError, GoogleNewsError):
             return None
 
+    #  Gộp 2 nguồn: VCI (tin công bố chính thức) + Google News (tin báo chí, tươi
+    #  hơn, có link bài gốc). VCI feed hay đóng băng nên Google News là cứu cánh.
+    raw_news = (safe(lambda: vci_direct.news(ticker, days=365, size=50)) or [])
+    raw_news += (safe(lambda: google_news.news(ticker, size=15)) or [])
+
     news: list[NewsItem] = []
-    for item in (safe(lambda: vci_direct.news(ticker, days=365, size=50)) or []):
-        title = _clean(item.get("title"))
-        if not title:
+    seen: set[str] = set()
+    for item in raw_news:
+        node = _to_news_item(ticker, item)
+        if node is None:
             continue
-        links: list[NewsLink] = []
-        #  VCI có link bài gốc → dùng thẳng; kèm luôn link tìm kiếm dự phòng.
-        if item.get("link"):
-            links.append(NewsLink(label="Đọc bài gốc", url=item["link"], kind="official"))
-        links += _search_links(ticker, title)
-        news.append(NewsItem(title=title, date=_date(item.get("date")), links=links))
+        key = _norm_title(node.title)
+        if key in seen:  # lọc trùng giữa/trong 2 nguồn theo tiêu đề
+            continue
+        seen.add(key)
+        news.append(node)
     news.sort(key=lambda n: n.date, reverse=True)
 
     events = _event_items(safe(lambda: vci_direct.events(ticker)) or [])
