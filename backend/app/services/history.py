@@ -7,7 +7,7 @@ không tham gia vào việc chấm điểm. Bộ chấm điểm vẫn dùng cử
 from __future__ import annotations
 
 from app.schemas.stock import HistoryStats, PriceHistory, PricePoint, RangeKey
-from app.services.providers import vci_adapter
+from app.services.providers import quotes
 from app.services.providers.base import Candle, ProviderError
 
 #  Số ngày LỊCH (không phải số phiên) cần lùi lại cho mỗi khung.
@@ -40,9 +40,9 @@ def fetch_history(ticker: str, range_key: RangeKey) -> PriceHistory:
     ticker = ticker.upper().strip()
     days, label = RANGES[range_key]
 
-    #  Chỉ vnstock nhận khoảng ngày tùy ý; CafeF phân trang 20 dòng/lần nên
-    #  không thực tế cho khung dài — vì vậy khung thời gian chỉ dựa vào vnstock.
-    candles = vci_adapter.fetch_ohlcv(ticker, days)
+    #  Nguồn nhận khoảng ngày tùy ý (DNSE ưu tiên, VCI dự phòng); CafeF phân trang
+    #  20 dòng/lần nên không thực tế cho khung dài → khung thời gian không dùng CafeF.
+    source, candles = quotes.fetch_ohlcv_sourced(ticker, days)
     if not candles:
         raise ProviderError(f"Không có dữ liệu giá cho {ticker} trong khung {label.lower()}.")
 
@@ -50,7 +50,7 @@ def fetch_history(ticker: str, range_key: RangeKey) -> PriceHistory:
         ticker=ticker,
         range=range_key,
         label=label,
-        source="VCI",
+        source=source,
         points=[
             PricePoint(d=c.date, o=round(c.open, 2), h=round(c.high, 2),
                        l=round(c.low, 2), c=round(c.close, 2), v=c.volume)

@@ -1,8 +1,12 @@
 """Orchestrator: gộp dữ liệu nhiều nguồn → Metrics → gọi bộ chấm điểm.
 
-Tách theo KHỐI, mỗi khối có nguồn chính + dự phòng riêng:
-  · Kỹ thuật  : CafeF (JSON sạch, nhanh) → VCI (Vietcap, gọi thẳng httpx)
+Tách theo KHỐI, mỗi khối có nguồn chính + dự phòng riêng. **DNSE ưu tiên hàng đầu
+cho khối GIÁ** vì nến ngày sâu ~10 năm (2 chu kỳ) đủ để đánh giá chuẩn xác:
+  · Kỹ thuật  : DNSE → CafeF (JSON sạch, nhanh) → VCI (Vietcap, gọi thẳng httpx)
   · Cơ bản    : VCI → KBS
+Cố ý KHÔNG dùng DNSE cho khối cơ bản: `financial-index` của DNSE trả tăng trưởng
+LN sai thước đo (TTM/quý, có mã còn ngược dấu vs YoY năm — HPG -29% vs +29%), sẽ
+phá tiêu chí tăng trưởng. VCI cho YoY năm chuẩn (khớp KQKD).
 Nhờ vậy hỏng một nguồn vẫn ra được phần còn lại; tiêu chí thật sự thiếu sẽ
 được đánh dấu `available=False` và tính 0đ (xem scoring.py).
 """
@@ -12,7 +16,7 @@ from typing import Callable, Optional
 
 from app.schemas.stock import Metrics, SourceMode, StockAnalysis
 from app.services import scoring
-from app.services.providers import cafef, vci_adapter
+from app.services.providers import cafef, dnse_adapter, vci_adapter
 from app.services.providers.base import FundamentalData, ProviderError, TechnicalData
 
 # P/E ngành & P/B hợp lý — ƯỚC LƯỢNG benchmark thị trường VN, không phải số crawl.
@@ -111,12 +115,15 @@ def analyze(
 
     # --- Khối kỹ thuật (bắt buộc) ---
     progress("technical", "Lấy lịch sử giá và tính chỉ báo kỹ thuật", 10)
-    if source == "vci":
+    if source == "dnse":
+        tech_sources = [("DNSE", lambda: dnse_adapter.fetch_technical(ticker))]
+    elif source == "vci":
         tech_sources = [("VCI", lambda: vci_adapter.fetch_technical(ticker))]
     elif source == "cafef":
         tech_sources = [("CafeF", lambda: cafef.fetch_technical(ticker))]
-    else:
+    else:  # auto — DNSE ưu tiên (10 năm), rồi CafeF (nhanh), rồi VCI
         tech_sources = [
+            ("DNSE", lambda: dnse_adapter.fetch_technical(ticker)),
             ("CafeF", lambda: cafef.fetch_technical(ticker)),
             ("VCI", lambda: vci_adapter.fetch_technical(ticker)),
         ]

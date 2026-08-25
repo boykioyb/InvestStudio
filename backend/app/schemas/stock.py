@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 Level = Literal["good", "warn", "bad"]
 Trend = Literal["up", "side", "down"]
 OcfSign = Literal["+", "±", "-"]
-SourceMode = Literal["auto", "vci", "cafef"]
+SourceMode = Literal["auto", "dnse", "vci", "cafef"]
 
 
 class Metrics(BaseModel):
@@ -492,6 +492,64 @@ class PositionReview(BaseModel):
     lots: list[LotResult] = []
     action: PositionAction
     warnings: list[str] = []
+    note: str = ""
+
+
+# ── Danh mục tổng quan (portfolio) ───────────────────────────────────────────
+class PortfolioLot(BaseModel):
+    """Một đợt mua (chỉ cần giá + số lượng cho tổng quan)."""
+
+    price: float = Field(..., gt=0, description="Giá mua (nghìn đ/cp)")
+    quantity: float = Field(..., gt=0, description="Số cổ phiếu")
+
+
+class PortfolioHolding(BaseModel):
+    ticker: str = Field(..., min_length=2, max_length=12)
+    lots: list[PortfolioLot] = Field(..., min_length=1, max_length=50)
+
+
+class PortfolioRequest(BaseModel):
+    holdings: list[PortfolioHolding] = Field(..., min_length=1, max_length=100)
+    #  Tổng vốn tài khoản (nghìn đ) — có thì tính được tỷ trọng từng mã.
+    account_value: Optional[float] = Field(None, gt=0)
+
+
+class PortfolioRow(BaseModel):
+    ticker: str
+    name: str = ""
+    quantity: float = 0
+    avg_cost: float = Field(0, description="Giá vốn bình quân (nghìn đ/cp)")
+    total_cost: float = Field(0, description="Tổng tiền đã bỏ ra (nghìn đ)")
+    current_price: Optional[float] = Field(None, description="Giá hiện tại (nghìn đ/cp)")
+    price_is_ref: bool = Field(False, description="True = dùng giá tham chiếu (ngoài phiên)")
+    market_value: Optional[float] = Field(None, description="Giá trị hiện tại (nghìn đ)")
+    pnl: Optional[float] = Field(None, description="Lãi/lỗ (nghìn đ)")
+    pnl_pct: Optional[float] = None
+    weight_pct: Optional[float] = Field(None, description="Tỷ trọng trên tài khoản (%)")
+
+
+class PortfolioTotals(BaseModel):
+    total_cost: float = 0
+    market_value: float = 0
+    pnl: float = 0
+    pnl_pct: float = 0
+    positions: int = 0
+    priced: int = Field(0, description="Số mã lấy được giá")
+    winners: int = 0
+    losers: int = 0
+
+
+class PortfolioError(BaseModel):
+    ticker: str
+    message: str
+
+
+class PortfolioReview(BaseModel):
+    asof: str = ""
+    in_session: bool = False
+    rows: list[PortfolioRow] = []
+    totals: PortfolioTotals
+    errors: list[PortfolioError] = []
     note: str = ""
 
 
