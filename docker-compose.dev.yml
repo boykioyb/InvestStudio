@@ -1,0 +1,36 @@
+# Chế độ DEV — mount mã nguồn + hot-reload cho CẢ frontend và backend.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   (gọn hơn:  ./dev.sh )
+#
+# Sửa file .py / .vue trên máy → container tự nạp lại, KHÔNG cần build lại image.
+# Bản chạy thường (production, đóng gói sẵn) vẫn như cũ:  docker compose up
+#
+# Ghi chú macOS: bind mount của Docker Desktop thường KHÔNG bắn sự kiện đổi file,
+# nên bật polling để reload luôn hoạt động (tốn CPU hơn chút — chấp nhận khi dev).
+
+services:
+  backend:
+    # uvicorn tự nạp lại khi .py đổi (watchfiles có sẵn trong uvicorn[standard]).
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      WATCHFILES_FORCE_POLLING: "true"   # macOS bind mount → phải polling mới thấy đổi
+    volumes:
+      - ./backend:/srv                   # mã nguồn live (đè bản COPY trong image)
+
+  # Worker/Beat dùng chung image backend — mount mã để khi khởi động lại lấy code mới.
+  # (Celery không hot-reload; đổi code tác vụ nền thì: docker compose restart worker beat)
+  worker:
+    volumes:
+      - ./backend:/srv
+  beat:
+    volumes:
+      - ./backend:/srv
+
+  frontend:
+    # CMD trong Dockerfile đã là `npm run dev` (HMR) — chỉ cần mount mã nguồn.
+    environment:
+      CHOKIDAR_USEPOLLING: "true"        # macOS bind mount → Vite/Nuxt polling
+    volumes:
+      - ./frontend:/app                  # mã nguồn live
+      - /app/node_modules                # GIỮ node_modules của container (alpine), host KHÔNG đè
