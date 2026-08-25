@@ -39,11 +39,16 @@ export function useStockDetails() {
     return detail || 'Không tải được dữ liệu. Kiểm tra máy chủ và thử lại.'
   }
 
+  //  Giữ spinner tối thiểu ~0.45s: nguồn phản hồi nhanh (đã cache phía máy chủ)
+  //  làm loading CHỚP tắt, nhìn giật. Đủ lâu để mắt nhận ra, đủ ngắn để không lê thê.
+  const MIN_LOADING_MS = 450
+
   async function get<T>(key: string, path: string, query: Record<string, string> = {}): Promise<T | null> {
     if (cache.has(key)) return cache.get(key) as T
 
     loading.value = { ...loading.value, [key]: true }
     errors.value = { ...errors.value, [key]: null }
+    const startedAt = Date.now()
     try {
       const result = await $fetch<T>(path, { baseURL: apiBase, query, timeout: 60_000 })
       cache.set(key, result)
@@ -52,6 +57,10 @@ export function useStockDetails() {
       errors.value = { ...errors.value, [key]: messageOf(err) }
       return null
     } finally {
+      const elapsed = Date.now() - startedAt
+      if (elapsed < MIN_LOADING_MS) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_LOADING_MS - elapsed))
+      }
       loading.value = { ...loading.value, [key]: false }
     }
   }

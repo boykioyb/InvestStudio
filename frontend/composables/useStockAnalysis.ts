@@ -1,5 +1,8 @@
 import type { AnalyzeOptions, ApiErrorBody, AnalyzeProgress, StockAnalysis } from '~/types/stock'
 
+//  Thời gian tối thiểu giữ màn loading phân tích (ms) — tránh chớp tắt khi cache.
+const MIN_ANALYZE_MS = 600
+
 /**
  * Gọi API phân tích cổ phiếu.
  * Composable này CHỈ lấy dữ liệu và chuyển lỗi thành thông báo tiếng Việt.
@@ -136,6 +139,7 @@ export function useStockAnalysis() {
     pending.value = true
     error.value = null
     progress.value = { step: 'start', label: 'Kết nối tới máy chủ', percent: 3 }
+    const startedAt = Date.now()
 
     try {
       // Ưu tiên luồng SSE để có tiến độ thật; hỏng thì quay về gọi một phát.
@@ -155,6 +159,12 @@ export function useStockAnalysis() {
       data.value = null
       error.value = toMessage(err)
     } finally {
+      //  Giữ màn loading tối thiểu ~0.6s để không CHỚP tắt khi kết quả đã được
+      //  cache (phản hồi gần như tức thì nhìn rất giật).
+      const elapsed = Date.now() - startedAt
+      if (elapsed < MIN_ANALYZE_MS) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_ANALYZE_MS - elapsed))
+      }
       pending.value = false
       progress.value = null
     }
