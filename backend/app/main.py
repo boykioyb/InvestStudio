@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, chat, notifications, screener, stocks, watchlist
+from app.api.routes import auth, chat, notifications, portfolio, screener, stocks, watchlist
 from app.core.config import DEV_JWT_SECRET, get_settings
 from app.db.session import init_db
 from app.schemas.stock import HealthResponse
@@ -71,6 +71,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(watchlist.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(portfolio.router, prefix="/api")
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["system"])
