@@ -29,7 +29,7 @@ watch([() => props.ticker, range], ([t, r]) => t && loadStats(t, r), { immediate
     </div>
 
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tính thống kê…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tính thống kê…" />
 
     <template v-else-if="stats">
       <div class="groups">

@@ -63,7 +63,7 @@ const mfiPath = computed(() => {
     </div>
 
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tính dòng tiền…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tính dòng tiền…" />
 
     <template v-else-if="flow">
       <section class="card">

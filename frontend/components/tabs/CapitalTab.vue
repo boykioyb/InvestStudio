@@ -25,7 +25,7 @@ function dates(e: EventItem): { label: string; value: string }[] {
 <template>
   <div class="tab-body">
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tải sự kiện doanh nghiệp…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tải sự kiện doanh nghiệp…" />
 
     <template v-else-if="actions">
       <section v-if="actions.dividends.length" class="card">

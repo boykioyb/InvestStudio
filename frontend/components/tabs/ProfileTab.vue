@@ -17,7 +17,7 @@ function shares(quantity: number | null): string {
 <template>
   <div class="tab-body">
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tải hồ sơ doanh nghiệp…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tải hồ sơ doanh nghiệp…" />
 
     <template v-else-if="profile">
       <section class="card">

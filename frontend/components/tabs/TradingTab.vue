@@ -25,7 +25,7 @@ function priceClass(price: number | null): string {
 <template>
   <div class="tab-body">
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tải bảng giá…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tải bảng giá…" />
 
     <template v-else-if="board">
       <section class="card">

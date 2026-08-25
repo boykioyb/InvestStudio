@@ -11,7 +11,7 @@ watch(() => props.ticker, (t) => t && loadNews(t), { immediate: true })
 <template>
   <div class="tab-body">
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tải tin tức…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tải tin tức…" />
 
     <template v-else-if="news">
       <p class="msg warn">{{ news.note }}</p>

@@ -40,7 +40,7 @@ function money(value: number | null): string {
     </div>
 
     <p v-if="errorOf(key)" class="msg error" role="alert">{{ errorOf(key) }}</p>
-    <p v-else-if="isLoading(key)" class="hint">Đang tải báo cáo…</p>
+    <LoadingState v-else-if="isLoading(key)" label="Đang tải báo cáo tài chính…" />
 
     <section v-else-if="statement" class="card">
       <header class="head">
