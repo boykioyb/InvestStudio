@@ -4,7 +4,7 @@
  * Bố cục kiểu Messenger: thanh bên trái = danh sách CÂU CHUYỆN; bên phải = khung chat.
  * Chỉ gọi composable; không chứa logic nghiệp vụ.
  */
-import { MessageCircle, Paperclip, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-vue-next'
+import { MessageCircle, Paperclip, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
 import type { ConversationOut } from '~/types/account'
 
 definePageMeta({ middleware: 'auth' })
@@ -111,13 +111,11 @@ async function startReindex(): Promise<void> {
 </script>
 
 <template>
-  <div class="wrap">
+  <div>
+    <AppHeader />
+    <div class="wrap">
     <header class="head">
       <h1><MessageCircle /> Trợ lý hỏi–đáp</h1>
-      <div class="row nav">
-        <NuxtLink to="/phan-tich" class="btn"><Search /> Phân tích</NuxtLink>
-        <NuxtLink to="/theo-doi" class="btn"><Star /> Theo dõi</NuxtLink>
-      </div>
     </header>
 
     <div class="chat-layout">
@@ -261,6 +259,7 @@ async function startReindex(): Promise<void> {
       Trợ lý tổng hợp dữ liệu (có thể sai) — luôn đối chiếu nguồn.
       Đây là công cụ hỗ trợ tư duy, <b>không phải khuyến nghị đầu tư</b>.
     </p>
+    </div>
   </div>
 </template>
 

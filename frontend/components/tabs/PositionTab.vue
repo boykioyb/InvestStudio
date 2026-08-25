@@ -17,12 +17,8 @@ const date = ref('')
 
 watch(() => props.ticker, (t) => t && load(t), { immediate: true })
 
-const num = (v: number | null | undefined, digits = 2) =>
-  v === null || v === undefined ? '—' : v.toLocaleString('vi-VN', { maximumFractionDigits: digits })
-
-/** Tiền lưu theo đơn vị nghìn đồng (do giá nhập là nghìn đ/cp) → hiển thị ra VND thật. */
-const money = (v: number | null | undefined) =>
-  v === null || v === undefined ? '—' : (v * 1000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })
+//  Định dạng số/tiền lấy từ một nơi dùng chung (nghìn đ → VND thật ở money()).
+const { num, money } = useFormat()
 
 /** Hiển thị ngày kiểu Việt Nam; dữ liệu vẫn lưu dạng ISO. */
 function viDate(iso: string): string {
