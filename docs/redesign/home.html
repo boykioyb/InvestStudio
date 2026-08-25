@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InvestStudio — Home</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+/* ---- ticker tape ---- */
+.tape{overflow:hidden;border-bottom:1px solid var(--line);background:rgba(10,17,34,.6);backdrop-filter:blur(8px)}
+.tape-track{display:inline-flex;gap:34px;padding:8px 0;white-space:nowrap;animation:tape 38s linear infinite;font-family:var(--mono);font-size:13px}
+.tape-track span{display:inline-flex;gap:8px}
+.tape b{font-weight:600}
+@keyframes tape{to{transform:translateX(-50%)}}
+.tape:hover .tape-track{animation-play-state:paused}
+
+/* ---- hero ---- */
+.hero{max-width:1320px;margin:0 auto;padding:64px 26px 30px;text-align:center;position:relative}
+.hero .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);border:1px solid var(--line);background:var(--panel);border-radius:20px;padding:6px 14px;margin-bottom:22px}
+.hero .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 10px var(--good);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.hero h1{font-size:clamp(34px,5.4vw,66px);line-height:1.04;margin:0 0 18px;font-weight:800;letter-spacing:-1.5px}
+.hero h1 .grad{background:linear-gradient(100deg,var(--accent),var(--accent-2) 45%,var(--good));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{max-width:620px;margin:0 auto 30px;color:var(--muted);font-size:17px;line-height:1.6}
+.hero-search{max-width:560px;margin:0 auto;display:flex;gap:10px;background:var(--panel);border:1px solid var(--line-hi);border-radius:16px;padding:8px 8px 8px 18px;box-shadow:var(--shadow)}
+.hero-search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:17px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;font-family:var(--mono)}
+.hero-search input::placeholder{color:var(--muted-2);text-transform:none;font-family:var(--sans);font-weight:400}
+.chips{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.chips span{font-size:12.5px;color:var(--muted);border:1px solid var(--line);background:var(--panel-hi);border-radius:20px;padding:5px 13px;cursor:pointer;transition:.15s;font-family:var(--mono)}
+.chips span:hover{color:var(--text);border-color:var(--accent)}
+
+/* ---- index cards ---- */
+.idx-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1320px;margin:8px auto 0;padding:0 26px}
+.idx{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;backdrop-filter:blur(12px);position:relative;overflow:hidden}
+.idx .nm{font-size:12px;color:var(--muted);font-weight:600}
+.idx .vv{font-family:var(--mono);font-size:26px;font-weight:600;margin:6px 0 2px}
+.idx .cg{font-family:var(--mono);font-size:13px;font-weight:600}
+.idx svg{position:absolute;right:0;bottom:0;width:56%;height:46px;opacity:.85}
+
+/* ---- section grid ---- */
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;max-width:1320px;margin:20px auto 0;padding:0 26px}
+.mv{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.mv:last-child{border-bottom:none}
+.mv .t{font-weight:700;width:58px}
+.mv .spk{flex:1;height:26px}
+.mv .p{font-family:var(--mono);font-size:13px;text-align:right;min-width:96px}
+.port-big{font-family:var(--mono);font-size:32px;font-weight:700}
+.port-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.st{background:var(--panel-hi);border:1px solid var(--line);border-radius:12px;padding:11px}
+.st .k{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.st .v{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:3px}
+.feat{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1320px;margin:26px auto 0;padding:0 26px}
+.feat .card{padding:22px}
+.feat .ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-size:20px;background:var(--panel-hi);border:1px solid var(--line);margin-bottom:12px}
+.feat h4{margin:0 0 6px;font-size:16px}
+.feat p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+@media(max-width:1000px){.idx-row{grid-template-columns:1fr 1fr}.cols{grid-template-columns:1fr}.feat{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="aura"></div><div class="grid-bg"></div>
+
+<header class="top">
+  <a class="brand" href="home.html"><span class="logo">IS</span> InvestStudio <small>· Terminal</small></a>
+  <nav class="tabs">
+    <a class="on" href="home.html">Home</a>
+    <a href="dashboard.html">Phân tích</a>
+    <a href="screener.html">Danh sách</a>
+    <a>Theo dõi</a><a>Trợ lý</a>
+  </nav>
+  <div class="cmdk">🔎 Tìm mã… <kbd>⌘K</kbd></div>
+  <div class="avatar">H</div>
+</header>
+
+<!-- ticker tape -->
+<div class="tape"><div class="tape-track" id="tape"></div></div>
+
+<!-- hero -->
+<section class="hero">
+  <div class="eyebrow"><span class="dot"></span> Thị trường đang mở cửa · cập nhật realtime</div>
+  <h1>Đầu tư có <span class="grad">cơ sở</span>,<br>không đầu tư theo <span class="grad">cảm tính</span>.</h1>
+  <p class="lead">Nhập một mã cổ phiếu — nhận điểm sức khỏe 0–100 trên 14 tiêu chí, định giá, kỹ thuật và khung thời gian phù hợp. Tất cả trong một màn hình.</p>
+  <div class="hero-search">
+    <input placeholder="Nhập mã cổ phiếu, VD: FPT" value="">
+    <button class="btn primary">Phân tích →</button>
+  </div>
+  <div class="chips">
+    <span>FPT</span><span>VCB</span><span>HPG</span><span>MWG</span><span>VNM</span><span>MBB</span>
+  </div>
+</section>
+
+<!-- index cards -->
+<div class="idx-row">
+  <div class="idx reveal"><div class="nm">VN-INDEX</div><div class="vv up" data-c="1284.56">0</div><div class="cg up">▲ +8,42 (+0,66%)</div><svg data-spk="up" viewBox="0 0 160 46" preserveAspectRatio="none"></svg></div>
+  <div class="idx reveal"><div class="nm">VN30</div><div class="vv up" data-c="1342.10">0</div><div class="cg up">▲ +11,3 (+0,85%)</div><svg data-spk="up" viewBox="0 0 160 46" preserveAspectRatio="none"></svg></div>
+  <div class="idx reveal"><div class="nm">HNX-INDEX</div><div class="vv down" data-c="238.71">0</div><div class="cg down">▼ −0,94 (−0,39%)</div><svg data-spk="down" viewBox="0 0 160 46" preserveAspectRatio="none"></svg></div>
+  <div class="idx reveal"><div class="nm">GT KHỚP LỆNH</div><div class="vv" data-c="18420" data-suf=" tỷ">0</div><div class="cg flat">HOSE hôm nay</div><svg data-spk="up" viewBox="0 0 160 46" preserveAspectRatio="none"></svg></div>
+</div>
+
+<!-- 3 cols: gainers / losers / portfolio -->
+<div class="cols">
+  <section class="card reveal"><h3>🔥 Tăng mạnh nhất</h3><div id="gainers"></div></section>
+  <section class="card reveal"><h3>❄️ Giảm sâu nhất</h3><div id="losers"></div></section>
+  <section class="card reveal"><h3>Danh mục của bạn</h3>
+    <div class="port-big up" id="portTotal">0 đ</div>
+    <div class="flat" style="font-size:12.5px">Tổng giá trị · <span class="up">+8,42% hôm nay</span></div>
+    <div class="port-grid">
+      <div class="st"><div class="k">Vốn</div><div class="v">183 tr</div></div>
+      <div class="st"><div class="k">Lãi/lỗ</div><div class="v up">+15,4 tr</div></div>
+      <div class="st"><div class="k">Số mã</div><div class="v">6</div></div>
+      <div class="st"><div class="k">Đang lãi</div><div class="v up">5 / 6</div></div>
+    </div>
+    <button class="btn" style="width:100%;margin-top:14px">Xem toàn danh mục →</button>
+  </section>
+</div>
+
+<!-- feature strip -->
+<div class="feat">
+  <div class="card reveal"><div class="ic">🎯</div><h4>Điểm 14 tiêu chí</h4><p>Chấm sức khỏe tài chính, định giá và kỹ thuật trên thang 100 — minh bạch từng tiêu chí.</p></div>
+  <div class="card reveal"><div class="ic">🧭</div><h4>Khung thời gian</h4><p>Gợi ý ngắn/trung/dài hạn phù hợp với điểm số và bối cảnh từng mã.</p></div>
+  <div class="card reveal"><div class="ic">🤖</div><h4>Trợ lý AI</h4><p>Hỏi bất cứ điều gì về mã đang xem — trợ lý đọc đúng số liệu của bạn để trả lời.</p></div>
+</div>
+
+<script>
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function countUp(el,to,dur,fmt){if(RM){el.textContent=fmt(to);return}const t0=performance.now();(function s(t){const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,3);el.textContent=fmt(to*e);if(p<1)requestAnimationFrame(s)})(t0)}
+function spark(svg,dir){const n=20,a=[];let v=50;for(let i=0;i<n;i++){v+=(Math.sin(i*.9)+(dir==='up'?.5:-.5))*4+(i%3-1)*2;a.push(v)}
+  const w=160,h=46,mn=Math.min(...a),mx=Math.max(...a);const X=i=>i/(n-1)*w,Y=x=>h-3-((x-mn)/(mx-mn||1))*(h-6);
+  let d='';a.forEach((x,i)=>d+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(x).toFixed(1)+' ');
+  const c=dir==='up'?'#2ee6a6':'#ff5d73';
+  svg.innerHTML=`<path d="${d}L ${w} ${h} L 0 ${h} Z" fill="${dir==='up'?'rgba(46,230,166,.16)':'rgba(255,93,115,.16)'}"/><path d="${d}" fill="none" stroke="${c}" stroke-width="2"/>`;}
+
+/* tape */
+const T=[['VN-INDEX','1.284,56','+0,66%','up'],['FPT','132,4','+1,65%','up'],['VCB','92,1','−0,42%','down'],['HPG','27,85','+2,10%','up'],['MWG','61,2','+0,88%','up'],['VNM','68,0','−0,15%','down'],['MBB','24,3','+1,24%','up'],['GAS','78,6','−0,63%','down'],['VIC','42,1','+0,24%','up'],['SSI','34,7','+3,02%','up']];
+const seg=T.map(([s,p,c,d])=>`<span><b>${s}</b> <span class="mono">${p}</span> <span class="mono ${d}">${c}</span></span>`).join('');
+document.getElementById('tape').innerHTML=seg+seg;
+
+/* index numbers + sparks */
+document.querySelectorAll('.vv').forEach(el=>{const to=+el.dataset.c,suf=el.dataset.suf||'';const dec=to>10000?0:2;
+  setTimeout(()=>countUp(el,to,1400,v=>v.toLocaleString('vi-VN',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf),200)});
+document.querySelectorAll('svg[data-spk]').forEach(s=>spark(s,s.dataset.spk));
+
+/* movers */
+const G=[['SSI','+6,8%','up'],['DIG','+6,5%','up'],['HPG','+2,1%','up'],['DGC','+1,9%','up'],['GEX','+1,4%','up']];
+const L=[['NVL','−4,2%','down'],['PDR','−3,1%','down'],['GAS','−0,6%','down'],['VCB','−0,4%','down'],['VNM','−0,2%','down']];
+const mv=(a)=>a.map(([t,p,d])=>`<div class="mv"><span class="t">${t}</span><svg class="spk" viewBox="0 0 120 26" preserveAspectRatio="none" data-spk="${d}"></svg><span class="p mono ${d}">${p}</span></div>`).join('');
+document.getElementById('gainers').innerHTML=mv(G);
+document.getElementById('losers').innerHTML=mv(L);
+document.querySelectorAll('.spk[data-spk]').forEach(s=>spark(s,s.dataset.spk));
+setTimeout(()=>countUp(document.getElementById('portTotal'),198450000,1500,v=>Math.round(v).toLocaleString('vi-VN')+' đ'),300);
+
+/* reveal */
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.style.transition='opacity .6s,transform .6s';e.target.style.opacity=1;e.target.style.transform='none';io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i*60)+'ms';io.observe(el)});
+/* fallback: đảm bảo mọi khối hiện sau 1.4s dù chưa cuộn tới (cho ảnh tĩnh / trình duyệt lạ) */
+setTimeout(()=>document.querySelectorAll('.reveal').forEach(el=>{el.style.opacity=1;el.style.transform='none'}),1400);
+</script>
+</body>
+</html>

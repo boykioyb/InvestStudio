@@ -1,0 +1,62 @@
+/* ============================================================
+   InvestStudio — Redesign theme (dùng chung cho các bản preview)
+   "Bloomberg Terminal × Linear" — dark, glass, data-dense
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#070b16; --bg-2:#0a1122;
+  --panel:rgba(20,28,48,.62); --panel-solid:#111a2e; --panel-hi:rgba(30,42,70,.55);
+  --line:rgba(120,140,190,.16); --line-hi:rgba(140,165,220,.32);
+  --text:#eef3ff; --muted:#8ea0c4; --muted-2:#5f6f92;
+  --good:#2ee6a6; --good-glow:rgba(46,230,166,.35);
+  --warn:#ffc24b; --warn-glow:rgba(255,194,75,.22);
+  --bad:#ff5d73;  --bad-glow:rgba(255,93,115,.30);
+  --accent:#5ac8ff; --accent-2:#a882ff; --emerald:#059669;
+  --radius:18px; --radius-sm:12px;
+  --shadow:0 24px 60px -20px rgba(0,0,0,.75);
+  --mono:'Fira Code',ui-monospace,monospace;
+  --sans:'Sora','Inter',-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--sans);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+.up{color:var(--good)} .down{color:var(--bad)} .flat{color:var(--muted)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* nền */
+.aura{position:fixed;inset:0;z-index:-2;overflow:hidden}
+.aura::before,.aura::after{content:"";position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 22s ease-in-out infinite alternate}
+.aura::before{width:52vw;height:52vw;left:-10vw;top:-16vw;background:radial-gradient(circle at 30% 30%,#123a6b,transparent 70%)}
+.aura::after{width:46vw;height:46vw;right:-12vw;bottom:-18vw;background:radial-gradient(circle at 60% 40%,#2a1a5e,transparent 70%);animation-delay:-8s}
+.grid-bg{position:fixed;inset:0;z-index:-1;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(circle at 50% 0%,#000,transparent 72%);opacity:.32}
+@keyframes drift{to{transform:translate3d(4vw,3vh,0) scale(1.12)}}
+
+/* header + preview switcher */
+header.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:16px;padding:13px 26px;border-bottom:1px solid var(--line);background:rgba(7,11,22,.72);backdrop-filter:blur(14px) saturate(1.4)}
+.brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:16px;white-space:nowrap;text-decoration:none}
+.logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:conic-gradient(from 210deg,var(--accent),var(--accent-2),var(--good),var(--accent));box-shadow:0 0 22px -4px var(--accent);color:#04121f;font-weight:900}
+.brand small{color:var(--muted);font-weight:500}
+nav.tabs{display:flex;gap:4px;margin-left:8px}
+nav.tabs a{padding:8px 14px;border-radius:10px;color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;transition:.18s;cursor:pointer}
+nav.tabs a:hover{color:var(--text);background:var(--panel-hi)}
+nav.tabs a.on{color:var(--text);background:var(--panel);border:1px solid var(--line-hi)}
+.cmdk{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:220px;padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:13px;cursor:text;transition:.2s}
+.cmdk:hover{border-color:var(--line-hi)}
+.cmdk kbd{margin-left:auto;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel-hi);border:1px solid var(--line);color:var(--muted)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04121f;display:grid;place-items:center;font-weight:800;font-size:13px}
+
+.stage{max-width:1320px;margin:0 auto;padding:22px 26px 80px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;backdrop-filter:blur(12px);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--line-hi),transparent)}
+.card h3{margin:0 0 14px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.pill{font-size:11px;font-weight:700;padding:4px 11px;border-radius:20px;letter-spacing:.4px;text-transform:uppercase}
+.pill.good{color:var(--good);background:var(--good-glow)} .pill.bad{color:var(--bad);background:var(--bad-glow)} .pill.warn{color:var(--warn);background:var(--warn-glow)}
+.btn{border:1px solid var(--line);background:var(--panel-hi);color:var(--text);border-radius:12px;padding:11px 20px;font-weight:700;font-size:14px;cursor:pointer;transition:.18s;font-family:var(--sans)}
+.btn:hover{border-color:var(--line-hi);transform:translateY(-1px)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04121f;border:none;box-shadow:0 10px 28px -10px var(--accent)}
+.reveal{opacity:0;transform:translateY(16px)}
+
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+@media(max-width:560px){nav.tabs{display:none}.stage{padding:16px 14px 60px}}

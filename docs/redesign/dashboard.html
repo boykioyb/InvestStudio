@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InvestStudio — Redesign Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ---- Nền không gian sâu ---- */
+  --bg:#070b16;
+  --bg-2:#0a1122;
+  --panel:rgba(20,28,48,.62);
+  --panel-solid:#111a2e;
+  --panel-hi:rgba(30,42,70,.55);
+  --line:rgba(120,140,190,.16);
+  --line-hi:rgba(140,165,220,.32);
+  --text:#eef3ff;
+  --muted:#8ea0c4;
+  --muted-2:#5f6f92;
+  /* ---- Tín hiệu tài chính ---- */
+  --good:#2ee6a6; --good-glow:rgba(46,230,166,.35);
+  --warn:#ffc24b;
+  --bad:#ff5d73;  --bad-glow:rgba(255,93,115,.35);
+  --accent:#5ac8ff;
+  --accent-2:#a882ff;
+  --emerald:#059669;
+  --radius:18px; --radius-sm:12px;
+  --shadow:0 24px 60px -20px rgba(0,0,0,.75);
+  --mono:'Fira Code',ui-monospace,monospace;
+  --sans:'Sora','Inter',-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--sans);
+  color:var(--text);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+/* ---- Nền aurora + lưới ---- */
+.aura{position:fixed;inset:0;z-index:-2;overflow:hidden}
+.aura::before,.aura::after{content:"";position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 22s ease-in-out infinite alternate}
+.aura::before{width:52vw;height:52vw;left:-10vw;top:-16vw;background:radial-gradient(circle at 30% 30%,#123a6b,transparent 70%)}
+.aura::after{width:46vw;height:46vw;right:-12vw;bottom:-18vw;background:radial-gradient(circle at 60% 40%,#2a1a5e,transparent 70%);animation-delay:-8s}
+.grid-bg{position:fixed;inset:0;z-index:-1;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:46px 46px;mask-image:radial-gradient(circle at 50% 0%,#000 0%,transparent 72%);opacity:.35}
+@keyframes drift{to{transform:translate3d(4vw,3vh,0) scale(1.12)}}
+
+/* ---- Header ---- */
+header.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:16px;
+  padding:14px 26px;border-bottom:1px solid var(--line);
+  background:rgba(7,11,22,.72);backdrop-filter:blur(14px) saturate(1.4)}
+.brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:16px;white-space:nowrap}
+.logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:conic-gradient(from 210deg,var(--accent),var(--accent-2),var(--good),var(--accent));
+  box-shadow:0 0 22px -4px var(--accent);color:#04121f;font-weight:900}
+.brand small{color:var(--muted);font-weight:500}
+nav.tabs{display:flex;gap:4px;margin-left:8px}
+nav.tabs a{padding:8px 14px;border-radius:10px;color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;transition:.18s}
+nav.tabs a:hover{color:var(--text);background:var(--panel-hi)}
+nav.tabs a.on{color:var(--text);background:var(--panel);border:1px solid var(--line-hi)}
+.cmdk{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:230px;
+  padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel);
+  color:var(--muted);font-size:13px;cursor:text;transition:.2s}
+.cmdk:hover{border-color:var(--line-hi)}
+.cmdk kbd{margin-left:auto;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel-hi);border:1px solid var(--line);color:var(--muted)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04121f;display:grid;place-items:center;font-weight:800;font-size:13px}
+
+/* ---- Layout ---- */
+.stage{max-width:1320px;margin:0 auto;padding:22px 26px 80px}
+.ticker-head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.ticker-head h1{font-size:40px;margin:0;letter-spacing:-1px;font-weight:800}
+.ticker-head .name{color:var(--muted);font-size:15px;margin-bottom:6px}
+.px{font-family:var(--mono);font-size:26px;font-weight:600;margin-left:auto;text-align:right}
+.px .chg{font-size:14px;font-weight:600}
+.up{color:var(--good)} .down{color:var(--bad)}
+.pill{font-size:11px;font-weight:700;padding:4px 11px;border-radius:20px;letter-spacing:.4px;text-transform:uppercase}
+.pill.good{color:var(--good);background:var(--good-glow);}
+.pill.warn{color:var(--warn);background:rgba(255,194,75,.16)}
+
+.bento{display:grid;grid-template-columns:320px minmax(0,1fr) 340px;gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px;backdrop-filter:blur(12px);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card::after{content:"";position:absolute;inset:0 0 auto 0;height:1px;background:linear-gradient(90deg,transparent,var(--line-hi),transparent)}
+.card h3{margin:0 0 14px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+
+/* ---- Vòng điểm số ---- */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.gauge{position:relative;width:210px;height:210px}
+.gauge svg{transform:rotate(-90deg)}
+.gauge .track{fill:none;stroke:var(--panel-hi);stroke-width:16}
+.gauge .prog{fill:none;stroke:url(#scoreGrad);stroke-width:16;stroke-linecap:round;
+  filter:drop-shadow(0 0 8px var(--good-glow));transition:stroke-dashoffset 1.6s cubic-bezier(.16,1,.3,1)}
+.gauge .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gauge .val{font-family:var(--mono);font-size:56px;font-weight:700;line-height:1}
+.gauge .max{color:var(--muted);font-size:13px;margin-top:2px}
+.verdict{font-weight:700;font-size:16px;margin-top:4px}
+.decision-row{display:flex;gap:8px;margin-top:14px;width:100%}
+.decision-row .d{flex:1;text-align:center;padding:10px 6px;border-radius:12px;border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--muted)}
+.decision-row .d.act{color:var(--good);border-color:var(--good);background:var(--good-glow);box-shadow:0 0 20px -8px var(--good-glow)}
+
+/* ---- Chart ---- */
+.chart-card{min-height:0}
+.spark{width:100%;height:150px;display:block}
+.range{display:flex;gap:6px;margin-top:10px}
+.range button{flex:none;padding:5px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;font-family:var(--mono)}
+.range button.on{color:var(--text);border-color:var(--accent);background:rgba(90,200,255,.12)}
+.mini-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.stat{background:var(--panel-hi);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.stat .v{font-family:var(--mono);font-size:18px;font-weight:600;margin-top:3px}
+
+/* ---- 14 tiêu chí ---- */
+.crit{display:flex;flex-direction:column;gap:2px}
+.crit-row{display:grid;grid-template-columns:1fr 90px 42px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.crit-row:last-child{border-bottom:none}
+.crit-row .lbl{font-size:12.5px;color:var(--text)}
+.crit-row .lbl small{color:var(--muted-2);display:block;font-size:10.5px}
+.bar{height:7px;border-radius:6px;background:var(--panel-hi);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.b-good i{background:linear-gradient(90deg,var(--emerald),var(--good))}
+.b-warn i{background:linear-gradient(90deg,#c98a1f,var(--warn))}
+.b-bad i{background:linear-gradient(90deg,#c0374a,var(--bad))}
+.crit-row .sc{font-family:var(--mono);font-size:13px;font-weight:600;text-align:right}
+
+/* ---- P&L card ---- */
+.pnl{display:flex;flex-direction:column;gap:4px}
+.pnl .big{font-family:var(--mono);font-size:34px;font-weight:700}
+.pnl .sub{color:var(--muted);font-size:12.5px}
+.pnl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.reveal{opacity:0;transform:translateY(16px)}
+
+/* ---- responsive ---- */
+@media(max-width:1100px){.bento{grid-template-columns:1fr}.px{margin-left:0}}
+@media(max-width:560px){.stage{padding:16px 14px 60px}.ticker-head h1{font-size:32px}nav.tabs{display:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="aura"></div>
+<div class="grid-bg"></div>
+
+<header class="top">
+  <div class="brand"><span class="logo">IS</span> InvestStudio <small>· Terminal</small></div>
+  <nav class="tabs">
+    <a>Danh mục</a>
+    <a class="on">Phân tích</a>
+    <a>Danh sách</a>
+    <a>Theo dõi</a>
+    <a>Trợ lý</a>
+  </nav>
+  <div class="cmdk">🔎 Tìm mã cổ phiếu… <kbd>⌘K</kbd></div>
+  <div class="who"><span class="avatar">H</span> Hòa</div>
+</header>
+
+<main class="stage">
+  <div class="ticker-head reveal">
+    <div>
+      <h1>FPT <span class="pill good">Đang tăng</span></h1>
+      <div class="name">CTCP FPT · Công nghệ thông tin · HOSE</div>
+    </div>
+    <div class="px">
+      <div class="up">132,400 đ</div>
+      <div class="chg up">▲ +2,150 &nbsp;(+1,65%)</div>
+    </div>
+  </div>
+
+  <div class="bento">
+    <!-- Cột A: điểm số -->
+    <section class="card reveal">
+      <h3>Điểm tổng hợp</h3>
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg width="210" height="210" viewBox="0 0 210 210">
+            <defs>
+              <linearGradient id="scoreGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#2ee6a6"/><stop offset="1" stop-color="#5ac8ff"/>
+              </linearGradient>
+            </defs>
+            <circle class="track" cx="105" cy="105" r="88"/>
+            <circle class="prog" id="ring" cx="105" cy="105" r="88"/>
+          </svg>
+          <div class="center">
+            <div class="val" id="scoreNum">0</div>
+            <div class="max">/ 100 điểm</div>
+          </div>
+        </div>
+        <div class="verdict up">Tốt — nền tảng vững</div>
+      </div>
+      <div class="decision-row">
+        <div class="d">Bán</div>
+        <div class="d">Giữ</div>
+        <div class="d act">Mua ↗</div>
+      </div>
+    </section>
+
+    <!-- Cột B: chart + tiêu chí -->
+    <section class="card chart-card reveal">
+      <h3>Diễn biến giá · 6 tháng</h3>
+      <svg class="spark" id="spark" viewBox="0 0 600 150" preserveAspectRatio="none"></svg>
+      <div class="range">
+        <button class="tnum">1T</button><button>3T</button>
+        <button class="on">6T</button><button>1N</button><button>Tất cả</button>
+      </div>
+      <div class="mini-stats">
+        <div class="stat"><div class="k">P/E</div><div class="v">18,4</div></div>
+        <div class="stat"><div class="k">P/B</div><div class="v">4,1</div></div>
+        <div class="stat"><div class="k">ROE</div><div class="v up">27,8%</div></div>
+        <div class="stat"><div class="k">Vốn hóa</div><div class="v">168 nghìn tỷ</div></div>
+      </div>
+    </section>
+
+    <!-- Cột C: P&L -->
+    <section class="card reveal">
+      <h3>Vị thế của bạn</h3>
+      <div class="pnl">
+        <div class="big up" id="pnl">+0 đ</div>
+        <div class="sub">Lãi/lỗ chưa thực hiện · <span class="up">+8,42%</span></div>
+      </div>
+      <div class="pnl-grid">
+        <div class="stat"><div class="k">Giá vốn BQ</div><div class="v">122,1</div></div>
+        <div class="stat"><div class="k">Giá TT</div><div class="v">132,4</div></div>
+        <div class="stat"><div class="k">Số lượng</div><div class="v">1.500</div></div>
+        <div class="stat"><div class="k">Tỷ trọng</div><div class="v warn">14,2%</div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 14 tiêu chí full width -->
+  <section class="card reveal" style="margin-top:16px">
+    <h3>14 tiêu chí · chấm điểm chi tiết</h3>
+    <div class="crit" id="crit"></div>
+  </section>
+</main>
+
+<script>
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---- count-up ---- */
+function countUp(el,to,dur,fmt){
+  if(RM){el.textContent=fmt(to);return}
+  const t0=performance.now();
+  (function step(t){
+    const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent=fmt(to*e);
+    if(p<1)requestAnimationFrame(step);
+  })(t0);
+}
+
+/* ---- gauge ---- */
+const R=88, C=2*Math.PI*R, ring=document.getElementById('ring');
+ring.style.strokeDasharray=C; ring.style.strokeDashoffset=C;
+const SCORE=78;
+setTimeout(()=>{
+  ring.style.strokeDashoffset = C*(1-SCORE/100);
+  countUp(document.getElementById('scoreNum'),SCORE,1600,v=>Math.round(v));
+},250);
+
+/* ---- P&L count ---- */
+setTimeout(()=>countUp(document.getElementById('pnl'),15450000,1400,
+  v=>'+'+Math.round(v).toLocaleString('vi-VN')+' đ'),400);
+
+/* ---- sparkline ---- */
+(function(){
+  const pts=[100,102,99,104,108,106,112,110,118,121,117,124,120,128,132.4];
+  const w=600,h=150,min=Math.min(...pts),max=Math.max(...pts),pad=12;
+  const X=i=>i/(pts.length-1)*w, Y=v=>h-pad-((v-min)/(max-min))*(h-2*pad);
+  let d='',area='';
+  pts.forEach((v,i)=>{d+=(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)+' '});
+  area=d+`L ${w} ${h} L 0 ${h} Z`;
+  const svg=document.getElementById('spark');
+  svg.innerHTML=`<defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="rgba(46,230,166,.35)"/><stop offset="1" stop-color="rgba(46,230,166,0)"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#fill)"/>
+    <path d="${d}" fill="none" stroke="#2ee6a6" stroke-width="2.5" stroke-linejoin="round"
+      stroke-dasharray="2000" stroke-dashoffset="${RM?0:2000}" style="transition:stroke-dashoffset 2s ease .3s"/>`;
+  if(!RM)requestAnimationFrame(()=>svg.querySelector('path[stroke]').style.strokeDashoffset=0);
+})();
+
+/* ---- 14 tiêu chí ---- */
+const CRIT=[
+  ['Tăng trưởng doanh thu','3 năm liên tục',90,'good'],
+  ['Biên lợi nhuận','Ổn định, cải thiện',82,'good'],
+  ['ROE','27,8% — rất cao',95,'good'],
+  ['Nợ vay / vốn CSH','Thấp, an toàn',88,'good'],
+  ['Dòng tiền hoạt động','Dương, đều',85,'good'],
+  ['Định giá P/E','Hơi cao so ngành',58,'warn'],
+  ['Định giá P/B','Cao',48,'warn'],
+  ['Cổ tức','Đều đặn',70,'good'],
+  ['Thanh khoản','Rất tốt',92,'good'],
+  ['Xu hướng kỹ thuật','Trên MA50/MA200',80,'good'],
+  ['Động lượng (RSI)','62 — khỏe',75,'good'],
+  ['Vị thế cạnh tranh','Dẫn đầu ngành',86,'good'],
+  ['Ban lãnh đạo','Minh bạch',78,'good'],
+  ['Chất xúc tác','Mảng AI/bán dẫn',40,'warn'],
+];
+const box=document.getElementById('crit');
+box.innerHTML=CRIT.map(([l,s,v,t])=>`
+  <div class="crit-row">
+    <div class="lbl">${l}<small>${s}</small></div>
+    <div class="bar b-${t}"><i data-v="${v}"></i></div>
+    <div class="sc ${t==='good'?'up':t==='bad'?'down':''}">${v}</div>
+  </div>`).join('');
+
+/* ---- reveal + stagger bars ---- */
+const io=new IntersectionObserver((es)=>{es.forEach(e=>{
+  if(e.isIntersecting){e.target.style.transition='opacity .6s, transform .6s';
+    e.target.style.opacity=1;e.target.style.transform='none';io.unobserve(e.target)}
+})},{threshold:.12});
+document.querySelectorAll('.reveal').forEach((el,i)=>{el.style.transitionDelay=(i*70)+'ms';io.observe(el)});
+
+setTimeout(()=>{
+  document.querySelectorAll('.bar i').forEach((el,i)=>{
+    setTimeout(()=>{ el.style.width=el.dataset.v+'%'; }, RM?0:i*55);
+  });
+},600);
+</script>
+</body>
+</html>
