@@ -22,7 +22,7 @@ const scoped = ref(true)      // mặc định: giới hạn trong mã đang xem
 const showList = ref(false)   // bật panel danh sách câu chuyện
 
 //  Chỉ coi là "đang xem mã" khi ở trang phân tích và đã có mã.
-const ticker = computed(() => (route.path === '/' ? activeTicker.value : ''))
+const ticker = computed(() => (route.path === '/phan-tich' ? activeTicker.value : ''))
 
 //  Nạp danh sách câu chuyện; có thì mở cuộc gần nhất, chưa có thì để cuộc mới trống.
 async function syncConversations(): Promise<void> {
@@ -50,7 +50,12 @@ watch(open, (v) => { if (v && isLoggedIn.value) void loadConversations() })
 
 const examples = computed(() =>
   ticker.value
-    ? [`Điểm mạnh yếu của ${ticker.value}?`, `${ticker.value} có tin gì mới?`]
+    ? [
+        `Điểm mạnh yếu của ${ticker.value}?`,
+        `${ticker.value} có tin gì mới?`,
+        `Phân tích cơ bản cổ phiếu ${ticker.value} dựa trên BCTC mới nhất?`,
+        `Đánh giá cổ phiếu ${ticker.value} dựa trên phân tích kỹ thuật?`,
+      ]
     : ['Mã nào vốn hóa lớn nhất VN30?', 'So sánh P/E của VCB và CTG']
 )
 
@@ -74,6 +79,13 @@ function submit(): void {
   //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới. Có mã + giới hạn → hỏi trong mã đó.
   askStream(q, ticker.value && scoped.value ? ticker.value : '',
     activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
+}
+
+//  Bấm câu gợi ý → điền rồi GỬI luôn (không dừng ở ô nhập).
+function pick(ex: string): void {
+  if (pending.value) return
+  question.value = ex
+  submit()
 }
 
 async function openFromList(id: number): Promise<void> {
@@ -182,7 +194,7 @@ function onDelete(c: ConversationOut): void {
 
         <div class="samples">
           <button v-for="ex in examples" :key="ex" type="button" class="sample"
-                  :disabled="pending" @click="question = ex">{{ ex }}</button>
+                  :disabled="pending" @click="pick(ex)">{{ ex }}</button>
         </div>
 
         <form class="ask" @submit.prevent="submit">

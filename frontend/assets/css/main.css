@@ -1,5 +1,5 @@
 /* ==========================================================================
-   InvestStudio — design system (giao diện tối) · redesign "Terminal × Linear"
+   Phân Tích Mã — design system (giao diện tối) · redesign "Terminal × Linear"
    Chỉ chứa trình bày. Không có logic chấm điểm ở đây.
    Giữ NGUYÊN tên biến & lớp dùng chung để các trang cũ kế thừa được.
    ========================================================================== */
@@ -11,10 +11,13 @@
   --panel: rgba(20, 28, 48, 0.62);
   --panel2: rgba(15, 22, 38, 0.72);
   --panel-solid: #111a2e;
+  --panel-deep: #0c1324;
   --panel-hi: rgba(30, 42, 70, 0.55);
   --line: rgba(120, 140, 190, 0.16);
   --line-hi: rgba(140, 165, 220, 0.32);
   --text: #eef3ff;
+  /* chữ nội dung sáng hơn --muted (dùng cho câu mô tả, dòng phụ trong thẻ) */
+  --text-2: #d4ddf2;
   --muted: #8ea0c4;
   --muted-2: #5f6f92;
 
@@ -25,6 +28,12 @@
   --accent: #5ac8ff;
   --accent2: #a882ff;
   --emerald: #059669;
+  /* biến thể dịu của tín hiệu — chữ đặt trên nền mờ cùng màu vẫn đọc được */
+  --bad-2: #ff7a8c;
+  --accent2-soft: #c3a8ff;
+  /* accent khi hover + màu chữ đặt trên nền accent */
+  --accent-hi: #7dd5ff;
+  --on-accent: #04121f;
 
   /* nền mờ dùng cho nhãn trạng thái */
   --good-soft: rgba(46, 230, 166, 0.16);

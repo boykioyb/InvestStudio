@@ -52,7 +52,7 @@ async function submitPw(): Promise<void> {
   else pwMsg.value = '⚠️ Đổi không thành công — mật khẩu hiện tại có đúng không?'
 }
 
-useHead({ title: 'Mã theo dõi — InvestStudio' })
+useHead({ title: 'Mã theo dõi — Phân Tích Mã' })
 
 onMounted(async () => {
   await ensureLoaded()  // middleware đã đảm bảo đăng nhập
@@ -167,12 +167,6 @@ function fmtPrice(value: number | null): string {
 h1 {
   margin: 0;
   font-size: 22px;
-}
-
-.nav .btn {
-  text-decoration: none;
-  padding: 8px 12px;
-  font-size: 12.5px;
 }
 
 .list {

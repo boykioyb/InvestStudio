@@ -8,6 +8,26 @@ const { textClass } = useLevel()
 const { price, date } = useFormat()
 const { history, range, pending: loadingChart, error: chartError, load } = usePriceHistory()
 
+/* ── Giá khớp gần realtime (poll nhẹ; chấm điểm vẫn dùng giá đóng cửa) ─────── */
+const { quote, isOpen } = useLiveQuote(computed(() => props.data.ticker))
+//  Đang phiên & có giá khớp thì ưu tiên giá sống; ngoài phiên dùng giá đóng cửa.
+const isLive = computed(() => isOpen.value && quote.value?.price != null)
+const displayPrice = computed(() => (isLive.value ? quote.value!.price : props.data.price))
+const chgClass = computed(() => {
+  const c = quote.value?.change
+  return c == null || c === 0 ? 'flat' : c > 0 ? 'up' : 'down'
+})
+const chgText = computed(() => {
+  const q = quote.value
+  if (!isLive.value || q?.change == null) return ''
+  const s = q.change > 0 ? '+' : q.change < 0 ? '−' : ''
+  const pct = q.change_pct == null ? '' : ` (${s}${Math.abs(q.change_pct)}%)`
+  return `${s}${price(Math.abs(q.change))}${pct}`
+})
+const priceLabel = computed(() =>
+  isLive.value ? `trong phiên · ${quote.value!.time}` : `đóng cửa ${date(props.data.asof)}`
+)
+
 // Đổi mã → tải lại khung đang chọn.
 watch(() => props.data.ticker, (t) => t && load(t, range.value), { immediate: true })
 
@@ -64,8 +84,14 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
         <FavoriteButton :ticker="data.ticker" class="follow" />
       </div>
       <div class="px">
-        <span class="px-val tnum">{{ price(data.price) }}</span>
-        <span class="px-unit">nghìn đ/cp</span>
+        <div class="px-row">
+          <span class="px-val tnum" :class="{ ['px-' + chgClass]: isLive }">{{ price(displayPrice) }}</span>
+          <span class="px-unit">nghìn đ/cp</span>
+        </div>
+        <span v-if="chgText" class="px-chg tnum" :class="'px-' + chgClass">{{ chgText }}</span>
+        <span class="px-time" :class="{ live: isLive }">
+          <span v-if="isLive" class="dot" aria-hidden="true" />{{ priceLabel }}
+        </span>
       </div>
     </header>
 
@@ -185,15 +211,58 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
   white-space: nowrap;
 }
 
+.px-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
 .px-val {
-  display: block;
   font-size: 20px;
   font-weight: 800;
+  transition: color .3s ease;
 }
 
 .px-unit {
   font-size: 10.5px;
   color: var(--muted);
+}
+
+.px-chg {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.px-time {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.px-time.live { color: var(--good); }
+
+.px-time .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--good);
+  animation: px-pulse 1.6s ease-in-out infinite;
+}
+
+.px-up { color: var(--good); }
+.px-down { color: var(--bad); }
+.px-flat { color: var(--muted); }
+
+@keyframes px-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
 }
 
 .gauge-block {

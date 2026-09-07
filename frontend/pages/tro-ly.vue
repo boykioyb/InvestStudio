@@ -64,7 +64,7 @@ async function onPickFiles(e: Event): Promise<void> {
   input.value = ''  // cho phép chọn lại cùng tệp
 }
 
-useHead({ title: 'Trợ lý hỏi–đáp — InvestStudio' })
+useHead({ title: 'Trợ lý hỏi–đáp — Phân Tích Mã' })
 
 const examples = [
   'Mã nào trong VN30 vốn hóa lớn nhất?',
@@ -277,12 +277,6 @@ h1 {
   font-size: 22px;
 }
 
-.nav .btn {
-  text-decoration: none;
-  padding: 8px 12px;
-  font-size: 12.5px;
-}
-
 /*  Bố cục 2 cột: danh sách câu chuyện | khung chat. */
 .chat-layout {
   display: grid;
@@ -303,11 +297,6 @@ h1 {
   background: var(--panel);
   padding: 10px;
   overflow: hidden;
-}
-
-.new {
-  justify-content: center;
-  gap: 6px;
 }
 
 /*  Thanh trên cùng: ô tìm + nút cuộc mới. */

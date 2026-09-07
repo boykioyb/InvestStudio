@@ -126,7 +126,7 @@ useHead({
   title: computed(() =>
     data.value?.ticker
       ? `${data.value.ticker} — Phân tích mã cổ phiếu`
-      : 'Phân tích mã cổ phiếu — InvestStudio'
+      : 'Phân Tích Mã — công cụ phân tích cổ phiếu'
   )
 })
 </script>
@@ -335,17 +335,6 @@ useHead({
   border-bottom: 1px solid var(--line);
 }
 
-.brand {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 800;
-  white-space: nowrap;
-  background: linear-gradient(92deg, var(--accent), var(--accent2), var(--good));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 .search {
   display: flex;
   gap: 8px;
@@ -406,12 +395,6 @@ useHead({
 .chip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.chip.nav {
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
 }
 
 .chip.toggle {
@@ -709,10 +692,6 @@ useHead({
     padding-bottom: 10px;
   }
 
-  .brand {
-    font-size: 16px;
-  }
-
   /* 1 1 100%: chiếm trọn hàng NHƯNG vẫn co được, nếu không sẽ tràn ngang ở 320px */
   .search {
     order: 2;
@@ -752,12 +731,6 @@ useHead({
     font-size: 13px;
     padding: 8px 14px;
   }
-
-  .chip.nav {
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
 
 .chip.toggle {
     order: 1;
