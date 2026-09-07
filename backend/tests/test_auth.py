@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 
-def _register(client, email="a@b.com", password="secret123"):
+def _register(client, email="a@b.com", password="matkhau-dai-hon"):
     return client.post("/api/auth/register", json={"email": email, "password": password})
 
 
@@ -19,7 +19,7 @@ def test_register_sets_cookie_and_me(client):
 
 def test_register_duplicate_email_409(client):
     _register(client)
-    dup = _register(client, password="other123")
+    dup = _register(client, password="mat-khau-khac")
     assert dup.status_code == 409
 
 

@@ -40,3 +40,27 @@ def delete_file(stored_name: str) -> None:
         os.remove(os.path.join(_dir(), stored_name))
     except FileNotFoundError:
         pass
+
+
+#  Chữ ký byte đầu tệp (magic bytes) của các định dạng được phép. Đây là thứ
+#  DUY NHẤT nói lên định dạng thật — `Content-Type` là do client tự khai.
+_MAGIC: tuple[tuple[bytes, str], ...] = (
+    (b"\x89PNG\r\n\x1a\n", "image/png"),
+    (b"\xff\xd8\xff", "image/jpeg"),
+    (b"GIF87a", "image/gif"),
+    (b"GIF89a", "image/gif"),
+    (b"%PDF-", "application/pdf"),
+)
+
+
+def sniff_mime(data: bytes) -> str:
+    """Đoán mime THẬT từ vài byte đầu. Không nhận ra → chuỗi rỗng.
+
+    WebP đặc biệt: "RIFF" ở byte 0-3 rồi "WEBP" ở byte 8-11.
+    """
+    for signature, mime in _MAGIC:
+        if data.startswith(signature):
+            return mime
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return ""

@@ -161,6 +161,37 @@ def enforce_daily(subject: str, scope: str, limit: int, *, fail_open: bool = Fal
         )
 
 
+def enforce_daily_buckets(buckets: list[tuple[str, str, int]], *,
+                          fail_open: bool = False) -> None:
+    """Nhiều rổ cùng lúc — rổ nào chạm trần thì chặn cả request.
+
+    Hai lượt: ĐỌC hết trước rồi mới TĂNG. Nếu vừa đọc vừa tăng thì một request
+    bị rổ cuối từ chối vẫn kịp trừ hạn mức ở các rổ trước — người dùng mất lượt
+    oan vì một câu hỏi chưa từng được trả lời.
+    """
+    for scope, subject, limit in buckets:
+        if used_today(scope, subject) >= limit:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=_bucket_message(scope, limit),
+                headers={"X-Quota-Limit": str(limit), "X-Quota-Remaining": "0"})
+    for scope, subject, limit in buckets:
+        enforce_daily(subject, scope, limit, fail_open=fail_open)
+
+
+def _bucket_message(scope: str, limit: int) -> str:
+    """Nói đúng rổ nào chạm trần — người dùng thật cần biết vì sao bị chặn."""
+    if scope.endswith(":device"):
+        return (f"Thiết bị này đã dùng hết {limit} lượt hỏi hôm nay. "
+                "Đổi tài khoản không tăng thêm lượt — vui lòng quay lại sau 0h.")
+    if scope.endswith(":ip"):
+        return (f"Mạng bạn đang dùng đã hết {limit} lượt hỏi hôm nay. "
+                "Vui lòng quay lại sau 0h.")
+    if scope.endswith(":net"):
+        return "Khu vực mạng này đang có lượng truy cập bất thường. Vui lòng thử lại sau."
+    return f"Đã dùng hết {limit} lượt hôm nay. Vui lòng quay lại sau 0h."
+
+
 def remaining_daily(scope: str, subject: str, limit: int) -> int:
     """Số lượt còn lại hôm nay — để frontend hiện 'còn 3/5 lượt'."""
     return max(0, limit - used_today(scope, subject))

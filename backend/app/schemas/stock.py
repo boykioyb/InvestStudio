@@ -509,7 +509,9 @@ class PortfolioHolding(BaseModel):
 
 
 class PortfolioRequest(BaseModel):
-    holdings: list[PortfolioHolding] = Field(..., min_length=1, max_length=100)
+    #  Trần 20 mã/lượt (trước là 100): mỗi mã là một lượt crawl thật, nguồn
+    #  chặn ở ~20 request/phút nên một request 100 mã đủ làm cả trang chết.
+    holdings: list[PortfolioHolding] = Field(..., min_length=1, max_length=20)
     #  Tổng vốn tài khoản (nghìn đ) — có thì tính được tỷ trọng từng mã.
     account_value: Optional[float] = Field(None, gt=0)
 

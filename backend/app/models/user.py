@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -31,7 +32,27 @@ class User(Base):
     #  chỉ mục RAG) — xem app/api/deps.py:require_admin.
     role: Mapped[str] = mapped_column(String(16), default="user", server_default="user",
                                       nullable=False)
+    #  'active' | 'suspended'. Khóa tài khoản mà không xóa dữ liệu.
+    status: Mapped[str] = mapped_column(String(16), default="active", server_default="active",
+                                        nullable=False)
+    #  None = chưa xác minh email → chưa được dùng trợ lý (chống tạo tài khoản
+    #  hàng loạt để nhân hạn mức).
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    #  Tăng lên là MỌI token đã cấp hết hiệu lực ngay (đổi mật khẩu, bị khóa,
+    #  nghi lộ phiên). Token sống 7 ngày nên không có cái này thì đổi mật khẩu
+    #  gần như vô nghĩa trước kẻ đã trộm được cookie.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0",
+                                               nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True)
+    last_ip: Mapped[str] = mapped_column(String(45), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def email_verified(self) -> bool:
+        """Cho DTO `UserOut` đọc — frontend chỉ cần biết đã xác minh hay chưa."""
+        return self.email_verified_at is not None
 
     watchlist: Mapped[list["WatchlistItem"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", order_by="WatchlistItem.created_at",

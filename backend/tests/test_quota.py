@@ -114,7 +114,7 @@ def test_redis_hong_thi_coi_nhu_can_quota(monkeypatch):
 def test_reindex_tu_choi_user_thuong(client):
     """H3: trước đây ai đăng nhập cũng bấm được nút nhúng cả rổ VN30."""
     reg = client.post("/api/auth/register",
-                      json={"email": "u@example.com", "password": "secret123"})
+                      json={"email": "u@example.com", "password": "matkhau-dai-hon"})
     assert reg.status_code == 201, reg.text
     r = client.post("/api/chat/reindex")
     assert r.status_code == 403
@@ -140,3 +140,92 @@ def test_trusted_proxy_theo_dai_cidr(monkeypatch):
     outside = SimpleNamespace(client=SimpleNamespace(host="203.0.113.50"),
                               headers={"x-real-ip": "9.9.9.9"})
     assert ratelimit.client_ip(outside) == "203.0.113.50"
+
+
+# ── Hạn mức theo THIẾT BỊ (đăng ký email mới không nhân được lượt) ───────────
+
+def test_ua_family_gom_theo_dong_trinh_duyet():
+    """Dùng nguyên chuỗi UA thì Chrome tự cập nhật là hạn mức tự reset."""
+    from app.core.fingerprint import _ua_family
+    cu = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+          "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36")
+    moi = cu.replace("130.0.0.0", "131.0.6778.86")
+    assert _ua_family(cu) == _ua_family(moi) == "chrome:mac"
+    assert _ua_family("Mozilla/5.0 (iPhone) ... Firefox/120") == "firefox:iphone"
+
+
+def test_subnet_gom_theo_dai_24():
+    from app.core.fingerprint import subnet_of
+    assert subnet_of("203.0.113.7") == subnet_of("203.0.113.200") == "203.0.113.0/24"
+    assert subnet_of("203.0.114.7") != subnet_of("203.0.113.7")
+
+
+def test_nhieu_ro_lay_ro_nghiem_ngat_nhat(monkeypatch):
+    """Rổ nào chạm trần cũng chặn, và KHÔNG trừ lượt của các rổ còn lại."""
+    from fastapi import HTTPException
+
+    from app.core import ratelimit
+
+    da_dung = {"rag": 0, "rag:device": 5}
+    da_tang: list[str] = []
+    monkeypatch.setattr(ratelimit, "used_today", lambda scope, subject: da_dung.get(scope, 0))
+    monkeypatch.setattr(ratelimit, "enforce_daily",
+                        lambda subject, scope, limit, **kw: da_tang.append(scope))
+
+    with pytest.raises(HTTPException) as loi:
+        ratelimit.enforce_daily_buckets([("rag", "1", 5), ("rag:device", "abc", 5)])
+    assert loi.value.status_code == 429
+    assert "thiết bị" in loi.value.detail.lower()
+    assert da_tang == []          # bị chặn thì không rổ nào bị trừ oan
+
+
+def test_nhieu_ro_con_cho_thi_tang_het(monkeypatch):
+    from app.core import ratelimit
+    da_tang: list[str] = []
+    monkeypatch.setattr(ratelimit, "used_today", lambda scope, subject: 0)
+    monkeypatch.setattr(ratelimit, "enforce_daily",
+                        lambda subject, scope, limit, **kw: da_tang.append(scope))
+    ratelimit.enforce_daily_buckets([("rag", "1", 5), ("rag:device", "abc", 5)])
+    assert da_tang == ["rag", "rag:device"]
+
+
+def test_qua_nhieu_tai_khoan_tren_mot_thiet_bi_thi_chan_dang_ky(client, monkeypatch):
+    """Thang leo thang: máy đã nuôi đủ N tài khoản thì không tạo thêm được."""
+    from app.core import fingerprint
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "max_accounts_per_device", 2)
+    for i in range(2):
+        r = client.post("/api/auth/register",
+                        json={"email": f"nguoi{i}@example.com", "password": "matkhau-dai-hon"})
+        assert r.status_code == 201, r.text
+
+    chan = client.post("/api/auth/register",
+                       json={"email": "nguoi9@example.com", "password": "matkhau-dai-hon"})
+    assert chan.status_code == 429
+    assert "thiết bị này" in chan.json()["detail"].lower()
+    assert fingerprint.accounts_on_device is not None
+
+
+def test_upload_tu_choi_tep_gia_dang_anh(client):
+    """Đổi Content-Type là nhét được tệp bất kỳ — phải kiểm byte đầu tệp."""
+    r = client.post("/api/auth/register",
+                    json={"email": "up@example.com", "password": "matkhau-dai-hon"})
+    assert r.status_code == 201
+
+    #  Nội dung không phải định dạng nào được phép.
+    la = client.post("/api/chat/upload",
+                     files={"file": ("hack.png", b"<html>xin chao</html>", "image/png")})
+    assert la.status_code == 415
+    assert "không nhận dạng" in la.json()["detail"].lower()
+
+    #  Nội dung LÀ PDF thật nhưng khai là ảnh → vẫn chặn (khai sai định dạng).
+    lech = client.post("/api/chat/upload",
+                       files={"file": ("x.png", b"%PDF-1.4 noi dung", "image/png")})
+    assert lech.status_code == 415
+    assert "không khớp" in lech.json()["detail"].lower()
+
+    #  Ảnh PNG thật thì qua.
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+    ok = client.post("/api/chat/upload", files={"file": ("that.png", png, "image/png")})
+    assert ok.status_code == 200, ok.text

@@ -10,13 +10,13 @@ import json
 import sys
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_admin
-from app.core import budget, ratelimit
+from app.api.deps import get_current_user, get_device, require_admin, require_verified
+from app.core import budget, fingerprint, ratelimit
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
 from app.db.session import get_db
@@ -42,25 +42,34 @@ from app.services.rag.tasks import reindex_task
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-def _check_quota(user: User) -> None:
-    """Ba lớp trước khi cho một câu hỏi đi tiếp.
+def _check_quota(user: User, request: Request, db: Session, fp_hash: str) -> None:
+    """Bốn lớp trước khi cho một câu hỏi đi tiếp.
 
     1. Trần chung sắp cạn (>90% quota ngày) → chỉ phục vụ người ĐÃ hỏi hôm nay.
        Người mới bị từ chối bằng lời nói thật, không phải lỗi kỹ thuật mơ hồ.
-    2. Hạn mức của chính người đó (`rag_daily_quota`).
-    3. (ở tầng dưới) mỗi request Gemini còn phải xin suất — xem app/core/budget.py.
+    2. Hạn mức NHIỀU RỔ: tài khoản · thiết bị · IP · dải mạng — lấy rổ nghiêm
+       ngặt nhất, nên đăng ký email mới hay mở tab ẩn danh đều không nhân được lượt.
+    3. (ở tầng dưới) mỗi request Gemini còn phải xin suất — app/core/budget.py.
 
     Vì sao chặt tay vậy: Gemini đang chạy bản MIỄN PHÍ. Không có hóa đơn, nhưng
     quota ngày là hữu hạn và không mua thêm được — hết là trợ lý im với TẤT CẢ
     mọi người tới 0h hôm sau.
     """
-    limit = get_settings().rag_daily_quota
+    settings = get_settings()
     if budget.new_questions_blocked() and ratelimit.used_today("rag", str(user.id)) == 0:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Trợ lý đã gần hết hạn mức chung của hôm nay nên tạm dừng nhận "
                    "người hỏi mới. Vui lòng quay lại sau 0h.")
-    ratelimit.enforce_daily(str(user.id), "rag", limit)
+
+    ip = ratelimit.client_ip(request)
+    ratelimit.enforce_daily_buckets([
+        ("rag", str(user.id), settings.rag_daily_quota),
+        ("rag:device", fp_hash, settings.chat_daily_per_device),
+        ("rag:ip", ip, settings.chat_daily_per_ip),
+        ("rag:net", fingerprint.subnet_of(ip), settings.chat_daily_per_subnet),
+    ])
+    fingerprint.record(db, fp_hash, request, user.id)
 
 
 def _title_from(question: str) -> str:
@@ -126,9 +135,10 @@ def _save_turn(db: Session, user: User, conv: Optional[Conversation], *,
 
 
 @router.post("", response_model=ChatResponse, summary="Hỏi trợ lý (RAG) một câu")
-def ask(payload: ChatRequest, user: User = Depends(get_current_user),
+def ask(payload: ChatRequest, request: Request, user: User = Depends(require_verified),
+        fp_hash: str = Depends(get_device),
         db: Session = Depends(get_db)) -> ChatResponse:
-    _check_quota(user)
+    _check_quota(user, request, db, fp_hash)
     ticker = payload.ticker.upper().strip() if payload.ticker else None
     question = payload.question.strip()
     conv = _resolve_conversation(db, user, conversation_id=payload.conversation_id,
@@ -175,9 +185,11 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                conversation_id: Optional[int] = Query(None),
                start_conversation: bool = Query(False),
                attachment_ids: Optional[str] = Query(None, description="Id các tệp, cách nhau dấu phẩy"),
-               user: User = Depends(get_current_user),
+               request: Request = None,  # type: ignore[assignment]
+               user: User = Depends(require_verified),
+               fp_hash: str = Depends(get_device),
                db: Session = Depends(get_db)) -> StreamingResponse:
-    _check_quota(user)
+    _check_quota(user, request, db, fp_hash)
     tk = ticker.upper().strip() if ticker else None
     q = question.strip()
     hist = _parse_history(history)
@@ -287,7 +299,7 @@ def delete_conversation(conversation_id: int, user: User = Depends(get_current_u
 @router.post("/upload", response_model=AttachmentOut,
              summary="Tải lên tệp đính kèm (ảnh/PDF) để gửi kèm câu hỏi")
 def upload_attachment(file: UploadFile = File(...),
-                      user: User = Depends(get_current_user),
+                      user: User = Depends(require_verified),
                       db: Session = Depends(get_db)) -> AttachmentOut:
     settings = get_settings()
     mime = file.content_type or ""
@@ -298,6 +310,21 @@ def upload_attachment(file: UploadFile = File(...),
     if len(data) > settings.upload_max_bytes:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                             detail=f"Tệp quá lớn (tối đa {settings.upload_max_bytes // 1_048_576} MB).")
+    #  Kiểm BYTE ĐẦU TỆP, không tin `content_type` do client khai: đổi header là
+    #  nhét được tệp bất kỳ vào máy chủ rồi lấy lại qua endpoint tải xuống.
+    if (real := attach_store.sniff_mime(data)) != mime:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Nội dung tệp không khớp với định dạng khai báo." if real else
+                   "Không nhận dạng được định dạng tệp. Chỉ nhận ảnh hoặc PDF.")
+    #  Trần dung lượng theo tài khoản — không có thì 10 MB × vô hạn lượt = đầy đĩa.
+    used = db.scalar(select(func.coalesce(func.sum(Attachment.size), 0))
+                     .where(Attachment.user_id == user.id)) or 0
+    if used + len(data) > settings.upload_max_bytes_per_user:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Bạn đã dùng hết {settings.upload_max_bytes_per_user // 1_048_576} MB "
+                   "dung lượng đính kèm. Hãy xóa bớt cuộc trò chuyện cũ.")
     stored = attach_store.save_bytes(data, mime)
     att = Attachment(user_id=user.id, filename=(file.filename or "tệp")[:255],
                      mime=mime, size=len(data), stored_name=stored)
@@ -318,8 +345,13 @@ def get_attachment(attachment_id: int, user: User = Depends(get_current_user),
         data = attach_store.read_bytes(att.stored_name)
     except FileNotFoundError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Tệp đã bị xoá khỏi đĩa.") from exc
-    return Response(content=data, media_type=att.mime,
-                    headers={"Content-Disposition": f'inline; filename="{att.filename}"'})
+    #  `nosniff` + PDF luôn tải về: PDF mở inline là một mặt phẳng tấn công
+    #  (JavaScript trong PDF, chuyển hướng) chạy trên chính origin của mình.
+    disposition = "attachment" if att.mime == "application/pdf" else "inline"
+    return Response(content=data, media_type=att.mime, headers={
+        "Content-Disposition": f'{disposition}; filename="{att.filename}"',
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 def _status(db: Session) -> IndexStatus:
@@ -365,17 +397,25 @@ def index_status(user: User = Depends(get_current_user),
 
 
 @router.get("/quota", summary="Hạn mức trợ lý còn lại hôm nay")
-def chat_quota(user: User = Depends(get_current_user)) -> dict:
+def chat_quota(user: User = Depends(get_current_user),
+               fp_hash: str = Depends(get_device)) -> dict:
     """Cho frontend hiện "còn 3/5 lượt hôm nay" thay vì để người dùng đâm vào 429.
 
     `level`: `ok` (bình thường) · `saving` (quota chung đang cạn → trả lời gọn
     hơn, không dùng agent) · `exhausted` (chỉ phục vụ người đã hỏi hôm nay).
     """
-    limit = get_settings().rag_daily_quota
-    snapshot = budget.status_snapshot()
+    settings = get_settings()
+    limit = settings.rag_daily_quota
+    #  Hiện số NHỎ NHẤT giữa rổ tài khoản và rổ thiết bị — đúng cái người dùng
+    #  thực sự còn, thay vì hứa 5 lượt rồi chặn ở lượt thứ 2.
+    remaining = min(
+        ratelimit.remaining_daily("rag", str(user.id), limit),
+        ratelimit.remaining_daily("rag:device", fp_hash, settings.chat_daily_per_device),
+    )
     return {
         "limit": limit,
         "used": ratelimit.used_today("rag", str(user.id)),
-        "remaining": ratelimit.remaining_daily("rag", str(user.id), limit),
-        "level": snapshot["level"],
+        "remaining": remaining,
+        "level": budget.status_snapshot()["level"],
+        "email_verified": user.email_verified_at is not None,
     }

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     #  Cookie chỉ gửi qua HTTPS khi bật. Để False khi chạy http://localhost.
     cookie_secure: bool = False
     cookie_name: str = "access_token"
+    #  Rỗng = cookie chỉ dùng cho đúng tên miền hiện tại. Đặt ".mien-cua-ban.vn"
+    #  khi khu quản trị nằm ở tên miền con (admin.mien-cua-ban.vn) để hai bên
+    #  dùng chung phiên đăng nhập.
+    cookie_domain: str = ""
 
     # ── RAG / Gemini ─────────────────────────────────────────────────────────
     gemini_api_key: str = ""                       # lấy ở https://aistudio.google.com/apikey
@@ -69,6 +73,17 @@ class Settings(BaseSettings):
     guest_analyze_daily: int = 30
     member_analyze_daily: int = 100
     member_refresh_daily: int = 10        # số lần ép crawl lại (bỏ qua cache)
+    #  ── Hạn mức trợ lý theo nhiều RỔ (xem app/core/fingerprint.py) ──────────
+    #  Lấy rổ NGHIÊM NGẶT NHẤT: đổi tài khoản vẫn kẹt ở rổ thiết bị, đổi thiết bị
+    #  vẫn kẹt ở rổ IP. Rổ dải mạng để rộng vì nhà mạng VN cho hàng nghìn thuê
+    #  bao dùng chung một IP — siết chặt là chặn nhầm cả khu.
+    chat_daily_per_device: int = 5
+    chat_daily_per_ip: int = 8
+    chat_daily_per_subnet: int = 60
+    #  Số tài khoản tối đa từng đăng nhập trên MỘT thiết bị. Quá ngưỡng thì chặn
+    #  tạo tài khoản mới từ thiết bị đó (các tài khoản cũ vẫn dùng bình thường).
+    max_accounts_per_device: int = 5
+
     #  CHỈ tin X-Forwarded-For khi request đến từ các IP này (proxy của mình).
     #  Rỗng = không tin ai → luôn dùng IP kết nối trực tiếp. Trong Docker, Nuxt
     #  proxy nằm cùng mạng nội bộ nên thường là dải 172.16.0.0/12 → khai "*"
@@ -104,10 +119,30 @@ class Settings(BaseSettings):
     #  Số lượt hội thoại gần nhất frontend gửi kèm để agent giữ ngữ cảnh ("nó"…).
     rag_history_turns: int = 4
 
+    # ── Email giao dịch (xác minh tài khoản, đặt lại mật khẩu) ───────────────
+    #  Chưa cấu hình → link in ra log máy chủ (chỉ hợp cho dev). BẮT BUỘC cấu
+    #  hình trước khi mở cho người lạ, xem app/core/mailer.py.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    #  Địa chỉ trang web công khai — dùng dựng link trong email.
+    public_base_url: str = "http://localhost:3010"
+    verify_token_minutes: int = 60 * 24      # thư xác minh sống 24 giờ
+    reset_token_minutes: int = 30            # link đặt lại mật khẩu sống 30 phút
+    #  Bắt buộc xác minh email trước khi dùng trợ lý. Tắt được khi chạy máy để
+    #  khỏi phải dựng SMTP, nhưng ở môi trường thật thì đây là rào chính chống
+    #  tạo tài khoản hàng loạt để nhân hạn mức.
+    require_verified_email: bool = True
+
     # ── Đính kèm (attachment) ────────────────────────────────────────────────
     upload_dir: str = "/app/uploads"       # thư mục lưu tệp (khớp volume trong compose)
     upload_max_bytes: int = 10_485_760     # 10 MB/tệp
     upload_max_per_message: int = 4        # số tệp tối đa mỗi câu hỏi
+    upload_max_bytes_per_user: int = 52_428_800   # 50 MB tổng cho mỗi tài khoản
     #  Chỉ nhận ảnh + PDF — thứ Gemini đọc được (multimodal). Chặn tệp lạ.
     upload_allowed_mimes: tuple[str, ...] = (
         "image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",

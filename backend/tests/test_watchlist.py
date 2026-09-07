@@ -3,7 +3,7 @@ from __future__ import annotations
 
 
 def _register(client, email="u@b.com"):
-    return client.post("/api/auth/register", json={"email": email, "password": "secret123"})
+    return client.post("/api/auth/register", json={"email": email, "password": "matkhau-dai-hon"})
 
 
 def test_requires_auth(client):

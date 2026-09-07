@@ -15,8 +15,13 @@ _BASE = os.environ.get(
 _TEST_DB = "investstudio_test"
 os.environ["APP_DATABASE_URL"] = _BASE.rsplit("/", 1)[0] + "/" + _TEST_DB
 os.environ["APP_GEMINI_API_KEY"] = ""  # chắc chắn test không gọi Gemini thật
-#  Vô hiệu hóa giới hạn tần suất trong test (nhiều lần register/login liên tiếp).
+#  Vô hiệu hóa giới hạn tần suất trong test (nhiều lần register/login liên tiếp,
+#  và cả bộ test bắn hơn 120 request/phút từ cùng một "IP").
 os.environ["APP_LOGIN_MAX_ATTEMPTS"] = "1000000"
+os.environ["APP_API_RATE_LIMIT_PER_MINUTE"] = "1000000"
+#  Test chạy KHÔNG có SMTP: mặc định không bắt xác minh email, test nào cần kiểm
+#  rào này thì tự bật lại bằng monkeypatch (xem tests/test_account.py).
+os.environ["APP_REQUIRE_VERIFIED_EMAIL"] = "false"
 
 import pytest  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -45,8 +50,9 @@ def db_engine():
 def _clean(db_engine):
     """Dọn sạch bảng trước mỗi test → các test độc lập, không ảnh hưởng nhau."""
     with db_engine.begin() as conn:
-        conn.execute(text("TRUNCATE users, watchlist_items, rag_documents, index_jobs "
-                           "RESTART IDENTITY CASCADE"))
+        conn.execute(text(
+            "TRUNCATE users, watchlist_items, rag_documents, index_jobs, "
+            "device_fingerprints, device_accounts RESTART IDENTITY CASCADE"))
     yield
 
 
