@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;min-height:100%}
+body{background:#070b16;color:#eef3ff;font-family:'Fira Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:#5ac8ff}a:hover{color:#8ddcff}
+input::placeholder{color:#8090b4;font-family:'Fira Sans',sans-serif;font-weight:400;text-transform:none;letter-spacing:0}
+@keyframes tape{to{transform:translateX(-50%)}}
+@keyframes pulse{50%{opacity:.35}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+
+<div style="position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none">
+  <div style="position:absolute;width:52vw;height:52vw;left:-10vw;top:-16vw;border-radius:50%;filter:blur(90px);opacity:.4;background:radial-gradient(circle at 30% 30%,#123a6b,transparent 70%)"></div>
+  <div style="position:absolute;width:46vw;height:46vw;right:-12vw;bottom:-18vw;border-radius:50%;filter:blur(90px);opacity:.3;background:radial-gradient(circle at 60% 40%,#2a1a5e,transparent 70%)"></div>
+</div>
+
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ false }}">
+<div style="background:#111a2e;border-bottom:1px solid rgba(140,165,220,.32);padding:10px 26px;font-size:12.5px;color:#a3b3d3;display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">
+  <b style="color:#eef3ff;font-size:11px;text-transform:uppercase;letter-spacing:1px">Review · ghi chú thiết kế</b>
+  <span>Trạng thái: <b style="color:#eef3ff">chưa đăng nhập · ngoài phiên</b>.</span>
+  <span>Số liệu FPT thật (24/08/2026). Số phiên, lịch sự kiện, tin, bảng điểm VN30 là <b style="color:#ffc24b">minh hoạ</b>; bảng điểm VN30 cần endpoint chấm theo lịch.</span>
+  <span>Gõ mã lạ (VD "ABCX") rồi Enter để xem trạng thái loading → lỗi.</span>
+</div>
+</sc-if>
+
+<div ref="{{ frameRef }}" style="margin:0 auto;min-height:100dvh;position:relative;transition:max-width .3s">
+<sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+<header data-screen-label="Header mobile" style="position:sticky;top:0;z-index:30;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 16px;border-bottom:1px solid rgba(120,140,190,.2);background:rgba(7,11,22,.92);backdrop-filter:blur(14px)">
+  <a href="#" style="display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;text-decoration:none;color:#eef3ff;min-height:44px;border-radius:8px" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">
+    <span style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#5ac8ff,#a882ff);color:#04121f;font-weight:800;font-size:14px">PT</span>Phân Tích Mã
+  </a>
+  <button type="button" aria-label="{{ menuLabel }}" aria-expanded="{{ menuOpen }}" onClick="{{ toggleMenu }}" style="width:44px;height:44px;border-radius:10px;border:1px solid transparent;background:none;color:#eef3ff;display:grid;place-items:center;cursor:pointer" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">
+    <sc-if value="{{ menuClosed }}" hint-placeholder-val="{{ true }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="20" y2="17"></line></svg></sc-if>
+    <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg></sc-if>
+  </button>
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Drawer" style="position:absolute;top:100%;left:0;right:0;height:calc(100dvh - 56px);z-index:50">
+      <div onClick="{{ closeMenu }}" aria-hidden="true" style="position:absolute;inset:0;background:rgba(7,11,22,.7)"></div>
+      <nav aria-label="Điều hướng chính" style="position:absolute;top:0;right:0;bottom:0;width:min(320px,86%);background:#0c1324;border-left:1px solid rgba(120,140,190,.2);padding:12px 12px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px;overflow-y:auto;box-shadow:-20px 0 40px -20px rgba(0,0,0,.8)">
+        <sc-for list="{{ menuLinks }}" as="l" hint-placeholder-count="6">
+          <a href="#" aria-current="{{ l.current }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:0 14px;border-radius:10px;text-decoration:none;font-size:16px;font-weight:{{ l.weight }};color:{{ l.color }};background:{{ l.bg }};border:1px solid {{ l.border }}" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">{{ l.label }}<span style="font-size:12px;color:#8090b4">{{ l.mark }}</span></a>
+        </sc-for>
+        <div style="height:1px;background:rgba(120,140,190,.2);margin:8px 0"></div>
+        <a href="#" style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border-radius:10px;text-decoration:none;font-size:15px;font-weight:700;background:#5ac8ff;color:#04121f" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Đăng nhập</a>
+        <p style="margin:10px 4px 0;font-size:12.5px;color:#8090b4;line-height:1.5">Đăng nhập để lưu mã theo dõi và hỏi trợ lý. Chấm điểm không cần tài khoản.</p>
+      </nav>
+    </div>
+  </sc-if>
+</header>
+
+<sc-if value="{{ showTape }}" hint-placeholder-val="{{ true }}">
+<div aria-hidden="true" style="height:30px;display:flex;align-items:center;gap:18px;padding:0 16px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;border-bottom:1px solid rgba(120,140,190,.2);background:rgba(10,17,34,.6);font-size:12.5px;font-family:'Fira Code',monospace">
+  <sc-for list="{{ tapeItems }}" as="t" hint-placeholder-count="9">
+    <span style="display:inline-flex;gap:6px;align-items:baseline;flex:none"><b style="color:#eef3ff;font-weight:600">{{ t.s }}</b><span style="color:#d4ddf2">{{ t.p }}</span><span style="color:{{ t.color }}">{{ t.c }}</span></span>
+  </sc-for>
+</div>
+</sc-if>
+
+<section data-screen-label="Hero mobile" style="padding:22px 16px 0">
+  <div style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#a3b3d3;margin-bottom:12px"><span style="width:7px;height:7px;border-radius:50%;background:{{ dotColor }}"></span>{{ sessionText }}</div>
+  <h1 style="font-size:28px;line-height:34px;margin:0 0 10px;font-weight:700;letter-spacing:-.5px;text-wrap:balance">Đánh giá cổ phiếu trước mỗi quyết định đầu tư.</h1>
+  <p style="margin:0 0 16px;font-size:15px;color:#d4ddf2;line-height:1.5">Điểm 0–100 theo 14 tiêu chí, kèm rủi ro trong kịch bản xấu.</p>
+  <form onSubmit="{{ onSubmit }}" aria-busy="{{ isLoading }}" style="display:flex;align-items:center;gap:6px;background:#111a2e;border:1px solid {{ formBorder }};border-radius:14px;padding:5px 5px 5px 12px;color:#a3b3d3;transition:border-color .2s">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input value="{{ ticker }}" onChange="{{ onType }}" disabled="{{ isLoading }}" placeholder="Nhập mã, VD: FPT" maxlength="12" spellcheck="false" autocapitalize="characters" aria-label="Mã cổ phiếu" style="flex:1;min-height:46px;background:none;border:none;outline:none;color:#eef3ff;font-size:17px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;font-family:'Fira Code',monospace;min-width:0">
+    <button type="submit" disabled="{{ isLoading }}" style="background:#5ac8ff;color:#04121f;border:none;border-radius:10px;padding:0 16px;min-height:46px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:'Fira Sans',sans-serif;white-space:nowrap;opacity:{{ btnOpacity }}" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">{{ btnLabelShort }}</button>
+  </form>
+  <p style="margin:8px 0 0;font-size:12px;color:#8090b4">Thông tin mang tính tham khảo, không phải khuyến nghị đầu tư.</p>
+  <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="margin:12px 0 0;background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:12px;padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px"><span style="display:flex;align-items:center;gap:8px;color:#eef3ff"><span style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(90,200,255,.25);border-top-color:#5ac8ff;animation:spin .8s linear infinite"></span>{{ stepText }}</span><span style="font-family:'Fira Code',monospace;color:#a3b3d3">{{ pct }}%</span></div>
+      <div style="height:6px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden;margin-top:8px"><div style="height:100%;background:#5ac8ff;width:{{ pctW }};transition:width .4s"></div></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+    <div role="alert" style="margin:12px 0 0;background:rgba(255,93,115,.08);border:1px solid rgba(255,93,115,.4);border-left:4px solid #ff5d73;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.5;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <span>{{ errorText }}</span>
+      <button type="button" onClick="{{ reset }}" style="background:none;border:1px solid rgba(255,93,115,.4);color:#eef3ff;border-radius:8px;padding:0 14px;min-height:44px;cursor:pointer;font-family:'Fira Sans',sans-serif;font-size:13px" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Thử lại</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isReady }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="margin:12px 0 0;background:rgba(46,230,166,.07);border:1px solid rgba(46,230,166,.35);border-left:4px solid #2ee6a6;border-radius:12px;padding:12px 14px;font-size:13.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <span>Đã chấm xong <b style="font-family:'Fira Code',monospace">{{ readyTicker }}</b>.</span>
+      <a href="#" style="text-decoration:none;background:#5ac8ff;color:#04121f;border-radius:8px;padding:0 14px;min-height:40px;display:inline-flex;align-items:center;font-weight:700;font-size:13px" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Mở phân tích →</a>
+    </div>
+  </sc-if>
+  <div style="display:flex;align-items:center;gap:8px;margin:12px -16px 0;padding:0 16px;overflow-x:auto;scrollbar-width:none">
+    <span style="font-size:12.5px;color:#8090b4;flex:none">Thử nhanh:</span>
+    <sc-for list="{{ examples }}" as="c" hint-placeholder-count="6">
+      <button type="button" onClick="{{ c.go }}" style="flex:none;min-height:44px;font-size:13px;color:#a3b3d3;border:1px solid rgba(120,140,190,.2);background:#111a2e;border-radius:22px;padding:0 14px;cursor:pointer;font-family:'Fira Code',monospace;font-weight:600" style-hover="color:#eef3ff;border-color:#5ac8ff" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">{{ c.code }}</button>
+    </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Tóm tắt FPT mobile" style="margin:22px 0 0;padding:18px 16px 22px;background:rgba(17,26,46,.55);border-top:1px solid rgba(120,140,190,.2);border-bottom:1px solid rgba(120,140,190,.2)">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:12px">
+    <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Kết quả mẫu</span>
+    <span style="font-size:12px;color:#8090b4">cập nhật <span style="font-family:'Fira Code',monospace;color:#a3b3d3">24/08/2026</span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="position:relative;width:88px;height:88px;flex:none" role="img" aria-label="Điểm 81 trên 100">
+      <svg viewBox="0 0 120 120" style="width:100%;height:100%;display:block">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(30,42,70,.9)" stroke-width="12"></circle>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#2ee6a6" stroke-width="12" stroke-linecap="round" transform="rotate(-90 60 60)" stroke-dasharray="326.73" stroke-dashoffset="{{ dashoffset }}"></circle>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:28px;font-weight:700;line-height:1;color:#2ee6a6;font-family:'Fira Code',monospace">{{ shownScore }}</span><span style="font-size:10.5px;color:#a3b3d3;font-family:'Fira Code',monospace">/100</span></div>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:baseline;gap:8px;min-width:0"><span style="font-size:22px;font-weight:700;font-family:'Fira Code',monospace">FPT</span><span style="font-size:12.5px;color:#a3b3d3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Công ty Cổ phần FPT</span></div>
+      <div style="font-size:14px;font-weight:600;color:#2ee6a6;margin-top:2px;line-height:1.35">Xuất sắc — ưu tiên giải ngân</div>
+      <div style="margin-top:4px;font-size:13px;color:#a3b3d3">Đóng cửa <b style="font-family:'Fira Code',monospace;color:#eef3ff;font-weight:600">71,40</b> nghìn đ/cp</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(120,140,190,.2);border:1px solid rgba(120,140,190,.2);border-radius:12px;overflow:hidden;margin-top:14px">
+    <div style="background:#0c1324;padding:12px 14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Định giá</div><div style="margin-top:4px;font-size:20px;font-weight:700;font-family:'Fira Code',monospace;color:#2ee6a6">18<span style="font-size:12px;color:#a3b3d3;font-weight:500">/20</span></div><div style="font-size:12px;color:#d4ddf2;margin-top:2px">P/E <span style="font-family:'Fira Code',monospace">12.2</span> vs ngành <span style="font-family:'Fira Code',monospace">18.0</span></div></div>
+    <div style="background:#0c1324;padding:12px 14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Rủi ro · kịch bản xấu</div><div style="margin-top:4px;font-size:20px;font-weight:700;font-family:'Fira Code',monospace;color:#ff7a8c">−8%<span style="font-size:12px;color:#a3b3d3;font-weight:500"> → 65,69</span></div><div style="font-size:12px;color:#d4ddf2;margin-top:2px">≈ <span style="font-family:'Fira Code',monospace">1,6%</span> tổng tài khoản</div></div>
+    <div style="background:#0c1324;padding:12px 14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Tầm nhìn hợp</div><div style="margin-top:4px;font-size:16px;font-weight:600;line-height:1.3">Trung hạn <span style="font-family:'Fira Code',monospace;color:#2ee6a6;font-weight:700">80</span><span style="font-family:'Fira Code',monospace;font-size:12px;color:#a3b3d3">/100</span></div><div style="font-size:12px;color:#d4ddf2;margin-top:2px">tháng – 1 năm</div></div>
+    <div style="background:#0c1324;padding:12px 14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Nguồn dữ liệu</div><div style="margin-top:4px;font-size:16px;font-weight:600;line-height:1.3">CafeF · VCI</div><div style="font-size:12px;color:#d4ddf2;margin-top:2px">dữ liệu đến <span style="font-family:'Fira Code',monospace">24/08/2026</span></div></div>
+  </div>
+  <button type="button" onClick="{{ toggleDetail }}" aria-expanded="{{ detailOpen }}" style="width:100%;min-height:48px;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:8px;background:none;border:1px solid rgba(90,200,255,.45);color:#5ac8ff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Fira Sans',sans-serif" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">{{ detailLabel }}<span aria-hidden="true">{{ detailChevron }}</span></button>
+  <sc-if value="{{ detailOpen }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="Chi tiết FPT mobile" style="margin-top:14px;padding-top:14px;border-top:1px dashed rgba(120,140,190,.3)">
+      <div style="display:flex;gap:4px" role="group" aria-label="Khung thời gian biểu đồ">
+        <sc-for list="{{ ranges }}" as="r" hint-placeholder-count="4">
+          <button type="button" onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="flex:1;min-height:44px;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.color }};border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Fira Sans',sans-serif" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">{{ r.label }}</button>
+        </sc-for>
+      </div>
+      <svg viewBox="0 0 600 140" preserveAspectRatio="none" style="display:block;width:100%;height:140px;margin-top:10px" role="img" aria-label="Diễn biến giá FPT">
+        <defs><linearGradient id="hgm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5ac8ff" stop-opacity=".22"></stop><stop offset="100%" stop-color="#5ac8ff" stop-opacity="0"></stop></linearGradient></defs>
+        <line x1="10" y1="126" x2="590" y2="126" stroke="rgba(120,140,190,.2)" vector-effect="non-scaling-stroke"></line>
+        <path d="{{ sparkArea }}" fill="url(#hgm)"></path>
+        <path d="{{ sparkPath }}" fill="none" stroke="#5ac8ff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+        <line x1="{{ lastX }}" y1="{{ lastY }}" x2="{{ lastX }}" y2="{{ lastY }}" stroke="#111a2e" stroke-width="12" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>
+        <line x1="{{ lastX }}" y1="{{ lastY }}" x2="{{ lastX }}" y2="{{ lastY }}" stroke="#5ac8ff" stroke-width="8" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>
+      </svg>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12.5px;color:#a3b3d3;margin-top:8px">
+        <span>Thấp nhất <b style="color:#eef3ff;font-family:'Fira Code',monospace;font-weight:600">{{ rangeLow }}</b></span>
+        <span style="text-align:right">Cao nhất <b style="color:#eef3ff;font-family:'Fira Code',monospace;font-weight:600">{{ rangeHigh }}</b></span>
+        <span>{{ rangeLabel }}: <b style="color:{{ rangeChgColor }};font-family:'Fira Code',monospace;font-weight:600">{{ rangeChg }}</b></span>
+        <span style="text-align:right;font-family:'Fira Code',monospace">{{ rangeSessions }} phiên</span>
+      </div>
+
+      <h4 style="margin:18px 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Hợp với tầm nhìn nào?</h4>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ horizons }}" as="h" hint-placeholder-count="3">
+          <div>
+            <div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span style="color:{{ h.labelColor }};font-weight:{{ h.weight }}">{{ h.star }}{{ h.label }}</span><span style="font-family:'Fira Code',monospace;color:#2ee6a6;font-weight:700">{{ h.value }}<span style="color:#a3b3d3;font-weight:500">/100</span></span></div>
+            <span style="display:block;height:6px;margin-top:5px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;background:#2ee6a6;width:{{ h.pct }}"></span></span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:16px;padding:12px 14px;border:1px solid rgba(255,93,115,.35);border-left:4px solid #ff5d73;border-radius:10px;background:rgba(255,93,115,.06)">
+        <div style="font-size:11.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#ff7a8c">Kịch bản xấu nhất</div>
+        <div style="display:flex;gap:18px;margin-top:6px">
+          <span><span style="display:block;font-size:11px;color:#a3b3d3">Chạm cắt lỗ tại</span><span style="font-size:16px;font-weight:700;color:#ff7a8c;font-family:'Fira Code',monospace">65,69</span></span>
+          <span><span style="display:block;font-size:11px;color:#a3b3d3">Thiệt hại</span><span style="font-size:16px;font-weight:700;color:#ff7a8c">≈ <span style="font-family:'Fira Code',monospace">1,6%</span> tài khoản</span></span>
+        </div>
+        <p style="margin:8px 0 0;font-size:13px;line-height:1.55;color:#d4ddf2">Bạn mua ở giá 71,4, giá quay đầu và chạm cắt lỗ 8% tại 65,69 nghìn đ/cp. Nếu đã dồn mức tối đa 20% tài khoản, bạn mất khoảng 1,6% tổng tài khoản trong lần này.</p>
+      </div>
+    </div>
+  </sc-if>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+    <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:48px;text-decoration:none;background:#5ac8ff;color:#04121f;border-radius:10px;font-size:15px;font-weight:700" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Mở phân tích đầy đủ FPT →</a>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;gap:6px;min-height:48px;text-decoration:none;border:1px solid rgba(120,140,190,.2);background:#0c1324;color:#eef3ff;border-radius:10px;font-size:14px;font-weight:600" style-hover="border-color:#5ac8ff;color:#5ac8ff" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">☆ Theo dõi FPT <span style="font-size:12px;color:#a3b3d3;font-weight:400">· cần đăng nhập</span></a>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">
+    <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#d4ddf2;border:1px solid rgba(120,140,190,.2);border-radius:20px;padding:5px 10px"><span style="color:#5ac8ff;font-weight:700">✓</span>Tài chính · định giá · kỹ thuật</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#d4ddf2;border:1px solid rgba(120,140,190,.2);border-radius:20px;padding:5px 10px"><span style="color:#5ac8ff;font-weight:700">✓</span>14 tiêu chí · 0–100</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#d4ddf2;border:1px solid rgba(120,140,190,.2);border-radius:20px;padding:5px 10px"><span style="color:#5ac8ff;font-weight:700">✓</span>Rủi ro kịch bản xấu</span>
+  </div>
+</section>
+
+<section data-screen-label="Vì sao 81 điểm mobile" style="padding:28px 16px 0">
+  <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;letter-spacing:-.3px;line-height:1.25">Vì sao FPT được 81 điểm?</h2>
+  <p style="margin:0 0 14px;font-size:13.5px;color:#a3b3d3;line-height:1.5">100 điểm chia cho 4 nhóm theo trọng số cố định. Chạm một nhóm để xem tiêu chí.</p>
+  <div style="display:flex;gap:3px;height:44px;border-radius:10px;overflow:hidden" role="tablist">
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+      <button type="button" role="tab" aria-selected="{{ g.on }}" onClick="{{ g.pick }}" title="{{ g.name }}" style="flex:{{ g.max }};border:none;cursor:pointer;background:{{ g.segBg }};color:{{ g.segFg }};font-family:'Fira Code',monospace;font-size:14px;font-weight:700;min-width:0" style-focus="outline:2px solid #eef3ff;outline-offset:-3px">{{ g.max }}</button>
+    </sc-for>
+  </div>
+  <div style="display:flex;justify-content:space-between;gap:10px;margin:12px 0 10px;align-items:baseline">
+    <span style="font-size:13px;font-weight:700;color:#5ac8ff;text-transform:uppercase;letter-spacing:.4px">{{ activeName }}</span>
+    <span style="font-size:13px;color:#a3b3d3;white-space:nowrap">FPT đạt <b style="color:#eef3ff;font-family:'Fira Code',monospace">{{ activeSum }}</b><span style="font-family:'Fira Code',monospace">/{{ activeMax }}</span></span>
+  </div>
+  <div style="display:flex;flex-direction:column">
+    <sc-for list="{{ activeItems }}" as="it" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;padding:9px 0;border-bottom:1px solid rgba(120,140,190,.14)">
+        <span style="font-size:14px">{{ it.label }}</span>
+        <span style="font-family:'Fira Code',monospace;font-weight:700;color:{{ it.color }};font-size:14px">{{ it.points }}<span style="color:#a3b3d3;font-weight:500">/{{ it.max }}</span></span>
+        <span style="grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12.5px;color:{{ it.color }};font-family:'Fira Code',monospace">{{ it.raw }}</span><span style="flex:1;max-width:120px;display:block;height:6px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:{{ it.color }};width:{{ it.pct }}"></span></span></span>
+      </div>
+    </sc-for>
+  </div>
+  <p style="margin:12px 0 0;font-size:13px;color:#a3b3d3;line-height:1.55">{{ activeNote }}</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:12.5px;color:#a3b3d3;font-family:'Fira Code',monospace"><span><b style="color:#2ee6a6">≥80</b> xuất sắc</span><span><b style="color:#2ee6a6">65–79</b> tốt</span><span><b style="color:#ffc24b">50–64</b> TB</span><span><b style="color:#ff7a8c">&lt;50</b> yếu</span></div>
+
+  <h3 style="margin:26px 0 6px;font-size:16px;font-weight:700">Ba quy tắc thẳng thắn</h3>
+  <div style="display:flex;flex-direction:column;border-top:1px solid rgba(120,140,190,.2)">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="3">
+      <div style="border-bottom:1px solid rgba(120,140,190,.2)">
+        <button type="button" onClick="{{ r.toggle }}" aria-expanded="{{ r.open }}" style="width:100%;min-height:56px;display:flex;align-items:center;gap:12px;background:none;border:none;padding:8px 0;text-align:left;cursor:pointer;color:#eef3ff;font-family:'Fira Sans',sans-serif" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="width:36px;height:36px;flex:none;border-radius:9px;display:grid;place-items:center;background:{{ r.iconBg }};color:{{ r.iconColor }};font-family:'Fira Code',monospace;font-weight:700;font-size:12px">{{ r.icon }}</span>
+          <span style="flex:1;font-size:15px;font-weight:600;line-height:1.35">{{ r.title }}</span>
+          <span aria-hidden="true" style="color:#8090b4;font-size:14px">{{ r.chevron }}</span>
+        </button>
+        <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}"><p style="margin:0 0 14px 48px;font-size:13.5px;color:#a3b3d3;line-height:1.55">{{ r.body }}</p></sc-if>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section data-screen-label="Thị trường mobile" style="padding:28px 16px 0">
+  <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;letter-spacing:-.3px;line-height:1.25">{{ marketTitleMobile }}</h2>
+  <p style="margin:0 0 14px;font-size:13.5px;color:#a3b3d3;line-height:1.5">{{ marketSub }}</p>
+  <div role="tablist" style="display:flex;gap:4px;padding:4px;background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:12px">
+      <sc-for list="{{ moverTabs }}" as="t" hint-placeholder-count="3">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="flex:1;min-height:44px;border:none;border-radius:9px;background:{{ t.bg }};color:{{ t.color }};font-size:13.5px;font-weight:{{ t.weight }};cursor:pointer;font-family:'Fira Sans',sans-serif;white-space:nowrap;padding:0 6px" style-focus="outline:2px solid #eef3ff;outline-offset:-3px">{{ t.label }}</button>
+      </sc-for>
+    </div>
+  <div style="display:flex;flex-direction:column;margin-top:6px">
+    <sc-for list="{{ moverItems }}" as="m" hint-placeholder-count="3">
+      <a href="#" style="display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;min-height:48px;padding:6px 4px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+        <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ m.symbol }}</span>
+        <span style="color:#a3b3d3;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.name }}</span>
+        <span style="display:flex;flex-direction:column;align-items:flex-end;white-space:nowrap;font-family:'Fira Code',monospace"><span style="font-size:13.5px">{{ m.price }}</span><span style="font-size:12.5px;color:{{ m.color }}">{{ m.chg }}</span></span>
+      </a>
+    </sc-for>
+  </div>
+  <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;text-decoration:none;color:#5ac8ff;font-weight:600;font-size:14px;border:1px solid rgba(90,200,255,.4);border-radius:10px" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px"><span>Xem tất cả&nbsp;·&nbsp;</span><span>{{ moverTabLabel }}</span><span>&nbsp;→</span></a>
+</section>
+
+<section data-screen-label="Sự kiện & tin mobile" style="padding:28px 16px 0">
+  <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;letter-spacing:-.3px;line-height:1.25">Sắp tới &amp; mới nhất</h2>
+  <p style="margin:0 0 14px;font-size:13.5px;color:#a3b3d3;line-height:1.5">Lịch cổ tức, tin công bố và bảng điểm VN30 sau phiên.</p>
+  <div role="tablist" style="display:flex;gap:4px;padding:4px;background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:12px">
+      <sc-for list="{{ infoTabs }}" as="t" hint-placeholder-count="3">
+        <button type="button" role="tab" aria-selected="{{ t.on }}" onClick="{{ t.pick }}" style="flex:1;min-height:44px;border:none;border-radius:9px;background:{{ t.bg }};color:{{ t.color }};font-size:13.5px;font-weight:{{ t.weight }};cursor:pointer;font-family:'Fira Sans',sans-serif;white-space:nowrap;padding:0 6px" style-focus="outline:2px solid #eef3ff;outline-offset:-3px">{{ t.label }}</button>
+      </sc-for>
+    </div>
+  <sc-if value="{{ infoIsEvents }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;margin-top:6px">
+      <sc-for list="{{ eventsTop }}" as="e" hint-placeholder-count="3">
+        <a href="#" style="display:grid;grid-template-columns:auto 56px 1fr;gap:12px;align-items:center;min-height:48px;padding:8px 4px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="display:flex;flex-direction:column;align-items:center;min-width:42px;background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:8px;padding:4px 6px;font-family:'Fira Code',monospace;line-height:1.15"><span style="font-size:15px;font-weight:700">{{ e.day }}</span><span style="font-size:10px;color:#a3b3d3">{{ e.mon }}</span></span>
+          <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ e.symbol }}</span>
+          <span style="font-size:13px;line-height:1.45"><span style="color:{{ e.color }};font-weight:600">{{ e.kind }}</span> <span style="color:#a3b3d3">· {{ e.text }}</span></span>
+        </a>
+      </sc-for>
+    </div>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;text-decoration:none;color:#5ac8ff;font-weight:600;font-size:14px;border:1px solid rgba(90,200,255,.4);border-radius:10px" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Xem lịch đầy đủ →</a>
+  </sc-if>
+  <sc-if value="{{ infoIsNews }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;margin-top:6px">
+      <sc-for list="{{ newsTop }}" as="n" hint-placeholder-count="3">
+        <a href="#" style="display:grid;grid-template-columns:56px 1fr;gap:10px;align-items:start;min-height:48px;padding:8px 4px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ n.symbol }}</span>
+          <span style="min-width:0"><span style="display:block;font-size:13.5px;line-height:1.45">{{ n.title }}</span><span style="display:block;font-size:12px;color:#8090b4;margin-top:2px"><span style="font-family:'Fira Code',monospace">{{ n.date }}</span> · tìm trên CafeF ↗</span></span>
+        </a>
+      </sc-for>
+    </div>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;text-decoration:none;color:#5ac8ff;font-weight:600;font-size:14px;border:1px solid rgba(90,200,255,.4);border-radius:10px" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Xem thêm tin →</a>
+  </sc-if>
+  <sc-if value="{{ infoIsLeaders }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;margin-top:6px">
+      <sc-for list="{{ leadersTop }}" as="l" hint-placeholder-count="3">
+        <a href="#" style="display:grid;grid-template-columns:56px 1fr auto;gap:10px;align-items:center;min-height:48px;padding:6px 4px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ l.symbol }}</span>
+          <span style="display:block;height:6px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:{{ l.color }};width:{{ l.pct }}"></span></span>
+          <span style="font-family:'Fira Code',monospace;font-weight:700;color:{{ l.color }}">{{ l.score }}<span style="color:#a3b3d3;font-weight:500;font-size:11px">/100</span></span>
+        </a>
+      </sc-for>
+    </div>
+    <p style="margin:8px 0 0;font-size:12px;color:#8090b4">Chấm lại sau mỗi phiên.</p>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;text-decoration:none;color:#5ac8ff;font-weight:600;font-size:14px;border:1px solid rgba(90,200,255,.4);border-radius:10px" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Xem cả bảng VN30 →</a>
+  </sc-if>
+</section>
+
+<section data-screen-label="CTA cuối mobile" style="padding:28px 16px 0">
+  <div style="border:1px solid rgba(90,200,255,.3);border-radius:14px;padding:18px 16px;background:#111a2e">
+    <h2 style="margin:0 0 4px;font-size:20px;font-weight:700;letter-spacing:-.3px;line-height:1.25">Mã bạn đang cầm được mấy điểm?</h2>
+    <p style="margin:0 0 14px;font-size:13.5px;color:#a3b3d3;line-height:1.5">Khoảng 20 giây, không cần tài khoản.</p>
+    <form onSubmit="{{ onSubmit }}" style="display:flex;align-items:center;gap:6px;background:#0c1324;border:1px solid rgba(120,140,190,.3);border-radius:14px;padding:5px 5px 5px 12px;color:#a3b3d3">
+      <input value="{{ ticker }}" onChange="{{ onType }}" disabled="{{ isLoading }}" placeholder="VD: HPG" maxlength="12" spellcheck="false" autocapitalize="characters" aria-label="Mã cổ phiếu" style="flex:1;min-height:46px;background:none;border:none;outline:none;color:#eef3ff;font-size:17px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;font-family:'Fira Code',monospace;min-width:0">
+      <button type="submit" disabled="{{ isLoading }}" style="background:#5ac8ff;color:#04121f;border:none;border-radius:10px;padding:0 16px;min-height:46px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:'Fira Sans',sans-serif;white-space:nowrap" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Chấm điểm</button>
+    </form>
+  </div>
+</section>
+
+<footer style="margin:28px 0 0;padding:16px 72px calc(84px + env(safe-area-inset-bottom)) 16px;color:#a3b3d3;font-size:12.5px;line-height:1.6;border-top:1px solid rgba(120,140,190,.2)">
+  Số liệu <b style="color:#eef3ff">thu thập tự động từ nguồn công khai</b> nên có thể chậm hoặc sai lệch. Đây là <b style="color:#eef3ff">công cụ hỗ trợ tư duy</b>, <b style="color:#eef3ff">không phải khuyến nghị đầu tư</b>.
+</footer>
+
+<sc-if value="{{ chatVisible }}" hint-placeholder-val="{{ false }}">
+<div style="position:sticky;bottom:calc(16px + env(safe-area-inset-bottom));height:0;display:flex;justify-content:flex-end;padding:0 16px;z-index:40;pointer-events:none">
+  <button type="button" aria-label="Mở trợ lý" style="pointer-events:auto;transform:translateY(-100%);width:44px;height:44px;border-radius:50%;border:1px solid rgba(140,165,220,.35);background:#111a2e;color:#5ac8ff;display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 20px -10px rgba(0,0,0,.8)" style-hover="border-color:#5ac8ff;background:#16223c" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
+  </button>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+
+
+<!-- header -->
+<header data-screen-label="Header" style="position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;padding:10px 26px;border-bottom:1px solid rgba(120,140,190,.2);background:rgba(7,11,22,.86);backdrop-filter:blur(14px)">
+  <a href="#" style="order:1;display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;text-decoration:none;color:#eef3ff;white-space:nowrap;min-height:44px;border-radius:8px" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">
+    <span style="width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,#5ac8ff,#a882ff);color:#04121f;font-weight:800;font-size:13px">PT</span>
+    Phân Tích Mã
+  </a>
+  <a href="#" style="order:3;margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border:1px solid #5ac8ff;color:#5ac8ff;border-radius:22px;padding:0 14px;min-height:40px;white-space:nowrap;text-decoration:none;background:rgba(15,22,38,.72)" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+    Đăng nhập
+  </a>
+  <nav aria-label="Điều hướng chính" style="order:2;flex:1 1 330px;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0">
+    <a href="#" aria-current="page" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;color:#eef3ff;text-decoration:none;font-size:14px;font-weight:600;background:rgba(90,200,255,.12);border:1px solid rgba(90,200,255,.45);white-space:nowrap" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Trang chủ</a>
+    <a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;color:#a3b3d3;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap;border:1px solid transparent" style-hover="color:#eef3ff;background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Danh mục</a>
+    <a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;color:#a3b3d3;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap;border:1px solid transparent" style-hover="color:#eef3ff;background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Phân tích</a>
+    <a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;color:#a3b3d3;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap;border:1px solid transparent" style-hover="color:#eef3ff;background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Danh sách mã</a>
+    <a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;color:#a3b3d3;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap;border:1px solid transparent" style-hover="color:#eef3ff;background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Theo dõi</a>
+    <a href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:10px;color:#a3b3d3;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap;border:1px solid transparent" style-hover="color:#eef3ff;background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Trợ lý</a>
+  </nav>
+</header>
+
+<!-- ticker tape -->
+<sc-if value="{{ showTape }}" hint-placeholder-val="{{ true }}">
+<div aria-hidden="true" style="overflow:hidden;border-bottom:1px solid rgba(120,140,190,.2);background:rgba(10,17,34,.6);-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)">{{ tapeEl }}</div>
+</sc-if>
+
+<!-- HERO -->
+<section data-screen-label="Hero" style="max-width:1320px;margin:0 auto;padding:52px 26px 0;text-align:center">
+  <div style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#a3b3d3;border:1px solid rgba(120,140,190,.2);background:#111a2e;border-radius:20px;padding:6px 14px;margin-bottom:22px">
+    <span style="width:7px;height:7px;border-radius:50%;background:{{ dotColor }}"></span>{{ sessionText }}
+  </div>
+  <h1 style="font-size:clamp(30px,4vw,52px);line-height:1.12;margin:0 auto 18px;font-weight:700;letter-spacing:-.8px;max-width:820px;text-wrap:balance">Đánh giá cổ phiếu trước mỗi quyết định đầu tư.</h1>
+  <ul style="list-style:none;margin:0 auto 28px;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 22px;font-size:15.5px;color:#d4ddf2;max-width:820px">
+    <li style="display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5ac8ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><polyline points="20 6 9 17 4 12"></polyline></svg>Phân tích tài chính, định giá và kỹ thuật</li>
+    <li style="display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5ac8ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><polyline points="20 6 9 17 4 12"></polyline></svg>Điểm tổng hợp 0–100 theo 14 tiêu chí</li>
+    <li style="display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5ac8ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><polyline points="20 6 9 17 4 12"></polyline></svg>Ước tính rủi ro trong kịch bản xấu</li>
+  </ul>
+  <form onSubmit="{{ onSubmit }}" aria-busy="{{ isLoading }}" style="display:flex;align-items:center;gap:8px;background:#111a2e;border:1px solid {{ formBorder }};border-radius:14px;padding:6px 6px 6px 14px;box-shadow:0 12px 30px -18px rgba(0,0,0,.8);color:#a3b3d3;max-width:560px;margin:0 auto;transition:border-color .2s">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input value="{{ ticker }}" onChange="{{ onType }}" disabled="{{ isLoading }}" placeholder="Nhập mã cổ phiếu, VD: FPT" maxlength="12" spellcheck="false" autocapitalize="characters" aria-label="Mã cổ phiếu" style="flex:1;min-height:44px;background:none;border:none;outline:none;color:#eef3ff;font-size:17px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;font-family:'Fira Code',ui-monospace,monospace;min-width:0">
+    <button type="submit" disabled="{{ isLoading }}" style="display:inline-flex;align-items:center;gap:8px;background:#5ac8ff;color:#04121f;border:none;border-radius:10px;padding:0 18px;min-height:44px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:'Fira Sans',sans-serif;box-shadow:0 6px 16px -10px rgba(90,200,255,.6);white-space:nowrap;opacity:{{ btnOpacity }}" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">{{ btnLabel }}</button>
+  </form>
+  <p style="margin:10px 0 0;font-size:12.5px;color:#8090b4">Thông tin mang tính tham khảo, không phải khuyến nghị đầu tư.</p>
+
+  <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="max-width:560px;margin:14px auto 0;background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:12px;padding:12px 14px;text-align:left">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px"><span style="display:flex;align-items:center;gap:8px;color:#eef3ff"><span style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(90,200,255,.25);border-top-color:#5ac8ff;animation:spin .8s linear infinite"></span>{{ stepText }}</span><span style="font-family:'Fira Code',monospace;color:#a3b3d3">{{ pct }}%</span></div>
+      <div style="height:6px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden;margin-top:8px"><div style="height:100%;background:#5ac8ff;width:{{ pctW }};transition:width .4s"></div></div>
+      <p style="margin:8px 0 0;font-size:12px;color:#8090b4">Tiến độ gắn với bước thật đang chạy, không phải đồng hồ đếm giả.</p>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isError }}" hint-placeholder-val="{{ false }}">
+    <div role="alert" style="max-width:560px;margin:14px auto 0;background:rgba(255,93,115,.08);border:1px solid rgba(255,93,115,.4);border-left:4px solid #ff5d73;border-radius:12px;padding:12px 14px;text-align:left;font-size:13.5px;line-height:1.5;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
+      <span>{{ errorText }}</span>
+      <button type="button" onClick="{{ reset }}" style="background:none;border:1px solid rgba(255,93,115,.4);color:#eef3ff;border-radius:8px;padding:6px 12px;min-height:36px;cursor:pointer;font-family:'Fira Sans',sans-serif;font-size:13px" style-hover="border-color:#ff5d73" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Thử lại</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isReady }}" hint-placeholder-val="{{ false }}">
+    <div role="status" style="max-width:560px;margin:14px auto 0;background:rgba(46,230,166,.07);border:1px solid rgba(46,230,166,.35);border-left:4px solid #2ee6a6;border-radius:12px;padding:12px 14px;text-align:left;font-size:13.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <span>Đã chấm xong <b style="font-family:'Fira Code',monospace">{{ readyTicker }}</b>.</span>
+      <a href="#" style="text-decoration:none;background:#5ac8ff;color:#04121f;border-radius:8px;padding:0 14px;min-height:36px;display:inline-flex;align-items:center;font-weight:700;font-size:13px" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Mở phân tích →</a>
+    </div>
+  </sc-if>
+
+  <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:18px">
+    <span style="font-size:13px;color:#8090b4">Thử nhanh:</span>
+    <sc-for list="{{ examples }}" as="c" hint-placeholder-count="6">
+      <button type="button" onClick="{{ c.go }}" style="min-height:40px;font-size:13px;color:#a3b3d3;border:1px solid rgba(120,140,190,.2);background:#111a2e;border-radius:20px;padding:0 14px;cursor:pointer;font-family:'Fira Code',monospace;font-weight:600" style-hover="color:#eef3ff;border-color:#5ac8ff" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">{{ c.code }}</button>
+    </sc-for>
+  </div>
+</section>
+
+<!-- PREVIEW STRIP -->
+<section data-screen-label="Kết quả mẫu FPT" style="max-width:1320px;margin:0 auto;padding:40px 26px 0">
+  <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:18px 20px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Kết quả mẫu</span>
+        <span style="font-size:20px;font-weight:700;font-family:'Fira Code',monospace;color:#eef3ff">FPT</span>
+        <span style="font-size:13px;color:#a3b3d3">Công ty Cổ phần FPT · Công nghệ</span>
+      </div>
+      <span style="font-size:12.5px;color:#a3b3d3;display:inline-flex;gap:8px;align-items:center;white-space:nowrap;line-height:1.8">Cập nhật <b style="font-family:'Fira Code',monospace;color:#eef3ff;font-weight:600">24/08/2026</b> · nguồn <span style="border:1px solid rgba(120,140,190,.2);border-radius:12px;padding:1px 8px;font-size:11.5px">CafeF</span><span style="border:1px solid rgba(120,140,190,.2);border-radius:12px;padding:1px 8px;font-size:11.5px">VCI</span></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px">
+      <div style="background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:10px;padding:14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Điểm tổng</div>
+        <div style="display:flex;align-items:baseline;gap:4px;margin-top:6px"><span style="font-size:34px;font-weight:700;line-height:1;color:#2ee6a6;font-family:'Fira Code',monospace">81</span><span style="font-size:13px;color:#a3b3d3;font-family:'Fira Code',monospace">/100</span></div>
+        <div style="font-size:12.5px;color:#2ee6a6;font-weight:600;margin-top:6px">Xuất sắc — ưu tiên giải ngân</div>
+      </div>
+      <div style="background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:10px;padding:14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Định giá</div>
+        <div style="display:flex;align-items:baseline;gap:4px;margin-top:6px"><span style="font-size:34px;font-weight:700;line-height:1;color:#2ee6a6;font-family:'Fira Code',monospace">18</span><span style="font-size:13px;color:#a3b3d3;font-family:'Fira Code',monospace">/20</span></div>
+        <div style="font-size:12.5px;color:#d4ddf2;margin-top:6px">P/E <b style="font-family:'Fira Code',monospace;font-weight:600">12.2</b> vs ngành <b style="font-family:'Fira Code',monospace;font-weight:600">18.0</b> · P/B <b style="font-family:'Fira Code',monospace;font-weight:600">3.06</b></div>
+      </div>
+      <div style="background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:10px;padding:14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Mức rủi ro · kịch bản xấu</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px"><span style="font-size:34px;font-weight:700;line-height:1;color:#ff5d73;font-family:'Fira Code',monospace">−8%</span><span style="font-size:13px;color:#a3b3d3">cắt lỗ tại <b style="font-family:'Fira Code',monospace;color:#eef3ff;font-weight:600">65,69</b></span></div>
+        <div style="font-size:12.5px;color:#d4ddf2;margin-top:6px">≈ <b style="font-family:'Fira Code',monospace;font-weight:600">1,6%</b> tổng tài khoản nếu dồn tối đa 20%</div>
+      </div>
+      <div style="background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:10px;padding:14px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#a3b3d3">Giá đóng cửa</div>
+        <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px"><span style="font-size:34px;font-weight:700;line-height:1;color:#eef3ff;font-family:'Fira Code',monospace">71,40</span><span style="font-size:13px;color:#a3b3d3">nghìn đ/cp</span></div>
+        <div style="font-size:12.5px;color:#d4ddf2;margin-top:6px">Tầm nhìn hợp nhất: <b style="font-weight:600">Trung hạn</b> <span style="font-family:'Fira Code',monospace;color:#2ee6a6;font-weight:600">80</span><span style="font-family:'Fira Code',monospace;color:#a3b3d3">/100</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px 16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:14px;font-size:13px;color:#a3b3d3">
+      <span>Chi tiết 14 tiêu chí, biểu đồ giá và kịch bản xấu nhất ở phần dưới.</span>
+      <a href="#" style="display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:10px;text-decoration:none;color:#5ac8ff;font-weight:600;border:1px solid rgba(90,200,255,.45)" style-hover="background:rgba(90,200,255,.12)" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Mở phân tích đầy đủ FPT →</a>
+    </div>
+  </div>
+</section>
+
+<!-- DETAIL: demo card + how -->
+<section data-screen-label="Chi tiết FPT & cách chấm" style="max-width:1320px;margin:0 auto;padding:48px 26px 0">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;align-items:start">
+
+    <div style="min-width:0;background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(120,140,190,.2)">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Màn phân tích thu gọn · FPT</span>
+        <span style="font-size:12px;color:#a3b3d3;font-family:'Fira Code',monospace;white-space:nowrap">24/08/2026</span>
+      </div>
+      <div style="padding:16px">
+        <div style="display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:1px solid rgba(120,140,190,.2)">
+          <div style="position:relative;width:110px;height:110px;flex:none" role="img" aria-label="Điểm 81 trên 100">
+            <svg viewBox="0 0 120 120" style="width:100%;height:100%;display:block">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(30,42,70,.9)" stroke-width="11"></circle>
+              <circle cx="60" cy="60" r="52" fill="none" stroke="#2ee6a6" stroke-width="11" stroke-linecap="round" transform="rotate(-90 60 60)" stroke-dasharray="326.73" stroke-dashoffset="{{ dashoffset }}"></circle>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <span style="font-size:34px;font-weight:700;line-height:1;color:#2ee6a6;font-family:'Fira Code',monospace">{{ shownScore }}</span>
+              <span style="font-size:11px;color:#a3b3d3;font-family:'Fira Code',monospace">/100</span>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+              <button type="button" onClick="{{ g.pick }}" style="display:grid;grid-template-columns:1fr auto;gap:3px 10px;align-items:center;background:none;border:none;padding:2px 0;min-height:auto;cursor:pointer;text-align:left;font-family:'Fira Sans',sans-serif;color:#eef3ff;opacity:{{ g.opacity }};transition:opacity .2s;border-radius:6px" style-hover="opacity:1" style-focus="outline:2px solid #5ac8ff;outline-offset:2px;opacity:1">
+                <span style="font-size:12px;color:#a3b3d3">{{ g.name }}</span>
+                <span style="font-size:12px;font-weight:700;font-family:'Fira Code',monospace;color:{{ g.color }}">{{ g.sum }}<span style="color:#a3b3d3;font-weight:500">/{{ g.max }}</span></span>
+                <span style="grid-column:1/-1;display:block;height:5px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:{{ g.color }};width:{{ g.pct }}"></span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:4px;margin-top:14px" role="group" aria-label="Khung thời gian biểu đồ">
+          <sc-for list="{{ ranges }}" as="r" hint-placeholder-count="4">
+            <button type="button" onClick="{{ r.pick }}" aria-pressed="{{ r.on }}" style="flex:1;min-height:36px;border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.color }};border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Fira Sans',sans-serif" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">{{ r.label }}</button>
+          </sc-for>
+        </div>
+        <svg viewBox="0 0 600 140" preserveAspectRatio="none" style="display:block;width:100%;height:120px;margin-top:8px" role="img" aria-label="Diễn biến giá FPT">
+          <defs><linearGradient id="hg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#5ac8ff" stop-opacity=".22"></stop><stop offset="100%" stop-color="#5ac8ff" stop-opacity="0"></stop></linearGradient></defs>
+          <line x1="10" y1="126" x2="590" y2="126" stroke="rgba(120,140,190,.2)" vector-effect="non-scaling-stroke"></line>
+          <path d="{{ sparkArea }}" fill="url(#hg2)"></path>
+          <path d="{{ sparkPath }}" fill="none" stroke="#5ac8ff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></path>
+          <line x1="{{ lastX }}" y1="{{ lastY }}" x2="{{ lastX }}" y2="{{ lastY }}" stroke="#111a2e" stroke-width="12" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>
+          <line x1="{{ lastX }}" y1="{{ lastY }}" x2="{{ lastX }}" y2="{{ lastY }}" stroke="#5ac8ff" stroke-width="8" stroke-linecap="round" vector-effect="non-scaling-stroke"></line>
+        </svg>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:#a3b3d3;margin-top:6px">
+          <span>Thấp nhất <b style="color:#eef3ff;font-family:'Fira Code',monospace;font-weight:600">{{ rangeLow }}</b></span>
+          <span>Cao nhất <b style="color:#eef3ff;font-family:'Fira Code',monospace;font-weight:600">{{ rangeHigh }}</b></span>
+          <span>{{ rangeLabel }}: <b style="color:{{ rangeChgColor }};font-family:'Fira Code',monospace;font-weight:600">{{ rangeChg }}</b></span>
+          <span style="margin-left:auto;font-family:'Fira Code',monospace">{{ rangeSessions }} phiên</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:8px;margin-top:14px">
+          <sc-for list="{{ horizons }}" as="h" hint-placeholder-count="3">
+            <div style="background:#0c1324;border:1px solid {{ h.border }};border-radius:10px;padding:10px">
+              <div style="display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:#a3b3d3"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ h.labelColor }};font-weight:{{ h.weight }}">{{ h.star }}{{ h.label }}</span><span style="font-family:'Fira Code',monospace;color:#2ee6a6;font-weight:700">{{ h.value }}<span style="color:#a3b3d3;font-weight:500">/100</span></span></div>
+              <span style="display:block;height:6px;margin:7px 0 5px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;background:#2ee6a6;width:{{ h.pct }}"></span></span>
+              <span style="font-size:11.5px;font-weight:600;color:#2ee6a6">Phù hợp cao</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="margin-top:12px;padding:12px 14px;border:1px solid rgba(255,93,115,.35);border-left:4px solid #ff5d73;border-radius:10px;background:rgba(255,93,115,.06)">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <span style="font-size:11.5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:#ff7a8c">Kịch bản xấu nhất</span>
+            <span style="display:flex;gap:16px;white-space:nowrap">
+              <span style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:10.5px;color:#a3b3d3">Chạm cắt lỗ tại</span><span style="font-size:14px;font-weight:700;color:#ff7a8c;font-family:'Fira Code',monospace">65,69</span></span>
+              <span style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:10.5px;color:#a3b3d3">Thiệt hại</span><span style="font-size:14px;font-weight:700;color:#ff7a8c;white-space:nowrap">≈ <span style="font-family:'Fira Code',monospace">1,6%</span> tài khoản</span></span>
+            </span>
+          </div>
+          <p style="margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#d4ddf2">Bạn mua ở giá 71,4, giá quay đầu và chạm cắt lỗ 8% tại 65,69 nghìn đ/cp. Nếu đã dồn mức tối đa 20% tài khoản, bạn mất khoảng 1,6% tổng tài khoản trong lần này.</p>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+          <a href="#" style="flex:1;min-width:180px;display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-decoration:none;background:#5ac8ff;color:#04121f;border-radius:10px;padding:0 16px;font-size:14px;font-weight:700" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Mở phân tích đầy đủ FPT →</a>
+          <a href="#" title="Đăng nhập để lưu mã theo dõi" style="display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;text-decoration:none;border:1px solid rgba(120,140,190,.2);background:#0c1324;color:#eef3ff;border-radius:10px;padding:0 14px;font-size:13.5px;font-weight:600;white-space:nowrap" style-hover="border-color:#5ac8ff;color:#5ac8ff" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">☆ Theo dõi FPT <span style="font-size:12px;color:#a3b3d3;font-weight:400">· cần đăng nhập</span></a>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:20px">
+        <h3 style="margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Điểm 81 của FPT đến từ đâu?</h3>
+        <p style="margin:0 0 16px;font-size:14.5px;color:#d4ddf2;line-height:1.55;text-wrap:pretty">100 điểm chia cho 4 nhóm theo trọng số cố định — mọi mã đều được đo bằng cùng một thước. Chạm vào từng nhóm để xem tiêu chí bên trong.</p>
+        <div style="display:flex;gap:3px;height:40px;border-radius:9px;overflow:hidden" role="tablist">
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+            <button type="button" role="tab" aria-selected="{{ g.on }}" onClick="{{ g.pick }}" title="{{ g.name }}" style="flex:{{ g.max }};border:none;cursor:pointer;background:{{ g.segBg }};color:{{ g.segFg }};font-family:'Fira Code',monospace;font-size:13px;font-weight:700;transition:background .2s;min-width:0" style-hover="filter:brightness(1.15)" style-focus="outline:2px solid #eef3ff;outline-offset:-3px">{{ g.max }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:10px;margin:12px 0 14px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;color:#5ac8ff;text-transform:uppercase;letter-spacing:.4px">{{ activeName }}</span>
+          <span style="font-size:13px;color:#a3b3d3">FPT đạt <b style="color:#eef3ff;font-family:'Fira Code',monospace">{{ activeSum }}</b><span style="font-family:'Fira Code',monospace">/{{ activeMax }}</span></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ activeItems }}" as="it" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:minmax(100px,1.1fr) minmax(90px,1fr) minmax(60px,2fr) auto;gap:10px;align-items:center;font-size:13px">
+              <span style="color:#a3b3d3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ it.label }}</span>
+              <span style="color:{{ it.color }};font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Fira Code',monospace;font-size:12px">{{ it.raw }}</span>
+              <span style="display:block;height:7px;border-radius:4px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;border-radius:4px;background:{{ it.color }};width:{{ it.pct }}"></span></span>
+              <span style="font-family:'Fira Code',monospace;font-weight:700;color:{{ it.color }}">{{ it.points }}<span style="color:#a3b3d3;font-weight:500">/{{ it.max }}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="margin:16px 0 0;font-size:12.5px;color:#a3b3d3;line-height:1.55">{{ activeNote }}</p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid rgba(120,140,190,.2);font-size:12.5px;color:#a3b3d3;font-family:'Fira Code',monospace">
+          <span><b style="color:#2ee6a6">≥80</b> xuất sắc</span><span><b style="color:#2ee6a6">65–79</b> tốt</span><span><b style="color:#ffc24b">50–64</b> trung bình</span><span><b style="color:#ff7a8c">&lt;50</b> yếu</span>
+        </div>
+      </div>
+
+      <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:6px 20px">
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:14px 0;border-bottom:1px solid rgba(120,140,190,.2)">
+          <span style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(255,93,115,.14);color:#ff7a8c;font-family:'Fira Code',monospace;font-weight:700;font-size:13px">−8%</span>
+          <div><h4 style="margin:0 0 3px;font-size:15px;font-weight:600">Kịch bản xấu nhất bằng con số</h4><p style="margin:0;color:#a3b3d3;font-size:13.5px;line-height:1.55">Mỗi mã có giá cắt lỗ cụ thể và thiệt hại ước tính trên tổng tài khoản. Rủi ro liệt kê là các tiêu chí đang bị 0 điểm của chính mã đó.</p></div>
+        </div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:14px 0;border-bottom:1px solid rgba(120,140,190,.2)">
+          <span style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(30,42,70,.7);border:1px solid rgba(120,140,190,.2);color:#a3b3d3;font-family:'Fira Code',monospace;font-weight:700;font-size:12px">N/A</span>
+          <div><h4 style="margin:0 0 3px;font-size:15px;font-weight:600">Thiếu số liệu thì 0 điểm, không bịa</h4><p style="margin:0;color:#a3b3d3;font-size:13.5px;line-height:1.55">Chỉ số không lấy được sẽ hiện N/A và kéo điểm xuống. Công cụ nói rõ điểm thấp là do thiếu dữ liệu.</p></div>
+        </div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;padding:14px 0">
+          <span style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(168,130,255,.14);color:#c3a8ff;font-family:'Fira Code',monospace;font-weight:700;font-size:13px">≠</span>
+          <div><h4 style="margin:0 0 3px;font-size:15px;font-weight:600">Sổ mua nhiều đợt cố ý bất đối xứng</h4><p style="margin:0;color:#a3b3d3;font-size:13.5px;line-height:1.55">Thủng cắt lỗ là cắt lỗ, bất kể điểm bao nhiêu. Khi đang lỗ, "bình quân giá xuống" luôn kèm cảnh báo: tiền chịu rủi ro tăng lên.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MARKET -->
+<section data-screen-label="Thị trường" style="max-width:1320px;margin:0 auto;padding:48px 26px 0">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+    <div>
+      <h2 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-.3px">{{ marketTitle }}</h2>
+      <p style="margin:4px 0 0;font-size:13.5px;color:#a3b3d3">{{ marketSub }}</p>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap" role="group" aria-label="Rổ chỉ số">
+      <sc-for list="{{ baskets }}" as="b" hint-placeholder-count="4">
+        <button type="button" onClick="{{ b.pick }}" aria-pressed="{{ b.on }}" style="min-height:40px;border:1px solid {{ b.border }};background:{{ b.bg }};color:{{ b.color }};border-radius:20px;padding:0 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Fira Sans',sans-serif" style-hover="border-color:#5ac8ff" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">{{ b.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ inSession }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:16px 20px;margin-bottom:16px">
+      <h3 style="margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Độ rộng thị trường · {{ basket }}</h3>
+      <div style="display:flex;height:10px;border-radius:6px;overflow:hidden;gap:2px"><span style="display:block;background:#2ee6a6;width:60%"></span><span style="display:block;background:#8090b4;width:10%"></span><span style="display:block;background:#ff5d73;width:30%"></span></div>
+      <div style="display:flex;gap:16px;font-size:13px;margin-top:8px;font-family:'Fira Code',monospace"><span style="color:#2ee6a6">▲ 18 tăng</span><span style="color:#a3b3d3">■ 3</span><span style="color:#ff7a8c">▼ 9 giảm</span></div>
+    </div>
+  </sc-if>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px">
+    <sc-for list="{{ moverCols }}" as="col" hint-placeholder-count="3">
+      <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:16px 18px">
+        <h3 style="margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">{{ col.title }}</h3>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ col.items }}" as="m" hint-placeholder-count="5">
+            <a href="#" style="display:grid;grid-template-columns:58px 1fr auto;gap:10px;align-items:center;min-height:44px;padding:6px 6px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+              <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ m.symbol }}</span>
+              <span style="color:#a3b3d3;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.name }}</span>
+              <span style="display:flex;flex-direction:column;align-items:flex-end;white-space:nowrap;font-family:'Fira Code',monospace"><span style="font-size:13px">{{ m.price }}</span><span style="font-size:12px;color:{{ m.color }}">{{ m.chg }}</span></span>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<!-- UPCOMING + NEWS + LEADERBOARD -->
+<section data-screen-label="Sắp tới & điểm" style="max-width:1320px;margin:0 auto;padding:16px 26px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px">
+  <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:16px 18px">
+    <h3 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Lịch sự kiện sắp tới · cổ tức &amp; ĐHCĐ</h3>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ events }}" as="e" hint-placeholder-count="4">
+        <a href="#" style="display:grid;grid-template-columns:auto 58px 1fr;gap:12px;align-items:center;min-height:44px;padding:8px 6px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="display:flex;flex-direction:column;align-items:center;min-width:42px;background:#0c1324;border:1px solid rgba(120,140,190,.2);border-radius:8px;padding:4px 6px;font-family:'Fira Code',monospace;line-height:1.15"><span style="font-size:15px;font-weight:700">{{ e.day }}</span><span style="font-size:10px;color:#a3b3d3">{{ e.mon }}</span></span>
+          <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ e.symbol }}</span>
+          <span style="font-size:13px;line-height:1.45"><span style="color:{{ e.color }};font-weight:600">{{ e.kind }}</span> <span style="color:#a3b3d3">· {{ e.text }}</span></span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+  <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:16px 18px">
+    <h3 style="margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Tin công bố mới · VN30</h3>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ news }}" as="n" hint-placeholder-count="4">
+        <a href="#" style="display:grid;grid-template-columns:58px 1fr;gap:10px;align-items:start;min-height:44px;padding:8px 6px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ n.symbol }}</span>
+          <span style="min-width:0"><span style="display:block;font-size:13px;line-height:1.45">{{ n.title }}</span><span style="display:block;font-size:11.5px;color:#8090b4;margin-top:2px"><span style="font-family:'Fira Code',monospace">{{ n.date }}</span> · tìm trên CafeF ↗</span></span>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+  <div style="background:#111a2e;border:1px solid rgba(120,140,190,.2);border-radius:14px;padding:16px 18px">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap"><h3 style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#a3b3d3">Điểm cao nhất VN30</h3><span style="font-size:11.5px;color:#8090b4">chấm lại sau mỗi phiên</span></div>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ leaders }}" as="l" hint-placeholder-count="5">
+        <a href="#" style="display:grid;grid-template-columns:58px 1fr auto;gap:10px;align-items:center;min-height:44px;padding:8px 6px;border-bottom:1px solid rgba(120,140,190,.14);text-decoration:none;color:#eef3ff;border-radius:8px" style-hover="background:rgba(30,42,70,.7)" style-focus="outline:2px solid #5ac8ff;outline-offset:-2px">
+          <span style="font-weight:700;color:#5ac8ff;font-family:'Fira Code',monospace">{{ l.symbol }}</span>
+          <span style="display:block;height:6px;border-radius:3px;background:rgba(120,140,190,.2);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:{{ l.color }};width:{{ l.pct }}"></span></span>
+          <span style="font-family:'Fira Code',monospace;font-weight:700;color:{{ l.color }}">{{ l.score }}<span style="color:#a3b3d3;font-weight:500;font-size:11px">/100</span></span>
+        </a>
+      </sc-for>
+    </div>
+    <a href="#" style="display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:12px;text-decoration:none;border:1px solid rgba(120,140,190,.2);background:#0c1324;color:#eef3ff;border-radius:10px;padding:0 16px;font-size:13.5px;font-weight:600" style-hover="border-color:#5ac8ff;color:#5ac8ff" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">Xem cả bảng VN30 →</a>
+  </div>
+</section>
+
+<!-- CLOSING CTA -->
+<section data-screen-label="CTA cuối" style="max-width:1320px;margin:0 auto;padding:48px 26px 0">
+  <div style="background:#111a2e;border:1px solid rgba(90,200,255,.3);border-radius:14px;padding:28px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px;align-items:center">
+    <div>
+      <h2 style="margin:0 0 6px;font-size:clamp(20px,2.4vw,28px);font-weight:700;letter-spacing:-.4px;line-height:1.2">Mã bạn đang cầm được mấy điểm?</h2>
+      <p style="margin:0;color:#a3b3d3;font-size:14px;line-height:1.55">Khoảng 20 giây. Đăng nhập chỉ cần khi muốn lưu mã theo dõi và hỏi trợ lý.</p>
+    </div>
+    <form onSubmit="{{ onSubmit }}" style="display:flex;align-items:center;gap:8px;background:#0c1324;border:1px solid rgba(120,140,190,.3);border-radius:14px;padding:6px 6px 6px 14px;color:#a3b3d3">
+      <input value="{{ ticker }}" onChange="{{ onType }}" disabled="{{ isLoading }}" placeholder="VD: HPG" maxlength="12" spellcheck="false" autocapitalize="characters" aria-label="Mã cổ phiếu" style="flex:1;min-height:44px;background:none;border:none;outline:none;color:#eef3ff;font-size:17px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;font-family:'Fira Code',monospace;min-width:0">
+      <button type="submit" disabled="{{ isLoading }}" style="background:#5ac8ff;color:#04121f;border:none;border-radius:10px;padding:0 18px;min-height:44px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:'Fira Sans',sans-serif;white-space:nowrap" style-hover="background:#7dd5ff" style-focus="outline:2px solid #eef3ff;outline-offset:2px">Chấm điểm →</button>
+    </form>
+  </div>
+</section>
+
+<footer style="max-width:1320px;margin:34px auto 0;padding:16px 26px 96px;color:#a3b3d3;font-size:12.5px;line-height:1.6;text-align:center;border-top:1px solid rgba(120,140,190,.2)">
+  Số liệu <b style="color:#eef3ff">thu thập tự động từ nguồn công khai</b> (CafeF, vnstock…) nên có thể chậm hoặc sai lệch — hãy đối chiếu báo cáo tài chính gốc. Đây là <b style="color:#eef3ff">công cụ hỗ trợ tư duy</b>, <b style="color:#eef3ff">không phải khuyến nghị đầu tư</b>.
+</footer>
+
+<button type="button" aria-label="Mở trợ lý" style="position:fixed;right:16px;bottom:16px;width:46px;height:46px;border-radius:50%;border:1px solid rgba(140,165,220,.35);background:#111a2e;color:#5ac8ff;display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 20px -10px rgba(0,0,0,.8);z-index:40" style-hover="border-color:#5ac8ff;background:#16223c" style-focus="outline:2px solid #5ac8ff;outline-offset:2px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg>
+</button>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;session&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Ngoài phiên&quot;,&quot;Trong phiên&quot;],&quot;default&quot;:&quot;Ngoài phiên&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Trạng thái&quot;},&quot;mobilePreview&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Trạng thái&quot;},&quot;mobileMenuOpen&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Review&quot;},&quot;showTape&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Bố cục&quot;},&quot;showNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Review&quot;}}">
+class Component extends DCLogic {
+  state = { shown: 0, activeGroup: 0, range: '1Q', ticker: '', basket: 'VN30', status: 'idle', step: 0, readyTicker: '', errorText: '', isMobile: false, menuOpen: false, detailOpen: false, ruleOpen: -1, moverTab: 0, infoTab: 0, chatVisible: false };
+  RULES = [
+    ['−8%', 'rgba(255,93,115,.14)', '#ff7a8c', 'Kịch bản xấu nhất bằng con số', 'Mỗi mã có giá cắt lỗ cụ thể và thiệt hại ước tính trên tổng tài khoản. Rủi ro liệt kê là các tiêu chí đang bị 0 điểm của chính mã đó.'],
+    ['N/A', 'rgba(30,42,70,.9)', '#a3b3d3', 'Thiếu số liệu thì 0 điểm, không bịa', 'Chỉ số không lấy được sẽ hiện N/A và kéo điểm xuống. Công cụ nói rõ điểm thấp là do thiếu dữ liệu.'],
+    ['≠', 'rgba(168,130,255,.14)', '#c3a8ff', 'Sổ mua nhiều đợt cố ý bất đối xứng', 'Thủng cắt lỗ là cắt lỗ, bất kể điểm bao nhiêu. Khi đang lỗ, "bình quân giá xuống" luôn kèm cảnh báo: tiền chịu rủi ro tăng lên.']
+  ];
+  MENU = ['Trang chủ', 'Danh mục', 'Phân tích', 'Danh sách mã', 'Theo dõi', 'Trợ lý'];
+  frameRef = React.createRef();
+  G = '#2ee6a6'; W = '#ffc24b'; B = '#ff7a8c'; M = '#a3b3d3';
+  KNOWN = ['FPT', 'VCB', 'HPG', 'MWG', 'VNM', 'MBB', 'VIC', 'VHM', 'BID', 'CTG', 'TCB', 'SSI', 'GAS', 'ACB', 'VPB', 'STB', 'MSN', 'SAB', 'PLX', 'POW', 'GVR', 'BCM', 'VRE', 'HDB', 'TPB', 'VJC', 'SHB', 'SSB', 'VIB', 'BVH'];
+  STEPS = [['Lấy giá và chỉ báo kỹ thuật', 10], ['Đọc hồ sơ doanh nghiệp', 45], ['Lấy báo cáo tài chính', 55], ['Chấm điểm 14 tiêu chí', 90]];
+
+  GROUPS = [
+    { name: 'Nền tảng & tài chính', sum: 39, max: 45, note: 'Nhóm nặng nhất (45 điểm): doanh nghiệp có kiếm ra tiền thật và có nợ nhiều không. FPT mất điểm duy nhất ở tăng trưởng lợi nhuận 19,1% — tốt nhưng chưa tới mốc điểm tối đa.',
+      items: [['Tăng trưởng LN', '19.1% YoY', 6, 12, 'W'], ['ROE', '28.3%', 10, 10, 'G'], ['Biên lợi nhuận', '16.0%', 8, 8, 'G'], ['Nợ vay D/E', '0.48', 8, 8, 'G'], ['Dòng tiền KD', 'Dương bền', 7, 7, 'G']] },
+    { name: 'Định giá', sum: 18, max: 20, note: 'Giá đang trả có đắt so với ngành không. P/E ngành là ước lượng theo bảng benchmark — ngân hàng nên dùng P/E ngành 9.',
+      items: [['P/E vs ngành', '12.2 / ngành 18.0', 10, 10, 'G'], ['P/B', '3.06 / hợp lý 3.5', 5, 5, 'G'], ['Cổ tức', '2.8%', 3, 5, 'W']] },
+    { name: 'Kỹ thuật & xu hướng', sum: 16, max: 20, note: 'Luôn đo trên cửa sổ 180 ngày cố định để mọi mã cùng một thước. Biểu đồ nhiều khung chỉ để xem, không đổi điểm.',
+      items: [['Xu hướng giá', 'Đi ngang', 4, 8, 'W'], ['Thanh khoản', '5.99 tr cp/phiên', 6, 6, 'G'], ['Động lượng RSI', 'RSI 58', 6, 6, 'G']] },
+    { name: 'Định tính & vĩ mô', sum: 8, max: 15, note: 'Ba tiêu chí này máy không crawl được — mặc định "trung bình", bạn tự chỉnh khi mở phân tích đầy đủ. 15 điểm này là phần bạn góp ý kiến của mình.',
+      items: [['Vị thế ngành', 'Trung bình', 3, 6, 'W'], ['Ban lãnh đạo & cổ đông', 'Ổn', 3, 5, 'W'], ['Catalyst', 'Tiềm năng', 2, 4, 'W']] }
+  ];
+  HORIZONS = [['Ngắn hạn (ngày–tuần)', 76, false], ['Trung hạn (tháng–1 năm)', 80, true], ['Dài hạn (nhiều năm)', 79, false]];
+  RANGES = { '1T': { label: '1 tháng', n: 22, lo: 68.1, hi: 76.5, chg: '-1.52%' }, '1Q': { label: 'Một quý', n: 66, lo: 62.2, hi: 76.5, chg: '-1.52%' }, '1N': { label: '1 năm', n: 248, lo: 58.4, hi: 81.9, chg: '+9.8%' }, '3N': { label: '3 năm', n: 744, lo: 31.2, hi: 81.9, chg: '+118%' } };
+  TAPE = [['VIC', '214,50', '+1,80%'], ['VCB', '59,20', '+0,34%'], ['VHM', '73,40', '-0,80%'], ['BID', '36,90', '-0,95%'], ['CTG', '31,80', '-0,60%'], ['TCB', '31,45', '+1,20%'], ['FPT', '71,40', '+0,42%'], ['HPG', '27,85', '+2,45%'], ['MWG', '61,20', '+3,10%']];
+  MOVERS = {
+    gainers: [['MWG', 'Đầu tư Thế giới Di động', '61,20', '+3,10%'], ['HPG', 'Tập đoàn Hòa Phát', '27,85', '+2,45%'], ['SSI', 'Chứng khoán SSI', '34,70', '+2,10%'], ['VIC', 'Tập đoàn Vingroup', '214,50', '+1,80%'], ['TCB', 'Ngân hàng Kỹ thương', '31,45', '+1,20%']],
+    losers: [['GAS', 'PV Gas', '78,60', '-1,60%'], ['VNM', 'Sữa Việt Nam', '68,00', '-1,25%'], ['BID', 'Ngân hàng Đầu tư & Phát triển', '36,90', '-0,95%'], ['VHM', 'Vinhomes', '73,40', '-0,80%'], ['CTG', 'Ngân hàng Công thương', '31,80', '-0,60%']],
+    active: [['VIC', 'Tập đoàn Vingroup', '214,50', '1.240 tỷ'], ['VCB', 'Ngân hàng Ngoại thương', '59,20', '860 tỷ'], ['HPG', 'Tập đoàn Hòa Phát', '27,85', '812 tỷ'], ['FPT', 'Công ty Cổ phần FPT', '71,40', '655 tỷ'], ['SSI', 'Chứng khoán SSI', '34,70', '598 tỷ']]
+  };
+  EVENTS = [['10', 'Th9', 'VNM', 'Cổ tức tiền', 'tạm ứng 15% (1.500 đ/cp)', 'G'], ['12', 'Th9', 'FPT', 'GDKHQ', 'cổ tức đợt 1/2026 bằng tiền 10%', 'G'], ['15', 'Th9', 'HPG', 'ĐHCĐ bất thường', 'phương án phát hành thêm', 'W'], ['18', 'Th9', 'MWG', 'Cổ tức tiền', '5% (500 đ/cp)', 'G']];
+  NEWS = [['FPT', 'Công bố kết quả kinh doanh 8 tháng: doanh thu +20%, LNTT +19%', '04/09'], ['VCB', 'Nghị quyết HĐQT về phương án tăng vốn điều lệ', '04/09'], ['HPG', 'Báo cáo tình hình quản trị công ty bán niên 2026', '03/09'], ['MWG', 'Giao dịch cổ phiếu của người nội bộ — Thành viên HĐQT', '02/09']];
+  LEADERS = [['FPT', 81], ['VCB', 78], ['MWG', 74], ['HPG', 69], ['TCB', 67]];
+
+  series(n, lo, hi, last) {
+    let s = 7 + n, r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const pts = []; let v = lo + (hi - lo) * 0.55;
+    for (let i = 0; i < n; i++) { v += (r() - 0.5) * (hi - lo) * 0.14 + (last - v) * 0.02; v = Math.max(lo, Math.min(hi, v)); pts.push(v); }
+    pts[Math.floor(n * 0.62)] = lo; pts[Math.floor(n * 0.25)] = hi; pts[n - 1] = last;
+    return pts;
+  }
+  paths(pts) {
+    const W = 600, H = 140, px = 10, py = 14, min = Math.min(...pts), max = Math.max(...pts), span = max - min || 1;
+    const P = pts.map((v, i) => [px + (W - 2 * px) * i / (pts.length - 1), py + (H - 2 * py) * (1 - (v - min) / span)]);
+    const line = P.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+    const l = P[P.length - 1];
+    return { line, area: `${line} L${l[0].toFixed(1)} ${H - py} L${P[0][0].toFixed(1)} ${H - py} Z`, lastX: l[0].toFixed(1), lastY: l[1].toFixed(1) };
+  }
+  componentDidMount() {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) { this.setState({ shown: 81 }); }
+    else {
+      const t0 = performance.now(), dur = 1200, step = (t) => { const p = Math.min(1, (t - t0) / dur); this.setState({ shown: 81 * (1 - Math.pow(1 - p, 3)) }); if (p < 1) this.raf = requestAnimationFrame(step); };
+      this.raf = requestAnimationFrame(step);
+    }
+    this.applyFrame();
+    this.onScroll = () => { const v = window.scrollY > 380; if (v !== this.state.chatVisible) this.setState({ chatVisible: v }); };
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+  }
+  componentDidUpdate() { this.applyFrame(); }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); this.timers?.forEach(clearTimeout); this.ro?.disconnect(); window.removeEventListener('scroll', this.onScroll); }
+  applyFrame() {
+    const el = this.frameRef.current; if (!el) return;
+    el.style.maxWidth = this.props.mobilePreview ? '390px' : 'none';
+    if (!this.ro) { this.ro = new ResizeObserver(() => this.layoutHeader()); this.ro.observe(el); }
+    this.layoutHeader();
+  }
+  layoutHeader() {
+    const f = this.frameRef.current; if (!f) return;
+    const m = f.clientWidth < 700;
+    if (m !== this.state.isMobile) this.setState({ isMobile: m, menuOpen: false });
+  }
+  lv(k) { return k === 'G' ? this.G : k === 'W' ? this.W : this.B; }
+
+  submit(e) {
+    e.preventDefault();
+    const code = this.state.ticker.trim().toUpperCase();
+    if (!code || this.state.status === 'loading') return;
+    this.timers?.forEach(clearTimeout); this.timers = [];
+    this.setState({ status: 'loading', step: 0, ticker: code });
+    this.STEPS.forEach((_, i) => { if (i) this.timers.push(setTimeout(() => this.setState({ step: i }), i * 650)); });
+    this.timers.push(setTimeout(() => {
+      if (this.KNOWN.includes(code)) this.setState({ status: 'ready', readyTicker: code });
+      else this.setState({ status: 'error', errorText: `Không tìm thấy mã "${code}" trên HOSE/HNX. Kiểm tra lại chính tả, hoặc chọn một mã gợi ý bên dưới.` });
+    }, this.STEPS.length * 650 + 300));
+  }
+
+  renderVals() {
+    const { shown, activeGroup, range, ticker, basket, status, step, isMobile, detailOpen, ruleOpen, moverTab, infoTab, chatVisible } = this.state;
+    const inSession = (this.props.session ?? 'Ngoài phiên') === 'Trong phiên';
+    const ag = this.GROUPS[activeGroup], rg = this.RANGES[range], sp = this.paths(this.series(rg.n, rg.lo, rg.hi, 71.4));
+    const fmt = (n) => n.toFixed(2).replace('.', ',');
+    const isLoading = status === 'loading', isError = status === 'error', isReady = status === 'ready';
+    const mono = "'Fira Code',monospace";
+    const tapeItems = [...this.TAPE, ...this.TAPE].map(([s, p, c], i) => React.createElement('span', { key: i, style: { display: 'inline-flex', gap: 7, alignItems: 'baseline', fontFamily: mono } },
+      React.createElement('b', { style: { color: '#eef3ff', fontWeight: 600 } }, s), React.createElement('span', { style: { color: '#d4ddf2' } }, p),
+      React.createElement('span', { style: { color: c.startsWith('-') ? this.B : this.G } }, c)));
+    const tapeEl = React.createElement('div', { style: { display: 'inline-flex', gap: 30, padding: '8px 0', whiteSpace: 'nowrap', animation: 'tape 45s linear infinite', fontSize: 13 } }, tapeItems);
+    const mk = (arr, isChg) => arr.map(([symbol, name, price, x]) => ({ symbol, name, price, chg: x, color: isChg ? (x.startsWith('-') ? this.B : this.G) : this.M }));
+    const menuOpen = this.state.menuOpen || !!this.props.mobileMenuOpen;
+    const moverKeys = ['gainers', 'losers', 'active'], moverLabels = ['Tăng mạnh', 'Giảm sâu', 'Sôi động'], infoLabels = ['Sự kiện', 'Tin công bố', 'Điểm VN30'];
+    const tab = (labels, cur, key) => labels.map((label, i) => ({ label, on: i === cur, pick: () => this.setState({ [key]: i }), bg: i === cur ? '#5ac8ff' : 'transparent', color: i === cur ? '#04121f' : '#a3b3d3', weight: i === cur ? 700 : 500 }));
+    return {
+      isMobile, isDesktop: !isMobile, menuOpen, menuClosed: !menuOpen, chatVisible,
+      menuLabel: menuOpen ? 'Đóng menu' : 'Mở menu',
+      toggleMenu: () => this.setState({ menuOpen: !menuOpen }), closeMenu: () => this.setState({ menuOpen: false }),
+      menuLinks: this.MENU.map((label, i) => ({ label, current: i === 0 ? 'page' : undefined, mark: i === 0 ? 'Đang xem' : '', weight: i === 0 ? 700 : 500, color: '#eef3ff', bg: i === 0 ? 'rgba(90,200,255,.12)' : 'transparent', border: i === 0 ? 'rgba(90,200,255,.45)' : 'transparent' })),
+      tapeItems: this.TAPE.map(([s, p, c]) => ({ s, p, c, color: c.startsWith('-') ? this.B : this.G })),
+      btnLabelShort: isLoading ? 'Đang chấm…' : 'Chấm điểm',
+      detailOpen, toggleDetail: () => this.setState({ detailOpen: !detailOpen }), detailLabel: detailOpen ? 'Thu gọn chi tiết' : 'Xem chi tiết 14 tiêu chí & biểu đồ', detailChevron: detailOpen ? '▴' : '▾',
+      rules: this.RULES.map(([icon, iconBg, iconColor, title, body], i) => ({ icon, iconBg, iconColor, title, body, open: ruleOpen === i, chevron: ruleOpen === i ? '▴' : '▾', toggle: () => this.setState({ ruleOpen: ruleOpen === i ? -1 : i }) })),
+      moverTabs: tab(moverLabels, moverTab, 'moverTab'), moverTabLabel: moverLabels[moverTab].toLowerCase(),
+      moverItems: mk(this.MOVERS[moverKeys[moverTab]], moverTab !== 2).slice(0, 3),
+      infoTabs: tab(infoLabels, infoTab, 'infoTab'), infoIsEvents: infoTab === 0, infoIsNews: infoTab === 1, infoIsLeaders: infoTab === 2,
+      eventsTop: this.EVENTS.slice(0, 3).map(([day, mon, symbol, kind, text, k]) => ({ day, mon, symbol, kind, text, color: this.lv(k) })),
+      newsTop: this.NEWS.slice(0, 3).map(([symbol, title, date]) => ({ symbol, title, date })),
+      leadersTop: this.LEADERS.slice(0, 3).map(([symbol, score]) => ({ symbol, score, pct: `${score}%`, color: score >= 65 ? this.G : this.W })),
+      marketTitleMobile: inSession ? `Thị trường lúc này · ${basket}` : `Phiên 05/09 · ${basket}`,
+      showNotes: this.props.showNotes ?? false, showTape: this.props.showTape ?? true, inSession, basket,
+      frameRef: this.frameRef, tapeEl, ticker,
+      isLoading, isError, isReady, readyTicker: this.state.readyTicker, errorText: this.state.errorText,
+      stepText: this.STEPS[step][0], pct: this.STEPS[step][1], pctW: `${this.STEPS[step][1]}%`,
+      btnLabel: isLoading ? 'Đang chấm…' : 'Chấm điểm →', btnOpacity: isLoading ? 0.7 : 1,
+      formBorder: isError ? 'rgba(255,93,115,.6)' : isLoading ? '#5ac8ff' : 'rgba(140,165,220,.35)',
+      onType: (e) => this.setState({ ticker: e.target.value.toUpperCase(), status: status === 'error' ? 'idle' : status }),
+      onSubmit: (e) => this.submit(e),
+      reset: () => this.setState({ status: 'idle', ticker: '' }),
+      examples: ['FPT', 'VCB', 'HPG', 'MWG', 'VNM', 'MBB'].map((code) => ({ code, go: () => this.setState({ ticker: code, status: 'idle' }) })),
+      sessionText: inSession ? 'Thị trường đang mở cửa · cập nhật theo phiên' : 'Ngoài phiên giao dịch · phiên tiếp theo Thứ Hai 08/09',
+      dotColor: inSession ? this.G : '#8090b4',
+      shownScore: Math.round(shown), dashoffset: (326.73 * (1 - shown / 100)).toFixed(2),
+      groups: this.GROUPS.map((g, i) => ({ name: g.name, sum: g.sum, max: g.max, pct: `${Math.round(g.sum / g.max * 100)}%`, color: g.sum / g.max >= 0.7 ? this.G : this.W, on: i === activeGroup,
+        opacity: i === activeGroup ? 1 : 0.6, segBg: i === activeGroup ? '#5ac8ff' : 'rgba(30,42,70,.9)', segFg: i === activeGroup ? '#04121f' : '#a3b3d3', pick: () => this.setState({ activeGroup: i }) })),
+      activeName: ag.name, activeSum: ag.sum, activeMax: ag.max, activeNote: ag.note,
+      activeItems: ag.items.map(([label, raw, points, max, k]) => ({ label, raw, points, max, pct: `${Math.round(points / max * 100)}%`, color: this.lv(k) })),
+      ranges: Object.keys(this.RANGES).map((k) => ({ label: k, on: k === range, pick: () => this.setState({ range: k }), border: k === range ? '#5ac8ff' : 'rgba(120,140,190,.2)', bg: k === range ? '#5ac8ff' : '#0c1324', color: k === range ? '#04121f' : '#a3b3d3' })),
+      sparkPath: sp.line, sparkArea: sp.area, lastX: sp.lastX, lastY: sp.lastY,
+      rangeLow: fmt(rg.lo), rangeHigh: fmt(rg.hi), rangeLabel: rg.label, rangeChg: rg.chg.replace('.', ','), rangeChgColor: rg.chg.startsWith('-') ? this.B : this.G, rangeSessions: rg.n,
+      horizons: this.HORIZONS.map(([label, value, best]) => ({ label, value, pct: `${value}%`, star: best ? '★ ' : '', border: best ? 'rgba(168,130,255,.5)' : 'rgba(120,140,190,.2)', labelColor: best ? '#eef3ff' : '#a3b3d3', weight: best ? 600 : 400 })),
+      marketTitle: inSession ? `Thị trường lúc này · ${basket}` : `Phiên Thứ Sáu 05/09 đã khép lại · ${basket}`,
+      marketSub: inSession ? 'Số liệu khớp lệnh cập nhật liên tục trong phiên. Bấm một mã để chấm điểm ngay.' : 'Kết quả phiên gần nhất, lấy từ bảng giá cuối phiên. Bấm một mã để chấm điểm ngay.',
+      baskets: ['VN30', 'VN100', 'HOSE', 'HNX30'].map((b) => ({ label: b, on: b === basket, pick: () => this.setState({ basket: b }), border: b === basket ? '#5ac8ff' : 'rgba(120,140,190,.2)', bg: b === basket ? '#5ac8ff' : '#111a2e', color: b === basket ? '#04121f' : '#a3b3d3' })),
+      moverCols: [{ title: 'Tăng mạnh nhất', items: mk(this.MOVERS.gainers, true) }, { title: 'Giảm sâu nhất', items: mk(this.MOVERS.losers, true) }, { title: 'Sôi động nhất · giá trị khớp lệnh', items: mk(this.MOVERS.active, false) }],
+      events: this.EVENTS.map(([day, mon, symbol, kind, text, k]) => ({ day, mon, symbol, kind, text, color: this.lv(k) })),
+      news: this.NEWS.map(([symbol, title, date]) => ({ symbol, title, date })),
+      leaders: this.LEADERS.map(([symbol, score]) => ({ symbol, score, pct: `${score}%`, color: score >= 65 ? this.G : this.W }))
+    };
+  }
+}
+</script>
+</body>
+</html>
