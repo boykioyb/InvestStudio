@@ -19,6 +19,9 @@ os.environ["APP_GEMINI_API_KEY"] = ""  # chắc chắn test không gọi Gemini 
 #  và cả bộ test bắn hơn 120 request/phút từ cùng một "IP").
 os.environ["APP_LOGIN_MAX_ATTEMPTS"] = "1000000"
 os.environ["APP_API_RATE_LIMIT_PER_MINUTE"] = "1000000"
+#  Khu quản trị: test chạy không có ứng dụng xác thực nên tắt bắt buộc 2 lớp;
+#  có test riêng bật lại để kiểm đúng rào này (tests/test_admin.py).
+os.environ["APP_ADMIN_REQUIRE_2FA"] = "false"
 #  Test chạy KHÔNG có SMTP: mặc định không bắt xác minh email, test nào cần kiểm
 #  rào này thì tự bật lại bằng monkeypatch (xem tests/test_account.py).
 os.environ["APP_REQUIRE_VERIFIED_EMAIL"] = "false"
@@ -49,10 +52,16 @@ def db_engine():
 @pytest.fixture
 def _clean(db_engine):
     """Dọn sạch bảng trước mỗi test → các test độc lập, không ảnh hưởng nhau."""
+    #  Bảng app_settings vừa bị xóa → phải bỏ cache trong tiến trình, nếu không
+    #  cờ của test trước còn hiệu lực tới 30 giây sang test sau.
+    from app.core import settings_store
+    settings_store.invalidate()
+
     with db_engine.begin() as conn:
         conn.execute(text(
             "TRUNCATE users, watchlist_items, rag_documents, index_jobs, "
-            "device_fingerprints, device_accounts RESTART IDENTITY CASCADE"))
+            "device_fingerprints, device_accounts, usage_events, usage_daily, "
+            "audit_logs, app_settings RESTART IDENTITY CASCADE"))
     yield
 
 

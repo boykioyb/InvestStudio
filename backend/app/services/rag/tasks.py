@@ -140,3 +140,10 @@ def index_analysis_task(self, analysis: dict) -> dict:
         return {"skipped": str(exc)}
     finally:
         db.close()
+
+
+@celery_app.task(name="usage.flush")
+def usage_flush_task() -> dict:
+    """Dồn bộ đếm Redis vào `usage_daily` để /admin vẽ được biểu đồ nhiều ngày."""
+    from app.services.usage_flush import flush
+    return flush()

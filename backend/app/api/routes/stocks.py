@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, sta
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user_optional
-from app.core import ratelimit
+from app.core import ratelimit, settings_store, usage
 from app.core.config import get_settings
 from app.models.user import User
 from app.schemas.stock import (
@@ -72,16 +72,15 @@ def _analyze_quota(request: Request, user: Optional[User], *, refresh: bool) -> 
     quét, còn nếu Redis chết mà chặn hết thì cả trang ngừng chạy — mất nhiều hơn
     được. Ngược lại với hạn mức Gemini (fail-closed, xem app/core/budget.py).
     """
-    settings = get_settings()
     if user is None:
         ratelimit.enforce_daily(f"ip:{ratelimit.client_ip(request)}", "analyze",
-                                settings.guest_analyze_daily, fail_open=True)
+                                settings_store.quota("guest_analyze_daily"), fail_open=True)
         return
     ratelimit.enforce_daily(f"u:{user.id}", "analyze",
-                            settings.member_analyze_daily, fail_open=True)
+                            settings_store.quota("member_analyze_daily"), fail_open=True)
     if refresh:
         ratelimit.enforce_daily(f"u:{user.id}", "refresh",
-                                settings.member_refresh_daily, fail_open=True)
+                                get_settings().member_refresh_daily, fail_open=True)
 
 
 def _may_refresh(refresh: bool, user: Optional[User]) -> bool:
@@ -92,7 +91,8 @@ def _may_refresh(refresh: bool, user: Optional[User]) -> bool:
     crawl thật liên tục — nguồn dữ liệu chặn ở ~20 request/phút, bị chặn là CẢ
     trang chết chứ không riêng một tính năng.
     """
-    return bool(refresh) and user is not None
+    #  Cần gạt khẩn cấp: tắt hẳn đường ép crawl khi nguồn dữ liệu đang căng.
+    return bool(refresh) and user is not None and settings_store.flag("refresh_enabled")
 
 
 def _cache_key(symbol: str, pos: int, mgmt: int, cat: int,
@@ -140,11 +140,16 @@ def analyze_stock(
     if not refresh and (hit := _cache.get(key)) is not None:
         return hit
 
-    try:
-        result = analyzer.analyze(symbol, pos=pos, mgmt=mgmt, cat=cat,
-                                  pe_sec=pe_sec, pb_fair=pb_fair, source=source)
-    except ProviderError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    with usage.track():
+        try:
+            result = analyzer.analyze(symbol, pos=pos, mgmt=mgmt, cat=cat,
+                                      pe_sec=pe_sec, pb_fair=pb_fair, source=source)
+        except ProviderError as exc:
+            usage.record(None, "analyze", user_id=(user.id if user else None),
+                         ip=ratelimit.client_ip(request), ticker=symbol, status="error")
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        usage.record(None, "analyze", user_id=(user.id if user else None),
+                     ip=ratelimit.client_ip(request), ticker=symbol)
 
     _cache[key] = result
     return result

@@ -23,3 +23,4 @@ google-genai>=1.0          # SDK Gemini (embedding + sinh câu trả lời)
 # ── Hàng đợi tác vụ nền (lập chỉ mục RAG chạy như một job) ─────────────────────
 celery>=5.4                # job queue — worker chạy reindex tách khỏi web process
 redis>=5.0                 # broker + result backend cho Celery
+pyotp>=2.9                # xác thực 2 lớp (TOTP) cho tài khoản quản trị

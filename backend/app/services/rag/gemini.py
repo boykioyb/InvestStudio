@@ -9,7 +9,7 @@ import time
 from functools import lru_cache
 from typing import Callable, Iterator
 
-from app.core import budget
+from app.core import budget, usage
 from app.core.config import get_settings
 
 
@@ -29,6 +29,17 @@ class QuotaError(GeminiError):
 _RATE_LIMIT_MARKS = ("429", "RESOURCE_EXHAUSTED", "rate limit", "quota")
 
 
+def _count_usage(result: object) -> None:
+    """Cộng dồn số token của MỘT request vào phạm vi đo đang mở (app/core/usage.py).
+
+    Không phải để tính tiền (bản miễn phí không có hóa đơn) mà để biết còn cách
+    trần TPM (token/phút) bao xa — chạm TPM là Google trả 429 dù quota ngày còn.
+    """
+    meta = getattr(result, "usage_metadata", None)
+    usage.add_call(getattr(meta, "prompt_token_count", 0) or 0,
+                   getattr(meta, "candidates_token_count", 0) or 0)
+
+
 def _is_rate_limited(exc: Exception) -> bool:
     """Google trả 429 (chạm request/phút) — đáng thử lại sau vài giây."""
     text = str(exc).lower()
@@ -45,7 +56,9 @@ def _guarded(call: Callable[[], object], what: str):
     for attempt in range(attempts):
         try:
             with budget.slot():
-                return call()
+                result = call()
+            _count_usage(result)
+            return result
         except budget.BudgetError as exc:
             raise QuotaError(str(exc)) from exc
         except GeminiError:
@@ -110,9 +123,12 @@ def generate_answer_stream(system_instruction: str, prompt: str):
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction, temperature=0.2),
             )
+            last = None
             for chunk in stream:
+                last = chunk
                 if chunk.text:
                     yield chunk.text
+            _count_usage(last)
     except budget.BudgetError as exc:
         raise QuotaError(str(exc)) from exc
     except GeminiError:

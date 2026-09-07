@@ -38,4 +38,9 @@ celery_app.conf.beat_schedule = {
         "task": "watchlist.check_alerts",
         "schedule": 1800.0,  # 30 phút
     },
+    #  Dồn bộ đếm Redis → bảng usage_daily cho biểu đồ ở /admin.
+    "flush-usage-counters": {
+        "task": "usage.flush",
+        "schedule": 300.0,   # 5 phút
+    },
 }

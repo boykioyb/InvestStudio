@@ -120,6 +120,22 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Khu QUẢN TRỊ — app Nuxt riêng (Nuxt UI). Tách khỏi web công khai để:
+  #  1. CSS của Tailwind không đè vỡ hệ thiết kế của trang công khai;
+  #  2. chặn được ở tầng mạng — ngoài môi trường thật hãy đặt sau reverse proxy
+  #     tại admin.<domain> kèm danh sách IP cho phép, và KHÔNG publish cổng này.
+  admin:
+    build: ./admin
+    image: investstudio-admin
+    ports:
+      - "${ADMIN_PORT:-3020}:3020"
+    environment:
+      NUXT_API_PROXY_TARGET: http://backend:8000
+      TZ: Asia/Ho_Chi_Minh
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   frontend:
     build: ./frontend
     image: investstudio-frontend

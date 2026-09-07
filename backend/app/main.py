@@ -8,8 +8,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import auth, chat, market, notifications, portfolio, screener, stocks, watchlist
-from app.core import ratelimit
+from app.api.routes import (admin, auth, chat, market, notifications, portfolio,
+                            screener, stocks, watchlist)
+from app.core import ratelimit, settings_store
 from app.core.config import DEV_JWT_SECRET, get_settings
 from app.db.session import init_db
 from app.schemas.stock import HealthResponse
@@ -97,6 +98,14 @@ async def rate_limit_and_headers(request: Request, call_next):
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
                                 headers=exc.headers or {})
 
+    #  Chế độ bảo trì: chặn API cho người dùng thường, /admin và đăng nhập vẫn
+    #  mở để quản trị còn vào tắt cờ được (nếu không thì tự nhốt mình bên ngoài).
+    if (path.startswith("/api") and settings_store.flag("maintenance_mode")
+            and not path.startswith(("/api/health", "/api/admin", "/api/auth"))):
+        return JSONResponse(
+            {"detail": "Hệ thống đang bảo trì, vui lòng quay lại sau ít phút."},
+            status_code=503)
+
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -115,6 +124,7 @@ app.include_router(chat.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["system"])

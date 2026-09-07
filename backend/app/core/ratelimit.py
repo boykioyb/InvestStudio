@@ -83,6 +83,11 @@ def _is_trusted_proxy(peer: str, trusted: list[str]) -> bool:
     return False
 
 
+def ip_in_list(ip: str, entries: list[str]) -> bool:
+    """IP có nằm trong danh sách (IP đơn / dải CIDR / "*") không."""
+    return _is_trusted_proxy(ip, entries)
+
+
 def enforce(request: Request, scope: str) -> None:
     """Đếm theo IP trong cửa sổ đăng nhập; quá ngưỡng → 429. Redis lỗi → cho qua."""
     settings = get_settings()

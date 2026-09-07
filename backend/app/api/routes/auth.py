@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_device
-from app.core import fingerprint, mailer, ratelimit
+from app.core import fingerprint, mailer, ratelimit, settings_store
 from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
@@ -67,6 +67,12 @@ def register(payload: RegisterRequest, request: Request, response: Response,
              fp_hash: str = Depends(get_device),
              db: Session = Depends(get_db)) -> User:
     ratelimit.enforce(request, "register")  # chống đăng ký spam theo IP
+    #  Cần gạt khẩn cấp: thấy bot tạo tài khoản hàng loạt thì đóng đăng ký ngay
+    #  trong /admin, người đang có tài khoản không bị ảnh hưởng.
+    if not settings_store.flag("registration_open"):
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Đăng ký tài khoản mới đang tạm đóng. Vui lòng quay lại sau.")
     #  Thang leo thang theo THIẾT BỊ: đăng ký thêm email trên cùng một máy là
     #  cách rẻ nhất để nhân hạn mức. Tài khoản cũ trên máy đó vẫn dùng bình thường.
     max_accounts = get_settings().max_accounts_per_device
@@ -110,6 +116,15 @@ def login(payload: LoginRequest, request: Request, response: Response,
     if user.status != "active":
         raise HTTPException(status.HTTP_403_FORBIDDEN,
                             detail="Tài khoản đang bị tạm khóa. Liên hệ hỗ trợ để mở lại.")
+
+    #  Đã bật 2 lớp thì mật khẩu đúng vẫn chưa đủ.
+    if user.totp_secret:
+        import pyotp
+        if not payload.totp_code:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                                detail="Nhập mã 6 số từ ứng dụng xác thực.")
+        if not pyotp.TOTP(user.totp_secret).verify(payload.totp_code, valid_window=1):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Mã 6 số không đúng.")
 
     ratelimit.clear(request, "login")  # đăng nhập đúng → xóa bộ đếm cho IP này
     user.last_login_at = func.now()

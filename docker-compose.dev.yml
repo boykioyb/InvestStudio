@@ -34,3 +34,10 @@ services:
     volumes:
       - ./frontend:/app                  # mã nguồn live
       - /app/node_modules                # GIỮ node_modules của container (alpine), host KHÔNG đè
+
+  admin:
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./admin:/app                     # mã nguồn live
+      - /app/node_modules                # giữ node_modules của container

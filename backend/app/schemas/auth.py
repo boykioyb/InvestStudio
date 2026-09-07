@@ -22,6 +22,8 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, max_length=128)
+    #  Mã 6 số từ ứng dụng xác thực — bắt buộc với tài khoản quản trị đã bật 2 lớp.
+    totp_code: str = Field("", max_length=8)
 
 
 class ChangePasswordRequest(BaseModel):

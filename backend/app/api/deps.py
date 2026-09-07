@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
-from app.core import fingerprint
+from app.core import fingerprint, ratelimit
 from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.db.session import get_db
@@ -66,17 +66,35 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     return user
 
 
-def require_admin(user: User = Depends(get_current_user)) -> User:
-    """Chỉ cho quản trị viên. Dùng cho việc TỐN HẠN MỨC CHUNG (lập chỉ mục…).
+#  Hai đường được miễn kiểm 2 lớp, nếu không sẽ tự nhốt mình bên ngoài: chưa bật
+#  2FA thì phải vào được đúng hai endpoint để bật nó.
+_TWO_FACTOR_EXEMPT = ("/api/admin/2fa/setup", "/api/admin/2fa/enable")
+
+
+def require_admin(request: Request, user: User = Depends(get_current_user)) -> User:
+    """Chỉ cho quản trị viên, kèm hai rào ngoài: danh sách IP và 2 lớp (TOTP).
 
     Trước đây `POST /chat/reindex` mở cho mọi tài khoản đã đăng nhập: một người
     lạ đăng ký xong bấm nút là đẩy job nhúng cả rổ VN30 — đủ để tiêu hết quota
-    Gemini của cả ngày.
+    Gemini của cả ngày. Nay khu quản trị còn đọc được dữ liệu của mọi người
+    dùng, nên rào phải dày hơn hẳn phần còn lại.
     """
+    settings = get_settings()
     if user.role != "admin":
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             detail="Chức năng này chỉ dành cho quản trị viên.")
+
+    allowlist = settings.admin_ip_allowlist
+    if allowlist and not ratelimit.ip_in_list(ratelimit.client_ip(request), allowlist):
+        #  Cố ý trả 404: đừng xác nhận với người lạ rằng ở đây CÓ khu quản trị.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+    if (settings.admin_require_2fa and not user.totp_secret
+            and not request.url.path.startswith(_TWO_FACTOR_EXEMPT)):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản quản trị phải bật xác thực 2 lớp trước khi dùng khu quản trị.")
     return user
 
 

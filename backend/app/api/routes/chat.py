@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_device, require_admin, require_verified
-from app.core import budget, fingerprint, ratelimit
+from app.core import budget, fingerprint, ratelimit, settings_store, usage
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
 from app.db.session import get_db
@@ -55,7 +55,12 @@ def _check_quota(user: User, request: Request, db: Session, fp_hash: str) -> Non
     quota ngày là hữu hạn và không mua thêm được — hết là trợ lý im với TẤT CẢ
     mọi người tới 0h hôm sau.
     """
-    settings = get_settings()
+    #  Cần gạt khẩn cấp: tắt trợ lý cho cả hệ thống ngay trong /admin, không
+    #  cần deploy lại (app/core/settings_store.py, cache 30 giây).
+    if not settings_store.flag("assistant_enabled"):
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Trợ lý đang tạm nghỉ để bảo trì. Các tính năng khác vẫn dùng bình thường.")
     if budget.new_questions_blocked() and ratelimit.used_today("rag", str(user.id)) == 0:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
@@ -64,10 +69,10 @@ def _check_quota(user: User, request: Request, db: Session, fp_hash: str) -> Non
 
     ip = ratelimit.client_ip(request)
     ratelimit.enforce_daily_buckets([
-        ("rag", str(user.id), settings.rag_daily_quota),
-        ("rag:device", fp_hash, settings.chat_daily_per_device),
-        ("rag:ip", ip, settings.chat_daily_per_ip),
-        ("rag:net", fingerprint.subnet_of(ip), settings.chat_daily_per_subnet),
+        ("rag", str(user.id), settings_store.quota("rag_daily_quota")),
+        ("rag:device", fp_hash, settings_store.quota("chat_daily_per_device")),
+        ("rag:ip", ip, settings_store.quota("chat_daily_per_ip")),
+        ("rag:net", fingerprint.subnet_of(ip), get_settings().chat_daily_per_subnet),
     ])
     fingerprint.record(db, fp_hash, request, user.id)
 
@@ -146,7 +151,10 @@ def ask(payload: ChatRequest, request: Request, user: User = Depends(require_ver
                                  question=question, ticker=ticker)
     parts, refs = _load_attachments(db, user, payload.attachment_ids)
     try:
-        resp = agent.answer_question(db, question, ticker, payload.history, parts or None)
+        with usage.track():
+            resp = agent.answer_question(db, question, ticker, payload.history, parts or None)
+            usage.record(db, "chat", user_id=user.id, ip=ratelimit.client_ip(request),
+                         fp_hash=fp_hash, ticker=ticker or "")
     except QuotaError as exc:
         #  Hết hạn mức / đang xếp hàng — nói thật, đừng che thành "lỗi hệ thống".
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
@@ -154,6 +162,8 @@ def ask(payload: ChatRequest, request: Request, user: User = Depends(require_ver
         #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
         #  ghi log phía máy chủ để còn gỡ lỗi.
         print(f"[chat] GeminiError: {exc}", file=sys.stderr)
+        usage.record(db, "chat", user_id=user.id, ip=ratelimit.client_ip(request),
+                     fp_hash=fp_hash, ticker=ticker or "", status="error")
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Trợ lý tạm thời không phản hồi được. Vui lòng thử lại sau.") from exc
@@ -202,23 +212,30 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
 
     def gen():
         final = None
-        try:
-            for kind, payload in agent.answer_stream(db, q, tk, hist, parts or None):
-                if kind == "delta":
-                    yield _sse("delta", {"text": payload})
-                elif kind == "step":
-                    yield _sse("step", payload)
-                else:
-                    payload.conversation_id = cid
-                    final = payload
-                    yield _sse("final", payload.model_dump(mode="json"))
-        except QuotaError as exc:
-            yield _sse("error", {"detail": str(exc)})
-            return
-        except GeminiError as exc:
-            print(f"[chat] stream GeminiError: {exc}", file=sys.stderr)
-            yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
-            return
+        ip = ratelimit.client_ip(request)
+        with usage.track():
+            try:
+                for kind, payload in agent.answer_stream(db, q, tk, hist, parts or None):
+                    if kind == "delta":
+                        yield _sse("delta", {"text": payload})
+                    elif kind == "step":
+                        yield _sse("step", payload)
+                    else:
+                        payload.conversation_id = cid
+                        final = payload
+                        yield _sse("final", payload.model_dump(mode="json"))
+            except QuotaError as exc:
+                usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash,
+                             ticker=tk or "", status="quota")
+                yield _sse("error", {"detail": str(exc)})
+                return
+            except GeminiError as exc:
+                print(f"[chat] stream GeminiError: {exc}", file=sys.stderr)
+                usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash,
+                             ticker=tk or "", status="error")
+                yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
+                return
+            usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash, ticker=tk or "")
         #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời).
         if final is not None:
             _save_turn(db, user, conv, ticker=tk, question=q, resp=final, attachments=refs)
@@ -405,12 +422,13 @@ def chat_quota(user: User = Depends(get_current_user),
     hơn, không dùng agent) · `exhausted` (chỉ phục vụ người đã hỏi hôm nay).
     """
     settings = get_settings()
-    limit = settings.rag_daily_quota
+    limit = settings_store.quota("rag_daily_quota")
     #  Hiện số NHỎ NHẤT giữa rổ tài khoản và rổ thiết bị — đúng cái người dùng
     #  thực sự còn, thay vì hứa 5 lượt rồi chặn ở lượt thứ 2.
     remaining = min(
         ratelimit.remaining_daily("rag", str(user.id), limit),
-        ratelimit.remaining_daily("rag:device", fp_hash, settings.chat_daily_per_device),
+        ratelimit.remaining_daily("rag:device", fp_hash,
+                                  settings_store.quota("chat_daily_per_device")),
     )
     return {
         "limit": limit,

@@ -119,6 +119,15 @@ class Settings(BaseSettings):
     #  Số lượt hội thoại gần nhất frontend gửi kèm để agent giữ ngữ cảnh ("nó"…).
     rag_history_turns: int = 4
 
+    # ── Khu quản trị (/admin) ────────────────────────────────────────────────
+    #  Danh sách IP/dải CIDR được vào /api/admin. RỖNG = không giới hạn (chỉ hợp
+    #  cho dev). Ở môi trường thật hãy khai IP nhà/VPN: đây là rào NGOÀI CÙNG,
+    #  đứng trước cả đăng nhập, nên kẻ trộm được mật khẩu vẫn không vào nổi.
+    admin_ip_allowlist: list[str] = []
+    #  Bắt buộc 2 lớp (TOTP) cho tài khoản quản trị. Chiếm được một tài khoản
+    #  admin là chiếm toàn bộ dữ liệu người dùng — nên mặc định BẬT.
+    admin_require_2fa: bool = True
+
     # ── Email giao dịch (xác minh tài khoản, đặt lại mật khẩu) ───────────────
     #  Chưa cấu hình → link in ra log máy chủ (chỉ hợp cho dev). BẮT BUỘC cấu
     #  hình trước khi mở cho người lạ, xem app/core/mailer.py.

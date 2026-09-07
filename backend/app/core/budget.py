@@ -31,8 +31,19 @@ import time
 from contextlib import contextmanager
 from datetime import date
 
+from app.core import settings_store
 from app.core.config import get_settings
 from app.core.ratelimit import redis_client
+
+
+def _cap() -> int:
+    """Trần request/ngày — ưu tiên giá trị chỉnh trong /admin (settings_store)."""
+    return settings_store.quota("gemini_daily_call_cap") or get_settings().gemini_daily_call_cap
+
+
+def _max_concurrent() -> int:
+    return (settings_store.quota("gemini_max_concurrent")
+            or get_settings().gemini_max_concurrent)
 
 #  Số request Gemini ĐANG chạy (mọi tiến trình web + worker dùng chung khóa này).
 _INFLIGHT_KEY = "gemini:inflight"
@@ -56,12 +67,12 @@ def used_today() -> int:
         return int(raw) if raw else 0
     except Exception as exc:  # noqa: BLE001
         print(f"[budget] không đọc được bộ đếm: {exc}", file=sys.stderr)
-        return get_settings().gemini_daily_call_cap
+        return _cap()
 
 
 def usage_ratio() -> float:
     """Tỷ lệ quota ngày đã dùng (0.0 → 1.0+)."""
-    cap = max(1, get_settings().gemini_daily_call_cap)
+    cap = max(1, _cap())
     return used_today() / cap
 
 
@@ -79,7 +90,7 @@ def status_snapshot() -> dict:
     """Tình trạng ngân sách — cho /admin và cho thông báo gửi người dùng."""
     settings = get_settings()
     used = used_today()
-    cap = settings.gemini_daily_call_cap
+    cap = _cap()
     ratio = used / max(1, cap)
     level = "ok" if ratio < settings.gemini_degrade_at else (
         "saving" if ratio < settings.gemini_block_new_at else "exhausted")
@@ -103,7 +114,7 @@ def slot():
     except Exception as exc:  # noqa: BLE001 - FAIL-CLOSED, xem docstring đầu file
         raise BudgetError("Hệ thống hạn mức tạm thời không sẵn sàng.") from exc
 
-    if used > settings.gemini_daily_call_cap:
+    if used > _cap():
         raise BudgetError(
             "Trợ lý đã dùng hết hạn mức chung của hôm nay. Vui lòng quay lại sau 0h.")
 
@@ -114,7 +125,7 @@ def slot():
         try:
             inflight = client.incr(_INFLIGHT_KEY)
             client.expire(_INFLIGHT_KEY, _INFLIGHT_TTL)
-            if inflight <= settings.gemini_max_concurrent:
+            if inflight <= _max_concurrent():
                 acquired = True
                 break
             client.decr(_INFLIGHT_KEY)
