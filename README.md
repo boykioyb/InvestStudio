@@ -1,4 +1,4 @@
-# InvestStudio
+# Phân Tích Mã
 
 Công cụ phân tích cổ phiếu Việt Nam: **nhập mã → crawl dữ liệu công khai → chấm điểm 100 điểm → kết luận** (sức khỏe tài chính · tầm nhìn · điểm số · quyết định).
 

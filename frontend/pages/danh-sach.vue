@@ -11,7 +11,7 @@ import type { ScreenerColumn, ScreenerRow } from '~/types/stock'
 const { data, pending, error, group, sort, order, load, selectGroup, toggleSort } = useScreener()
 const { num } = useFormat()
 
-useHead({ title: 'Danh sách mã — InvestStudio' })
+useHead({ title: 'Danh sách mã — Phân Tích Mã' })
 
 onMounted(load)
 

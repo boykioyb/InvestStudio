@@ -8,7 +8,7 @@ const password = ref('')
 const displayName = ref('')
 const localError = ref('')
 
-useHead({ title: 'Đăng ký — InvestStudio' })
+useHead({ title: 'Đăng ký — Phân Tích Mã' })
 
 const nextPath = computed(() => isSafeNext(String(route.query.next || '/')))
 

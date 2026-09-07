@@ -273,7 +273,7 @@ def totp_setup(request: Request, admin: User = Depends(require_admin),
     #  Giữ tạm trong Redis 10 phút thay vì ghi thẳng vào tài khoản.
     from app.core.ratelimit import redis_client
     redis_client().set(f"totp:pending:{admin.id}", secret, ex=600)
-    url = pyotp.TOTP(secret).provisioning_uri(name=admin.email, issuer_name="InvestStudio")
+    url = pyotp.TOTP(secret).provisioning_uri(name=admin.email, issuer_name="Phân Tích Mã")
     audit.log(db, admin, "totp_setup", request=request, target_type="user", target_id=admin.id)
     return TotpSetupOut(secret=secret, otpauth_url=url)
 

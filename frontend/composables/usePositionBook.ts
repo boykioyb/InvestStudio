@@ -1,6 +1,10 @@
 import type { PositionLot, PositionReview } from '~/types/stock'
 
-const STORAGE_KEY = 'investstudio.positions.v1'
+const STORAGE_KEY = 'phantichma.positions.v1'
+//  Khóa cũ từ thời tên sản phẩm là InvestStudio. Người dùng đã lưu sổ mua trong
+//  trình duyệt của họ — đổi tên khóa mà không đọc lại khóa cũ là XÓA SẠCH dữ
+//  liệu đó một cách âm thầm. Đọc lại một lần rồi chuyển sang khóa mới.
+const LEGACY_KEY = 'investstudio.positions.v1'
 
 /**
  * Sổ mua nhiều đợt.
@@ -24,7 +28,15 @@ export function usePositionBook() {
   function readAll(): Record<string, { lots: PositionLot[]; account?: string }> {
     if (!import.meta.client) return {}
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) return JSON.parse(raw)
+
+      //  Chưa có khóa mới → thử khóa cũ và dọn nhà một lần.
+      const cu = localStorage.getItem(LEGACY_KEY)
+      if (!cu) return {}
+      localStorage.setItem(STORAGE_KEY, cu)
+      localStorage.removeItem(LEGACY_KEY)
+      return JSON.parse(cu)
     } catch {
       return {}
     }

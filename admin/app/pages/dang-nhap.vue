@@ -48,7 +48,7 @@ async function dangNhap() {
     <div class="min-h-screen flex items-center justify-center bg-elevated/40 p-4">
       <UCard class="w-full max-w-sm">
         <template #header>
-          <p class="font-semibold">InvestStudio</p>
+          <p class="font-semibold">Phân Tích Mã</p>
           <p class="text-sm text-muted">Đăng nhập khu quản trị</p>
         </template>
 

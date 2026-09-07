@@ -6,7 +6,7 @@ const { data, pending, error, isEmpty, load } = usePortfolio()
 const { num, money } = useFormat()
 
 onMounted(load)
-useHead({ title: 'Danh mục — InvestStudio' })
+useHead({ title: 'Danh mục — Phân Tích Mã' })
 
 const sign = (v: number | null | undefined) =>
   v == null ? '' : v > 0 ? 'lv-good' : v < 0 ? 'lv-bad' : 'lv-na'

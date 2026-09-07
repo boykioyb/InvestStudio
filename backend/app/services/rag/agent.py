@@ -29,7 +29,7 @@ from app.services.rag import chat, gemini, store
 from app.services.rag.gemini import GeminiError, QuotaError, embed_texts
 
 _SYSTEM = (
-    "Bạn là trợ lý phân tích cổ phiếu Việt Nam của InvestStudio. Bạn có nhiều CÔNG CỤ "
+    "Bạn là trợ lý phân tích cổ phiếu Việt Nam của Phân Tích Mã. Bạn có nhiều CÔNG CỤ "
     "lấy dữ liệu THẬT: phân tích/chấm điểm một mã (kèm khối 'quyet_dinh': tóm tắt hành "
     "động, cỡ vị thế, cắt lỗ); chỉ số & báo cáo tài chính; bảng giá, dòng tiền & lịch "
     "sử giá; cảnh báo; xếp hạng rổ; và tìm kho tri thức (tin tức, tổng quan). Chọn "

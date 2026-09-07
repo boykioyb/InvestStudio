@@ -6,7 +6,7 @@ const route = useRoute()
 const email = ref('')
 const password = ref('')
 
-useHead({ title: 'Đăng nhập — InvestStudio' })
+useHead({ title: 'Đăng nhập — Phân Tích Mã' })
 
 const nextPath = computed(() => isSafeNext(String(route.query.next || '/')))
 

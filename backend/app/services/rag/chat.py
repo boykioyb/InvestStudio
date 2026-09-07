@@ -16,7 +16,7 @@ from app.services.rag import store
 from app.services.rag.gemini import embed_texts, generate_answer, generate_answer_stream
 
 _SYSTEM = (
-    "Bạn là trợ lý phân tích cổ phiếu Việt Nam của InvestStudio. "
+    "Bạn là trợ lý phân tích cổ phiếu Việt Nam của Phân Tích Mã. "
     "CHỈ được dùng số liệu trong phần 'NGỮ CẢNH' bên dưới — không bịa; nếu ngữ cảnh "
     "không đủ, nói rõ là dữ liệu chưa được lập chỉ mục/chưa đủ. "
     "KHÔNG chỉ liệt kê thông tin: sau khi đọc ngữ cảnh, hãy đưa ra MỘT kết luận rõ "

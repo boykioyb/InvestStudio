@@ -1,6 +1,6 @@
 """Fixture cho test CẦN cơ sở dữ liệu.
 
-Dùng một DB RIÊNG `investstudio_test` để tuyệt đối không đụng dữ liệu thật (kho
+Dùng một DB RIÊNG `phantichma_test` để tuyệt đối không đụng dữ liệu thật (kho
 RAG, tài khoản). Test KHÔNG dùng các fixture này (VD test_scoring) sẽ không kích
 hoạt kết nối DB, nên vẫn chạy được cả khi không có Postgres.
 """
@@ -11,8 +11,8 @@ import os
 #  Trỏ sang DB test TRƯỚC khi bất kỳ module app nào đọc cấu hình (get_settings
 #  cache lần gọi đầu). Chỉ đặt biến môi trường — chưa mở kết nối nào ở đây.
 _BASE = os.environ.get(
-    "APP_DATABASE_URL", "postgresql+psycopg://invest:invest@postgres:5432/investstudio")
-_TEST_DB = "investstudio_test"
+    "APP_DATABASE_URL", "postgresql+psycopg://invest:invest@postgres:5432/phantichma")
+_TEST_DB = "phantichma_test"
 os.environ["APP_DATABASE_URL"] = _BASE.rsplit("/", 1)[0] + "/" + _TEST_DB
 os.environ["APP_GEMINI_API_KEY"] = ""  # chắc chắn test không gọi Gemini thật
 #  Vô hiệu hóa giới hạn tần suất trong test (nhiều lần register/login liên tiếp,

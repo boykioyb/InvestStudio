@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Chạy InvestStudio ở chế độ DEV (hot-reload cho frontend + backend).
+# Chạy Phân Tích Mã ở chế độ DEV (hot-reload cho frontend + backend).
 #
 #   ./dev.sh              # khởi động, bám log  (mặc định: up)
 #   ./dev.sh -d           # chạy nền            (→ up -d)

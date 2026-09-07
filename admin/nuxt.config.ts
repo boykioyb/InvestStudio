@@ -28,7 +28,7 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'vi' },
-      title: 'Quản trị — InvestStudio',
+      title: 'Quản trị — Phân Tích Mã',
       // Khu quản trị KHÔNG được lập chỉ mục tìm kiếm.
       meta: [{ name: 'robots', content: 'noindex, nofollow' }]
     }

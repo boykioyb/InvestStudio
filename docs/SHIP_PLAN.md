@@ -1,4 +1,4 @@
-# Kế hoạch đưa InvestStudio ra người dùng thật (Ship Plan v2)
+# Kế hoạch đưa Phân Tích Mã ra người dùng thật (Ship Plan v2)
 
 > Lập 2026-09-07 · bản v2 đào sâu tới mức thi công + bổ sung **khu quản trị `/admin`**.
 > Mọi khẳng định đều dẫn `file:dòng` từ mã nguồn hiện tại. Bổ sung cho [`REFACTOR_PLAN.md`](REFACTOR_PLAN.md)

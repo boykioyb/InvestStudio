@@ -26,7 +26,7 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: 'vi' },
-      title: 'Phân tích mã cổ phiếu — InvestStudio',
+      title: 'Phân Tích Mã — công cụ phân tích cổ phiếu Việt Nam',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },

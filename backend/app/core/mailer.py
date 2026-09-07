@@ -57,17 +57,17 @@ def send(to: str, subject: str, body: str) -> bool:
 
 def send_verification(to: str, token: str) -> bool:
     link = f"{get_settings().public_base_url}/xac-minh?token={token}"
-    return send(to, "Xác minh tài khoản InvestStudio", (
+    return send(to, "Xác minh tài khoản Phân Tích Mã", (
         "Chào bạn,\n\n"
         "Bấm vào liên kết dưới đây để xác minh email và mở khóa trợ lý:\n\n"
         f"{link}\n\n"
-        "Liên kết có hiệu lực trong 24 giờ. Nếu bạn không đăng ký InvestStudio, "
+        "Liên kết có hiệu lực trong 24 giờ. Nếu bạn không đăng ký Phân Tích Mã, "
         "hãy bỏ qua thư này.\n"))
 
 
 def send_password_reset(to: str, token: str) -> bool:
     link = f"{get_settings().public_base_url}/dat-lai-mat-khau?token={token}"
-    return send(to, "Đặt lại mật khẩu InvestStudio", (
+    return send(to, "Đặt lại mật khẩu Phân Tích Mã", (
         "Chào bạn,\n\n"
         "Bấm vào liên kết dưới đây để đặt mật khẩu mới:\n\n"
         f"{link}\n\n"

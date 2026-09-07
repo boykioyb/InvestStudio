@@ -1,4 +1,4 @@
-"""Điểm khởi tạo FastAPI cho InvestStudio API."""
+"""Điểm khởi tạo FastAPI cho Phân Tích Mã API."""
 from __future__ import annotations
 
 import sys

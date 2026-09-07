@@ -1,4 +1,4 @@
-# Kế hoạch Refactor toàn diện — InvestStudio (BE + FE)
+# Kế hoạch Refactor toàn diện — Phân Tích Mã (BE + FE)
 
 > Trạng thái: **CHỜ DUYỆT SCOPE** — chưa bắt đầu code.
 > Ngày lập: 2026-08-24. Nguồn: khảo sát code có bằng chứng (file:line) toàn bộ `backend/app/` và `frontend/`.

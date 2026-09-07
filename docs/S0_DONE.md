@@ -87,7 +87,7 @@ một rổ đếm, còn header thì vẫn 100% do client kiểm soát. Sửa c�
 
 1. **Cấp admin cho tài khoản của bạn** — chưa ai là admin nên nút reindex đang khóa với tất cả:
    ```bash
-   docker compose exec -T postgres psql -U invest -d investstudio -c "UPDATE users SET role='admin' WHERE email='hoatq.dev@gmail.com';"
+   docker compose exec -T postgres psql -U invest -d phantichma -c "UPDATE users SET role='admin' WHERE email='hoatq.dev@gmail.com';"
    ```
 2. **Đọc quota thật trong AI Studio** rồi đặt `APP_GEMINI_DAILY_CALL_CAP` cho đúng dự án (mặc định 1400 là ước lượng).
 3. **Xem lại ngưỡng 70%/90%** của hạ cấp mềm.

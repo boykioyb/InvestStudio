@@ -13,7 +13,7 @@ DEV_JWT_SECRET = "doi-bi-mat-nay-truoc-khi-len-that"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
 
-    app_name: str = "InvestStudio API"
+    app_name: str = "Phân Tích Mã API"
     version: str = "3.0.0"
     #  "dev" | "prod". Ở prod: tắt /docs, /openapi.json và bật header bảo mật.
     env: str = "dev"
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # ── Cơ sở dữ liệu (PostgreSQL + pgvector) ────────────────────────────────
     #  Dialect psycopg (psycopg 3). Trong Docker host là "postgres" (tên service).
-    database_url: str = "postgresql+psycopg://invest:invest@localhost:5432/investstudio"
+    database_url: str = "postgresql+psycopg://invest:invest@localhost:5432/phantichma"
 
     # ── Xác thực (JWT trong cookie httpOnly) ─────────────────────────────────
     #  ⚠️ ĐỔI ở môi trường thật — bí mật này ký toàn bộ token đăng nhập.

@@ -21,7 +21,7 @@ const links = [
     <div class="flex">
       <aside class="hidden md:flex w-60 shrink-0 flex-col gap-1 border-r border-default p-4 min-h-screen">
         <div class="px-2 pb-4">
-          <p class="text-sm font-semibold">InvestStudio</p>
+          <p class="text-sm font-semibold">Phân Tích Mã</p>
           <p class="text-xs text-muted">Khu quản trị</p>
         </div>
         <UButton

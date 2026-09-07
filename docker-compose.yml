@@ -1,4 +1,4 @@
-# InvestStudio — FastAPI (backend) + Nuxt 3 (frontend), chạy hoàn toàn trong Docker.
+# Phân Tích Mã — FastAPI (backend) + Nuxt 3 (frontend), chạy hoàn toàn trong Docker.
 #
 #   docker compose up --build       → API :8010 · Web :3010
 #   Mở http://localhost:3010        → nhập mã cổ phiếu
@@ -12,7 +12,7 @@
 
 # Biến môi trường dùng CHUNG cho backend và worker (một nơi khai báo, không lệch).
 x-app-env: &app-env
-  APP_DATABASE_URL: postgresql+psycopg://invest:invest@postgres:5432/investstudio
+  APP_DATABASE_URL: postgresql+psycopg://invest:invest@postgres:5432/phantichma
   # ⚠️ ĐỔI trước khi lên môi trường thật — bí mật ký token đăng nhập.
   APP_JWT_SECRET: ${APP_JWT_SECRET:-doi-bi-mat-nay-truoc-khi-len-that}
   # Chạy http://localhost nên cookie KHÔNG bật Secure. Đặt true khi có HTTPS.
@@ -43,12 +43,12 @@ services:
     environment:
       POSTGRES_USER: invest
       POSTGRES_PASSWORD: invest
-      POSTGRES_DB: investstudio
+      POSTGRES_DB: phantichma
       TZ: Asia/Ho_Chi_Minh
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U invest -d investstudio"]
+      test: ["CMD-SHELL", "pg_isready -U invest -d phantichma"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -67,7 +67,7 @@ services:
 
   backend:
     build: ./backend
-    image: investstudio-backend
+    image: phantichma-backend
     ports:
       - "${API_PORT:-8010}:8000"
     environment:
@@ -95,7 +95,7 @@ services:
   # Worker Celery — chạy job lập chỉ mục RAG + cảnh báo (dùng chung image backend).
   worker:
     build: ./backend
-    image: investstudio-backend
+    image: phantichma-backend
     command: celery -A app.core.celery_app:celery_app worker -l info
     environment:
       <<: *app-env
@@ -109,7 +109,7 @@ services:
   # Celery Beat — bộ lập lịch: reindex VN30 mỗi sáng + quét ngưỡng theo dõi 30 phút/lần.
   beat:
     build: ./backend
-    image: investstudio-backend
+    image: phantichma-backend
     command: celery -A app.core.celery_app:celery_app beat -l info
     environment:
       <<: *app-env
@@ -126,7 +126,7 @@ services:
   #     tại admin.<domain> kèm danh sách IP cho phép, và KHÔNG publish cổng này.
   admin:
     build: ./admin
-    image: investstudio-admin
+    image: phantichma-admin
     ports:
       - "${ADMIN_PORT:-3020}:3020"
     environment:
@@ -138,7 +138,7 @@ services:
 
   frontend:
     build: ./frontend
-    image: investstudio-frontend
+    image: phantichma-frontend
     ports:
       - "${WEB_PORT:-3010}:3010"
     environment:
