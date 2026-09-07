@@ -20,12 +20,13 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.core import budget
 from app.core.config import get_settings
 from app.schemas.chat import AgentStep, ChatResponse, ChatTurnInput, Citation
 from app.services import alerts, analyzer, details, history, market, screener
 from app.services.providers.base import ProviderError
 from app.services.rag import chat, gemini, store
-from app.services.rag.gemini import GeminiError, embed_texts
+from app.services.rag.gemini import GeminiError, QuotaError, embed_texts
 
 _SYSTEM = (
     "Bạn là trợ lý phân tích cổ phiếu Việt Nam của InvestStudio. Bạn có nhiều CÔNG CỤ "
@@ -439,7 +440,10 @@ def answer_question(db: Session, question: str, ticker: Optional[str] = None,
     `attachments` = danh sách (bytes, mime) ảnh/PDF gửi kèm (multimodal).
     """
     settings = get_settings()
-    if not settings.rag_agent_enabled:
+    #  Hạ cấp mềm: quota chung đã qua ngưỡng → bỏ agent, dùng RAG một nhịp
+    #  (1 request Gemini thay vì 3–7). Chậm hơn về chất lượng nhưng còn phục vụ
+    #  được nhiều người tới cuối ngày, thay vì vài người rồi tắt hẳn.
+    if not settings.rag_agent_enabled or not budget.should_use_agent():
         return chat.answer_question(db, question, ticker)
 
     citations: list[Citation] = []
@@ -456,6 +460,10 @@ def answer_question(db: Session, question: str, ticker: Optional[str] = None,
                                        label=_step_label(data["tool"], data["args"])))
             else:
                 answer = str(data)
+    except QuotaError:
+        #  Hết hạn mức thì lui về một nhịp cũng vô ích (vẫn phải gọi Gemini) →
+        #  để route nói thật với người dùng.
+        raise
     except GeminiError:
         #  Agent hỏng (thiếu key / API đổi / lỗi định dạng) → RAG một-nhịp cho chắc.
         return chat.answer_question(db, question, ticker)
@@ -473,7 +481,7 @@ def answer_stream(db: Session, question: str, ticker: Optional[str] = None,
     giữa chừng → lui về RAG một-nhịp. `attachments` = (bytes, mime) ảnh/PDF.
     """
     settings = get_settings()
-    if not settings.rag_agent_enabled:
+    if not settings.rag_agent_enabled or not budget.should_use_agent():
         yield from chat.answer_stream(db, question, ticker)
         return
 
@@ -493,6 +501,8 @@ def answer_stream(db: Session, question: str, ticker: Optional[str] = None,
                 yield ("step", {"tool": step.tool, "label": step.label})
             else:
                 answer = str(data)
+    except QuotaError:
+        raise
     except GeminiError:
         yield from chat.answer_stream(db, question, ticker)
         return

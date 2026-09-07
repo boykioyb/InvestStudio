@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     app_name: str = "InvestStudio API"
     version: str = "3.0.0"
+    #  "dev" | "prod". Ở prod: tắt /docs, /openapi.json và bật header bảo mật.
+    env: str = "dev"
     # Origin của frontend Nuxt được phép gọi API (CORS).
     cors_origins: list[str] = ["http://localhost:3010", "http://127.0.0.1:3010"]
     # Thời gian cache kết quả phân tích (giây) — tránh gọi nguồn liên tục.
@@ -55,7 +57,42 @@ class Settings(BaseSettings):
     rate_limit_redis_url: str = "redis://localhost:6379/2"
     login_max_attempts: int = 10          # số lần/cửa sổ cho mỗi IP
     login_window_seconds: int = 300       # cửa sổ 5 phút
-    rag_daily_quota: int = 100            # số lượt hỏi trợ lý/user/ngày (chống cháy Gemini)
+    #  Số lượt hỏi trợ lý/user/ngày. Đặt 5 vì Gemini đang chạy BẢN MIỄN PHÍ:
+    #  quota ngày hữu hạn và KHÔNG mua thêm được — hết là trợ lý im với mọi
+    #  người tới 0h hôm sau. Xem thêm app/core/budget.py.
+    rag_daily_quota: int = 5
+
+    # ── Giới hạn tần suất chung + IP thật sau proxy ──────────────────────────
+    #  Trần request/phút cho MỖI IP trên toàn bộ /api (chống quét, chống DoS rẻ tiền).
+    api_rate_limit_per_minute: int = 120
+    #  Số lượt phân tích/ngày: khách (theo IP) và thành viên (theo tài khoản).
+    guest_analyze_daily: int = 30
+    member_analyze_daily: int = 100
+    member_refresh_daily: int = 10        # số lần ép crawl lại (bỏ qua cache)
+    #  CHỈ tin X-Forwarded-For khi request đến từ các IP này (proxy của mình).
+    #  Rỗng = không tin ai → luôn dùng IP kết nối trực tiếp. Trong Docker, Nuxt
+    #  proxy nằm cùng mạng nội bộ nên thường là dải 172.16.0.0/12 → khai "*"
+    #  CHỈ khi backend chắc chắn không phơi thẳng ra Internet (xem H5).
+    trusted_proxies: list[str] = []
+    #  Số hop tin cậy tính từ CUỐI chuỗi X-Forwarded-For (phần do proxy của mình
+    #  ghi). Lấy từ cuối chứ không phải từ đầu — hop đầu do client tự khai.
+    trusted_proxy_hops: int = 1
+
+    # ── Ngân sách Gemini (bản miễn phí: RPM/RPD hữu hạn, không mua thêm) ──────
+    #  Trần SỐ REQUEST Gemini/ngày. Đọc quota thật của dự án trong AI Studio rồi
+    #  chừa lại ~100 cho job nền (reindex 8h sáng) — hết quota giữa ngày thì job
+    #  chết lặng và kho RAG đứng yên mà không ai biết.
+    gemini_daily_call_cap: int = 1400
+    #  Số câu hỏi được gọi Gemini CÙNG LÚC. Bản miễn phí ~10–15 request/phút mà
+    #  một câu hỏi bắn 3–7 request liên tiếp → 2 là biên an toàn.
+    gemini_max_concurrent: int = 2
+    gemini_slot_wait_seconds: float = 15.0   # chờ tối đa khi đang kẹt hàng đợi
+    gemini_retry_attempts: int = 3           # thử lại khi Google trả 429
+    #  Hạ cấp mềm theo % quota ngày đã dùng: qua mức này thì TẮT agent, lui về
+    #  RAG một nhịp (1 request thay vì 3–7).
+    gemini_degrade_at: float = 0.70
+    #  Qua mức này thì chỉ người ĐÃ hỏi trong ngày mới được hỏi tiếp.
+    gemini_block_new_at: float = 0.90
 
     # ── Agentic RAG (trợ lý tự chọn công cụ) ─────────────────────────────────
     #  Bật vòng lặp agent: model tự gọi tool (phân tích/xếp hạng/tìm tri thức)
@@ -63,9 +100,9 @@ class Settings(BaseSettings):
     rag_agent_enabled: bool = True
     #  Trần số vòng gọi tool cho MỖI câu hỏi — chặn lặp vô tận + đốt quota Gemini
     #  (1 câu vẫn tính 1 đơn vị quota, nhưng mỗi vòng là 1 lần gọi model).
-    rag_agent_max_steps: int = 5
+    rag_agent_max_steps: int = 3
     #  Số lượt hội thoại gần nhất frontend gửi kèm để agent giữ ngữ cảnh ("nó"…).
-    rag_history_turns: int = 6
+    rag_history_turns: int = 4
 
     # ── Đính kèm (attachment) ────────────────────────────────────────────────
     upload_dir: str = "/app/uploads"       # thư mục lưu tệp (khớp volume trong compose)

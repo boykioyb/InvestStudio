@@ -26,8 +26,14 @@ x-app-env: &app-env
   # Celery: Redis làm broker (/0) và result backend (/1)
   APP_CELERY_BROKER_URL: redis://redis:6379/0
   APP_CELERY_RESULT_BACKEND: redis://redis:6379/1
-  # Redis (/2) cho giới hạn tần suất đăng nhập
+  # Redis (/2) cho giới hạn tần suất + hạn mức
   APP_RATE_LIMIT_REDIS_URL: redis://redis:6379/2
+  # Trình duyệt gọi /api qua proxy Nuxt, nên backend nhìn thấy IP của CONTAINER
+  # frontend chứ không phải IP người dùng. Chỉ tin X-Forwarded-For khi request
+  # đến từ dải mạng nội bộ của Docker — gọi thẳng vào cổng API từ ngoài thì
+  # header giả mạo bị lờ đi. (IP container do Docker cấp động ⇒ khai theo dải.)
+  APP_TRUSTED_PROXIES: '["172.16.0.0/12"]'
+  APP_TRUSTED_PROXY_HOPS: "1"
   TZ: Asia/Ho_Chi_Minh
 
 services:

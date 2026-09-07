@@ -5,14 +5,59 @@ tính năng RAG mới bắt buộc phải có `APP_GEMINI_API_KEY`.
 """
 from __future__ import annotations
 
+import time
 from functools import lru_cache
 from typing import Callable, Iterator
 
+from app.core import budget
 from app.core.config import get_settings
 
 
 class GeminiError(RuntimeError):
     """Lỗi thuộc về Gemini (thiếu key, gọi API hỏng) — tách khỏi ProviderError."""
+
+
+class QuotaError(GeminiError):
+    """Hết hạn mức / đang xếp hàng — KHÔNG phải lỗi kỹ thuật.
+
+    Tách riêng vì cách xử lý khác hẳn: lỗi kỹ thuật thì lui về RAG một nhịp cho
+    chắc, còn hết hạn mức thì lui cũng vô ích (vẫn phải gọi Gemini) — phải nói
+    thật với người dùng là hôm nay hết lượt.
+    """
+
+
+_RATE_LIMIT_MARKS = ("429", "RESOURCE_EXHAUSTED", "rate limit", "quota")
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    """Google trả 429 (chạm request/phút) — đáng thử lại sau vài giây."""
+    text = str(exc).lower()
+    return any(mark.lower() in text for mark in _RATE_LIMIT_MARKS)
+
+
+def _guarded(call: Callable[[], object], what: str):
+    """Gọi Gemini qua NGÂN SÁCH: tính vào quota ngày, xếp hàng, thử lại khi 429.
+
+    Mọi lệnh gọi Gemini trong file này đều đi qua đây — đó là lý do bộ đếm phản
+    ánh đúng số request THẬT, không phải số "lượt hỏi" (một lượt = 3–7 request).
+    """
+    attempts = max(1, get_settings().gemini_retry_attempts)
+    for attempt in range(attempts):
+        try:
+            with budget.slot():
+                return call()
+        except budget.BudgetError as exc:
+            raise QuotaError(str(exc)) from exc
+        except GeminiError:
+            raise
+        except Exception as exc:  # pragma: no cover - lỗi mạng/hạn mức từ Gemini
+            if _is_rate_limited(exc) and attempt < attempts - 1:
+                #  Giãn cách tăng dần: 1s → 2s → 4s. Google tính theo phút nên
+                #  chờ vài giây thường là qua.
+                time.sleep(2 ** attempt)
+                continue
+            raise GeminiError(f"{what} lỗi: {exc}") from exc
+    raise GeminiError(f"{what} lỗi: hết lượt thử lại.")  # pragma: no cover
 
 
 @lru_cache
@@ -41,18 +86,12 @@ def embed_texts(texts: list[str], *, is_query: bool = False) -> list[list[float]
 
     settings = get_settings()
     task = "RETRIEVAL_QUERY" if is_query else "RETRIEVAL_DOCUMENT"
-    try:
-        resp = _client().models.embed_content(
-            model=settings.gemini_embed_model,
-            contents=texts,
-            config=types.EmbedContentConfig(
-                task_type=task, output_dimensionality=settings.embed_dim
-            ),
-        )
-    except GeminiError:
-        raise
-    except Exception as exc:  # pragma: no cover - lỗi mạng/hạn mức từ Gemini
-        raise GeminiError(f"Gemini nhúng văn bản lỗi: {exc}") from exc
+    resp = _guarded(lambda: _client().models.embed_content(
+        model=settings.gemini_embed_model,
+        contents=texts,
+        config=types.EmbedContentConfig(
+            task_type=task, output_dimensionality=settings.embed_dim),
+    ), "Gemini nhúng văn bản")
     return [list(item.values) for item in resp.embeddings]
 
 
@@ -61,16 +100,21 @@ def generate_answer_stream(system_instruction: str, prompt: str):
     from google.genai import types
 
     settings = get_settings()
+    #  Giữ suất trong SUỐT lúc stream (khác các lệnh gọi một-phát): kết nối còn
+    #  mở là Google vẫn đang phục vụ ta, nên vẫn phải tính là một chỗ đang chạy.
     try:
-        stream = _client().models.generate_content_stream(
-            model=settings.gemini_chat_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction, temperature=0.2),
-        )
-        for chunk in stream:
-            if chunk.text:
-                yield chunk.text
+        with budget.slot():
+            stream = _client().models.generate_content_stream(
+                model=settings.gemini_chat_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction, temperature=0.2),
+            )
+            for chunk in stream:
+                if chunk.text:
+                    yield chunk.text
+    except budget.BudgetError as exc:
+        raise QuotaError(str(exc)) from exc
     except GeminiError:
         raise
     except Exception as exc:  # pragma: no cover
@@ -126,8 +170,11 @@ def run_agent(
 
     try:
         for _ in range(max_steps):
-            resp = client.models.generate_content(
-                model=settings.gemini_chat_model, contents=contents, config=agent_config)
+            #  MỖI vòng là MỘT request Gemini → đếm riêng. Suất chỉ giữ trong lúc
+            #  gọi model, nhả ra khi chạy tool (tool đi crawl, không đụng Gemini).
+            resp = _guarded(lambda: client.models.generate_content(
+                model=settings.gemini_chat_model, contents=contents, config=agent_config),
+                "Gemini agent")
             calls = list(resp.function_calls or [])
             if not calls:
                 yield ("answer", (resp.text or "").strip())
@@ -142,10 +189,10 @@ def run_agent(
                     types.Part.from_function_response(
                         name=call.name, response={"result": result})]))
         #  Chạm trần số bước → ép model chốt (bỏ tools để không gọi thêm nữa).
-        final = client.models.generate_content(
+        final = _guarded(lambda: client.models.generate_content(
             model=settings.gemini_chat_model, contents=contents,
             config=types.GenerateContentConfig(
-                system_instruction=system_instruction, temperature=0.2))
+                system_instruction=system_instruction, temperature=0.2)), "Gemini agent")
         yield ("answer", (final.text or "").strip())
     except GeminiError:
         raise
@@ -158,16 +205,10 @@ def generate_answer(system_instruction: str, prompt: str) -> str:
     from google.genai import types
 
     settings = get_settings()
-    try:
-        resp = _client().models.generate_content(
-            model=settings.gemini_chat_model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction, temperature=0.2
-            ),
-        )
-    except GeminiError:
-        raise
-    except Exception as exc:  # pragma: no cover
-        raise GeminiError(f"Gemini sinh câu trả lời lỗi: {exc}") from exc
+    resp = _guarded(lambda: _client().models.generate_content(
+        model=settings.gemini_chat_model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction, temperature=0.2),
+    ), "Gemini sinh câu trả lời")
     return (resp.text or "").strip()

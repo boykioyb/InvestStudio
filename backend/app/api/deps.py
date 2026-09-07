@@ -21,6 +21,21 @@ def _read_token(request: Request) -> str | None:
     return None
 
 
+def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> User | None:
+    """Người dùng nếu ĐANG đăng nhập, None nếu là khách — KHÔNG raise 401.
+
+    Dùng cho các endpoint mở cho cả khách nhưng cư xử khác nhau: khách chỉ được
+    đọc cache, thành viên mới được ép crawl lại (`refresh=true`) và có hạn mức
+    riêng. Nhờ vậy trang phân tích vẫn xem được mà không ai mượn được đường công
+    khai để đốt hạn mức nguồn dữ liệu.
+    """
+    token = _read_token(request)
+    sub = decode_access_token(token) if token else None
+    if sub is None or not sub.isdigit():
+        return None
+    return db.get(User, int(sub))
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     """Bắt buộc đăng nhập. Raise 401 nếu thiếu / sai token hoặc user không còn."""
     token = _read_token(request)
@@ -34,4 +49,18 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, int(sub)) if sub.isdigit() else None
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Phiên đăng nhập không còn hợp lệ.")
+    return user
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Chỉ cho quản trị viên. Dùng cho việc TỐN HẠN MỨC CHUNG (lập chỉ mục…).
+
+    Trước đây `POST /chat/reindex` mở cho mọi tài khoản đã đăng nhập: một người
+    lạ đăng ký xong bấm nút là đẩy job nhúng cả rổ VN30 — đủ để tiêu hết quota
+    Gemini của cả ngày.
+    """
+    if user.role != "admin":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="Chức năng này chỉ dành cho quản trị viên.")
     return user

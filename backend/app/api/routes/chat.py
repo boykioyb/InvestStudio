@@ -15,8 +15,8 @@ from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
-from app.core import ratelimit
+from app.api.deps import get_current_user, require_admin
+from app.core import budget, ratelimit
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
 from app.db.session import get_db
@@ -36,10 +36,31 @@ from app.schemas.chat import (
 )
 from app.services.rag import agent, store
 from app.services.rag import attachments as attach_store
-from app.services.rag.gemini import GeminiError
+from app.services.rag.gemini import GeminiError, QuotaError
 from app.services.rag.tasks import reindex_task
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+def _check_quota(user: User) -> None:
+    """Ba lớp trước khi cho một câu hỏi đi tiếp.
+
+    1. Trần chung sắp cạn (>90% quota ngày) → chỉ phục vụ người ĐÃ hỏi hôm nay.
+       Người mới bị từ chối bằng lời nói thật, không phải lỗi kỹ thuật mơ hồ.
+    2. Hạn mức của chính người đó (`rag_daily_quota`).
+    3. (ở tầng dưới) mỗi request Gemini còn phải xin suất — xem app/core/budget.py.
+
+    Vì sao chặt tay vậy: Gemini đang chạy bản MIỄN PHÍ. Không có hóa đơn, nhưng
+    quota ngày là hữu hạn và không mua thêm được — hết là trợ lý im với TẤT CẢ
+    mọi người tới 0h hôm sau.
+    """
+    limit = get_settings().rag_daily_quota
+    if budget.new_questions_blocked() and ratelimit.used_today("rag", str(user.id)) == 0:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trợ lý đã gần hết hạn mức chung của hôm nay nên tạm dừng nhận "
+                   "người hỏi mới. Vui lòng quay lại sau 0h.")
+    ratelimit.enforce_daily(str(user.id), "rag", limit)
 
 
 def _title_from(question: str) -> str:
@@ -107,7 +128,7 @@ def _save_turn(db: Session, user: User, conv: Optional[Conversation], *,
 @router.post("", response_model=ChatResponse, summary="Hỏi trợ lý (RAG) một câu")
 def ask(payload: ChatRequest, user: User = Depends(get_current_user),
         db: Session = Depends(get_db)) -> ChatResponse:
-    ratelimit.enforce_daily(str(user.id), "rag", get_settings().rag_daily_quota)  # quota/ngày
+    _check_quota(user)
     ticker = payload.ticker.upper().strip() if payload.ticker else None
     question = payload.question.strip()
     conv = _resolve_conversation(db, user, conversation_id=payload.conversation_id,
@@ -116,6 +137,9 @@ def ask(payload: ChatRequest, user: User = Depends(get_current_user),
     parts, refs = _load_attachments(db, user, payload.attachment_ids)
     try:
         resp = agent.answer_question(db, question, ticker, payload.history, parts or None)
+    except QuotaError as exc:
+        #  Hết hạn mức / đang xếp hàng — nói thật, đừng che thành "lỗi hệ thống".
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
     except GeminiError as exc:
         #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
         #  ghi log phía máy chủ để còn gỡ lỗi.
@@ -153,7 +177,7 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                attachment_ids: Optional[str] = Query(None, description="Id các tệp, cách nhau dấu phẩy"),
                user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> StreamingResponse:
-    ratelimit.enforce_daily(str(user.id), "rag", get_settings().rag_daily_quota)
+    _check_quota(user)
     tk = ticker.upper().strip() if ticker else None
     q = question.strip()
     hist = _parse_history(history)
@@ -176,6 +200,9 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                     payload.conversation_id = cid
                     final = payload
                     yield _sse("final", payload.model_dump(mode="json"))
+        except QuotaError as exc:
+            yield _sse("error", {"detail": str(exc)})
+            return
         except GeminiError as exc:
             print(f"[chat] stream GeminiError: {exc}", file=sys.stderr)
             yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
@@ -312,9 +339,9 @@ def _status(db: Session) -> IndexStatus:
 
 
 @router.post("/reindex", response_model=IndexStatus, status_code=status.HTTP_202_ACCEPTED,
-             summary="Đưa việc lập chỉ mục VN30 + tin vào hàng đợi (chạy nền qua Celery)")
+             summary="[QUẢN TRỊ] Đưa việc lập chỉ mục VN30 + tin vào hàng đợi (Celery)")
 def reindex(deep: bool = Query(False, description="Kèm điểm số/ROE qua analyze() — chậm hơn"),
-            user: User = Depends(get_current_user),
+            user: User = Depends(require_admin),
             db: Session = Depends(get_db)) -> IndexStatus:
     current = _status(db)
     if current.running:
@@ -335,3 +362,20 @@ def reindex(deep: bool = Query(False, description="Kèm điểm số/ROE qua ana
 def index_status(user: User = Depends(get_current_user),
                  db: Session = Depends(get_db)) -> IndexStatus:
     return _status(db)
+
+
+@router.get("/quota", summary="Hạn mức trợ lý còn lại hôm nay")
+def chat_quota(user: User = Depends(get_current_user)) -> dict:
+    """Cho frontend hiện "còn 3/5 lượt hôm nay" thay vì để người dùng đâm vào 429.
+
+    `level`: `ok` (bình thường) · `saving` (quota chung đang cạn → trả lời gọn
+    hơn, không dùng agent) · `exhausted` (chỉ phục vụ người đã hỏi hôm nay).
+    """
+    limit = get_settings().rag_daily_quota
+    snapshot = budget.status_snapshot()
+    return {
+        "limit": limit,
+        "used": ratelimit.used_today("rag", str(user.id)),
+        "remaining": ratelimit.remaining_daily("rag", str(user.id), limit),
+        "level": snapshot["level"],
+    }

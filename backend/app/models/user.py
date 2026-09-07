@@ -27,6 +27,10 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(120), default="")
     #  Chỉ lưu MẬT KHẨU ĐÃ BĂM (bcrypt), không bao giờ lưu mật khẩu thô.
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    #  'user' | 'admin'. Chỉ admin được chạm vào việc tiêu hạn mức chung (lập
+    #  chỉ mục RAG) — xem app/api/deps.py:require_admin.
+    role: Mapped[str] = mapped_column(String(16), default="user", server_default="user",
+                                      nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     watchlist: Mapped[list["WatchlistItem"]] = relationship(

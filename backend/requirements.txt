@@ -4,6 +4,7 @@ pydantic>=2.9
 pydantic-settings>=2.6
 httpx>=0.27               # gọi thẳng API VCI/Vietcap (đã CAI vnstock/vnai)
 certifi                   # SSL bundle cho provider CafeF (urllib)
+cachetools>=5.5           # TTLCache có TRẦN số mục — cache cũ là dict không bao giờ dọn
 pytest>=8.0
 
 # ── Tài khoản người dùng + lưu trữ (login/đăng ký, mã yêu thích) ──────────────
