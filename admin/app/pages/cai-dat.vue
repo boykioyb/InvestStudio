@@ -1,9 +1,15 @@
 <script setup lang="ts">
 /** Cài đặt: cần gạt khẩn cấp + hạn mức + bật xác thực 2 lớp. */
 const api = useAdminApi()
+const route = useRoute()
+const me = useAdminUser()
+
+//  Bị đẩy sang đây vì chưa bật 2 lớp → nói rõ lý do ngay đầu trang, thay vì để
+//  người dùng ngơ ngác không hiểu sao vừa bấm Tổng quan lại nhảy sang Cài đặt.
+const cangBat2Lop = computed(() => route.query.canh_bao === '2fa' || me.value?.totp_enabled === false)
 
 const { data, pending, refresh } = await useAsyncData('settings', () =>
-  api.get<any[]>('/admin/settings')
+  api.get<any[]>('/admin/settings').catch(() => [])
 )
 
 const nhap = reactive<Record<string, any>>({})
@@ -53,9 +59,13 @@ async function bat() {
   loi.value = ''
   try {
     await api.post(`/admin/2fa/enable?code=${ma.value}`)
-    thongBao.value = 'Đã bật xác thực 2 lớp. Lần đăng nhập sau cần mã 6 số.'
     totp.value = null
     ma.value = ''
+    //  Bật 2 lớp làm token_version tăng → phiên hiện tại đã chết. Nói thật và
+    //  đưa về trang đăng nhập thay vì để người dùng bấm tiếp rồi ăn 401.
+    thongBao.value = 'Đã bật xác thực 2 lớp. Đang đưa bạn về trang đăng nhập…'
+    me.value = null
+    setTimeout(() => navigateTo('/dang-nhap?next=/'), 1800)
   } catch (e: any) {
     loi.value = e.message
   }
@@ -71,6 +81,15 @@ async function bat() {
       </div>
       <UButton :loading="dangLuu" icon="i-lucide-save" @click="luu">Lưu thay đổi</UButton>
     </div>
+
+    <UAlert
+      v-if="cangBat2Lop"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-shield-alert"
+      title="Hãy bật xác thực 2 lớp trước"
+      description="Khu quản trị đọc được dữ liệu của mọi người dùng, nên chỉ mở sau khi tài khoản có 2 lớp. Bật ở thẻ bên dưới, sau đó đăng nhập lại."
+    />
 
     <UAlert v-if="loi" color="error" variant="subtle" :title="loi" close @close="loi = ''" />
     <UAlert v-else-if="thongBao" color="success" variant="subtle" :title="thongBao" close @close="thongBao = ''" />
@@ -107,7 +126,10 @@ async function bat() {
         chiếm toàn bộ. Mật khẩu thôi không đủ.
       </p>
 
-      <div v-if="!totp" class="mt-3">
+      <p v-if="me?.totp_enabled" class="mt-3 text-sm text-success">
+        Tài khoản này đã bật 2 lớp.
+      </p>
+      <div v-else-if="!totp" class="mt-3">
         <UButton icon="i-lucide-shield-check" variant="soft" @click="taoKhoa">Tạo mã bật 2 lớp</UButton>
       </div>
 

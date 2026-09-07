@@ -189,3 +189,30 @@ def test_bat_2_lop_roi_dang_nhap_phai_co_ma(admin_client, db, monkeypatch):
         "email": "sep@gmail.com", "password": _PW,
         "totp_code": pyotp.TOTP(setup["secret"]).now()})
     assert du.status_code == 200
+
+
+def test_403_thieu_2_lop_co_header_danh_dau(admin_client, monkeypatch):
+    """Giao diện phải PHÂN BIỆT được "chưa bật 2 lớp" với "không có quyền":
+    cái đầu tự sửa được nên đưa thẳng người dùng tới trang bật, cái sau thì không."""
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "admin_require_2fa", True)
+
+    r = admin_client.get("/api/admin/overview")
+    assert r.status_code == 403
+    assert r.headers.get("x-admin-setup") == "totp"
+
+
+def test_me_bao_da_bat_2_lop_chua(admin_client, db):
+    import pyotp
+
+    assert admin_client.get("/api/auth/me").json()["totp_enabled"] is False
+
+    setup = admin_client.post("/api/admin/2fa/setup").json()
+    admin_client.post(f"/api/admin/2fa/enable?code={pyotp.TOTP(setup['secret']).now()}")
+
+    #  Bật xong phiên cũ chết (token_version tăng) → đăng nhập lại rồi mới hỏi.
+    admin_client.cookies.clear()
+    admin_client.post("/api/auth/login", json={
+        "email": "sep@gmail.com", "password": _PW,
+        "totp_code": pyotp.TOTP(setup["secret"]).now()})
+    assert admin_client.get("/api/auth/me").json()["totp_enabled"] is True

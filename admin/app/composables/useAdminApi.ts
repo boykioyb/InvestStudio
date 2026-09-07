@@ -20,7 +20,16 @@ export function useAdminApi() {
         await toLogin(useRoute().fullPath)
         throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.')
       }
-      if (status === 403) throw new Error(detail || 'Tài khoản này không có quyền quản trị.')
+      if (status === 403) {
+        //  "Chưa bật 2 lớp" khác hẳn "không có quyền": cái đầu tự sửa được, nên
+        //  đưa thẳng người dùng tới nơi bật thay vì để họ đọc lỗi rồi tự mò.
+        //  Backend đánh dấu bằng header X-Admin-Setup (app/api/deps.py).
+        if (error?.response?.headers?.get('x-admin-setup') === 'totp') {
+          const route = useRoute()
+          if (route.path !== '/cai-dat') await navigateTo('/cai-dat?canh_bao=2fa')
+        }
+        throw new Error(detail || 'Tài khoản này không có quyền quản trị.')
+      }
       if (status === 404 && path.startsWith('/admin')) {
         throw new Error('Không truy cập được khu quản trị từ địa chỉ IP hiện tại.')
       }

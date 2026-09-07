@@ -52,6 +52,11 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property
+    def totp_enabled(self) -> bool:
+        """Cho DTO đọc — frontend chỉ cần biết đã bật hay chưa, không cần khóa."""
+        return bool(self.totp_secret)
+
+    @property
     def email_verified(self) -> bool:
         """Cho DTO `UserOut` đọc — frontend chỉ cần biết đã xác minh hay chưa."""
         return self.email_verified_at is not None

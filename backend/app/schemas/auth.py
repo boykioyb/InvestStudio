@@ -57,4 +57,5 @@ class UserOut(BaseModel):
     display_name: str
     role: str = "user"
     email_verified: bool = False
+    totp_enabled: bool = False
     created_at: datetime

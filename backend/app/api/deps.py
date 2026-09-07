@@ -94,7 +94,10 @@ def require_admin(request: Request, user: User = Depends(get_current_user)) -> U
             and not request.url.path.startswith(_TWO_FACTOR_EXEMPT)):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            detail="Tài khoản quản trị phải bật xác thực 2 lớp trước khi dùng khu quản trị.")
+            detail="Tài khoản quản trị phải bật xác thực 2 lớp trước khi dùng khu quản trị.",
+            #  Header để giao diện PHÂN BIỆT được "thiếu 2 lớp" với "không có
+            #  quyền": cái đầu sửa được ngay (đi bật), cái sau thì không.
+            headers={"X-Admin-Setup": "totp"})
     return user
 
 
