@@ -12,7 +12,14 @@ export function useAdminApi() {
     } catch (error: any) {
       const status = error?.response?.status
       const detail = error?.data?.detail
-      if (status === 401) throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.')
+      if (status === 401) {
+        //  Phiên chết GIỮA CHỪNG (token bị thu hồi, hết hạn) → đưa thẳng ra
+        //  trang đăng nhập kèm đường quay lại, đừng để người dùng nhìn dòng chữ
+        //  đỏ rồi không biết bấm vào đâu.
+        useAdminUser().value = null
+        await toLogin(useRoute().fullPath)
+        throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.')
+      }
       if (status === 403) throw new Error(detail || 'Tài khoản này không có quyền quản trị.')
       if (status === 404 && path.startsWith('/admin')) {
         throw new Error('Không truy cập được khu quản trị từ địa chỉ IP hiện tại.')

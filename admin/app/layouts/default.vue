@@ -1,5 +1,12 @@
 <script setup lang="ts">
 const route = useRoute()
+const me = useAdminUser()
+
+async function dangXuat() {
+  await $fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+  me.value = null
+  await navigateTo('/dang-nhap')
+}
 
 const links = [
   { label: 'Tổng quan', icon: 'i-lucide-gauge', to: '/' },
@@ -27,8 +34,15 @@ const links = [
           :variant="route.path === link.to ? 'soft' : 'ghost'"
           class="justify-start"
         />
-        <div class="mt-auto px-2 pt-4 text-xs text-muted">
-          Mọi thao tác ghi đều được lưu nhật ký.
+        <div class="mt-auto space-y-2 pt-4">
+          <p class="px-2 text-xs text-muted">Mọi thao tác ghi đều được lưu nhật ký.</p>
+          <div v-if="me" class="border-t border-default px-2 pt-3">
+            <p class="truncate text-xs">{{ me.email }}</p>
+            <UButton
+              icon="i-lucide-log-out" label="Đăng xuất" size="xs" variant="ghost"
+              color="neutral" class="mt-1 justify-start" @click="dangXuat"
+            />
+          </div>
         </div>
       </aside>
 
