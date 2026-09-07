@@ -71,6 +71,23 @@ export interface PriceHistory {
   stats: HistoryStats
 }
 
+/** Giá khớp gần realtime của một mã (backend cache ngắn, gộp lô). */
+export interface Quote {
+  symbol: string
+  price: number | null
+  ref: number | null
+  change: number | null
+  change_pct: number | null
+  volume: number | null
+  time: string
+}
+
+export interface QuoteBatch {
+  quotes: Quote[]
+  is_open: boolean
+  asof: string
+}
+
 /** Tiến độ một bước phân tích do máy chủ phát qua SSE. */
 export interface AnalyzeProgress {
   /** Mã bước: technical | company | fundamentals | scoring | done | cache | start */
@@ -573,4 +590,41 @@ export interface ScreenerList {
   session: SessionState
   rows: ScreenerRow[]
   note: string
+}
+
+/* ==========================================================================
+   Điểm nhấn thị trường cho trang chủ — GET /api/market/highlights
+   ========================================================================== */
+
+/** Mức độ của sự kiện → ánh xạ sang màu tín hiệu (--good/--warn/--bad). */
+export type HighlightLevel = 'good' | 'warn' | 'bad'
+
+/** Một sự kiện sắp tới (cổ tức, GDKHQ, ĐHCĐ…). `date` dạng ISO yyyy-mm-dd. */
+export interface MarketEvent {
+  date: string
+  symbol: string
+  kind: string
+  detail: string
+  level: HighlightLevel
+}
+
+/** Một tin công bố. `url` có thể null khi nguồn không kèm liên kết. */
+export interface MarketNewsItem {
+  symbol: string
+  title: string
+  date: string
+  url: string | null
+}
+
+/** Một dòng bảng điểm cao nhất trong rổ. */
+export interface MarketLeader {
+  symbol: string
+  score: number
+}
+
+export interface MarketHighlights {
+  group: string
+  events: MarketEvent[]
+  news: MarketNewsItem[]
+  leaders: MarketLeader[]
 }

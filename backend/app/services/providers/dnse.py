@@ -7,13 +7,15 @@ kỳ). Endpoint không cần token/cookie; đo thực tế 2026-08-25 đều HTT
 Khác VCI ở đơn vị giá: DNSE trả nến **đã ở NGHÌN ĐỒNG** (close ~14.0 cho TPB) nên
 KHÔNG chia 1000 (VCI trả ở đồng, phải chia). Volume là số cổ phiếu thô.
 
-Phạm vi: khối GIÁ (đã wired làm nguồn ưu tiên hàng đầu) + tin tức (nguồn tươi, sẵn
-để cắm vào feed). KHÔNG phơi chỉ số cơ bản: `financial-index` của DNSE trả tăng
-trưởng LN sai thước đo (không phải YoY năm) nên khối cơ bản vẫn để VCI đảm nhiệm.
+Phạm vi: khối GIÁ (nguồn ưu tiên hàng đầu) + tin tức + sự kiện doanh nghiệp (đều
+nguồn TƯƠI, thay feed VCI đã đóng băng). KHÔNG phơi chỉ số cơ bản: `financial-index`
+của DNSE trả tăng trưởng LN sai thước đo (không phải YoY năm) nên cơ bản để VCI lo.
 
 Endpoint (rút từ chính trang senses/co-phieu-<mã>):
   · GET  api.dnse.com.vn/chart-api/v2/ohlcs/stock?symbol=&resolution=1D&from=&to=
   · POST api-bo.dnse.com.vn/senses-api/v3/news/_query   body {"symbols":[...],...}
+  · GET  api-bo.dnse.com.vn/senses-api/events?symbol=       (sự kiện riêng từng mã)
+  · GET  api-bo.dnse.com.vn/senses-api/corporate-actions    (lịch quyền SẮP TỚI, cả sàn)
 """
 from __future__ import annotations
 
@@ -99,10 +101,18 @@ def ohlcv(symbol: str, days: int = 180) -> list[dict]:
     return out
 
 
-def news(symbol: str, limit: int = 20) -> list[dict]:
-    """Tin tức của một mã (nguồn TƯƠI, có nội dung đầy đủ). Phân trang qua `cursor`."""
+def news_many(symbols: list[str], limit: int = 20) -> list[dict]:
+    """Tin tức của NHIỀU mã trong MỘT request (body nhận cả danh sách `symbols`).
+
+    Quan trọng cho khối điểm nhấn trang chủ: 30 mã VN30 vẫn chỉ tốn 1 request,
+    không fan-out 30 lần. Mỗi tin kèm `symbol` (mã chính do nguồn gắn) và
+    `symbols` (mọi mã được nhắc) để tầng trên lọc theo rổ.
+    """
+    codes = [s.upper().strip() for s in symbols if s and s.strip()]
+    if not codes:
+        return []
     data = _request("POST", f"{_SENSES}/v3/news/_query", json={
-        "symbols": [symbol.upper()], "limit": limit, "cursor": "",
+        "symbols": codes, "limit": limit, "cursor": "",
         "tags": ["news"], "macro": False,
     }) or {}
     items: list[dict] = []
@@ -110,11 +120,83 @@ def news(symbol: str, limit: int = 20) -> list[dict]:
         title = it.get("title") or ""
         if not title:
             continue
+        related = [str(s).upper() for s in (it.get("symbols") or []) if s]
         items.append({
             "title": title,
             "date": str(it.get("publishTime") or "")[:10],
             "source": it.get("domain") or it.get("author") or "",
             "link": it.get("sensesUrl") or "",
             "summary": it.get("head") or "",
+            "symbol": str(it.get("symbol") or "").upper(),
+            "symbols": related,
         })
     return items
+
+
+def news(symbol: str, limit: int = 20) -> list[dict]:
+    """Tin tức của một mã (nguồn TƯƠI, có nội dung đầy đủ). Phân trang qua `cursor`."""
+    return news_many([symbol], limit)
+
+
+def corporate_events(symbol: str) -> list[dict]:
+    """Sự kiện doanh nghiệp RIÊNG một mã (cổ tức, ĐHCĐ, phát hành…) — nguồn TƯƠI.
+
+    Endpoint per-symbol `senses-api/events` (khác feed corporate-actions toàn thị
+    trường). Trả shape khớp `_event_items` của feed:
+      · gdkhqDate → ngày GDKHQ (giao dịch không hưởng quyền) = exright_date + date
+      · ndkccDate → ngày ĐKCC (đăng ký cuối cùng) = record_date
+    Endpoint KHÔNG kèm tỷ lệ/giá trị cổ tức → ratio/value_per_share để None.
+    """
+    data = _request("GET", f"{_SENSES}/events", params={"symbol": symbol.upper()})
+    rows = data if isinstance(data, list) else ((data or {}).get("data") or [])
+    out: list[dict] = []
+    for e in rows:
+        name = e.get("name") or e.get("title") or ""
+        if not name:
+            continue
+        exright = str(e.get("gdkhqDate") or e.get("gdkhqDateOrigin") or "")[:10]
+        out.append({
+            "name": name,
+            "title": e.get("title") or e.get("titleEvent") or "",
+            "date": exright,
+            "ratio": None,
+            "value_per_share": None,
+            "record_date": str(e.get("ndkccDate") or e.get("ndkccDateOrigin") or "")[:10],
+            "exright_date": exright,
+            "payout_date": "",
+            "action": "",
+        })
+    return out
+
+
+def upcoming_corporate_actions() -> list[dict]:
+    """Sự kiện doanh nghiệp SẮP TỚI của TOÀN thị trường — MỘT request cho mọi mã.
+
+    Khác `corporate_events(symbol)` (per-symbol, và chỉ trả sự kiện ĐÃ QUA): feed
+    `senses-api/corporate-actions` là lịch quyền sắp thực hiện của cả sàn — đo
+    thực tế 2026-09-07 trả 72 sự kiện, GDKHQ từ hôm nay tới +30 ngày. Nhờ vậy
+    dựng lịch sự kiện cho một rổ 30 mã chỉ tốn 1 request thay vì 30.
+
+    Endpoint BỎ QUA mọi tham số (đã thử size/limit/from/to/symbols → vẫn trả y
+    nguyên 72 dòng), nên việc lọc theo rổ và theo ngày làm ở tầng service.
+    """
+    data = _request("GET", f"{_SENSES}/corporate-actions") or {}
+    rows = data.get("corporateActions") if isinstance(data, dict) else data
+    out: list[dict] = []
+    for e in rows or []:
+        symbol = str(e.get("symbol") or "").upper()
+        name = e.get("name") or e.get("titleEvent") or ""
+        if not symbol or not name:
+            continue
+        out.append({
+            "symbol": symbol,
+            "name": name,
+            "title": e.get("title") or e.get("titleEvent") or e.get("note") or "",
+            #  GDKHQ = mốc người mua sau ngày này KHÔNG còn hưởng quyền → mốc
+            #  đáng nhớ nhất với người xem; ĐKCC/ngày thực hiện chỉ là dự phòng.
+            "exright_date": str(e.get("exRightsDate") or "")[:10],
+            "record_date": str(e.get("recordDate") or "")[:10],
+            "action_date": str(e.get("actionDate") or "")[:10],
+            "url": e.get("url") or "",
+        })
+    return out

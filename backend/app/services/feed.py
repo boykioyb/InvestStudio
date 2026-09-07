@@ -104,6 +104,28 @@ def _event_items(events: list[dict]) -> list[EventItem]:
     return sorted(items, key=lambda e: e.date, reverse=True)
 
 
+def _corporate_events(ticker: str) -> list[EventItem]:
+    """Sự kiện doanh nghiệp: DNSE ưu tiên (tươi) → VCI dự phòng.
+
+    Feed sự kiện của VCI đã đóng băng (~2023 với nhiều mã) nên DNSE per-symbol là
+    nguồn chính; chỉ lùi về VCI khi DNSE lỗi/rỗng.
+    """
+    from app.services.providers import dnse, vci_direct
+    from app.services.providers.dnse import DnseError
+    from app.services.providers.vci_direct import VciError
+
+    try:
+        rows = dnse.corporate_events(ticker)
+    except DnseError:
+        rows = []
+    if not rows:
+        try:
+            rows = vci_direct.events(ticker)
+        except VciError:
+            rows = []
+    return _event_items(rows)
+
+
 def fetch_news(ticker: str) -> NewsFeed:
     """Tin công bố + sự kiện doanh nghiệp gần đây (lấy thẳng VCI, không qua vnstock)."""
     from app.services.providers import google_news, vci_direct
@@ -136,7 +158,7 @@ def fetch_news(ticker: str) -> NewsFeed:
         news.append(node)
     news.sort(key=lambda n: n.date, reverse=True)
 
-    events = _event_items(safe(lambda: vci_direct.events(ticker)) or [])
+    events = _corporate_events(ticker)
 
     if not news and not events:
         raise ProviderError(f"Không có tin tức hay sự kiện nào cho {ticker}.")
@@ -149,14 +171,8 @@ def fetch_news(ticker: str) -> NewsFeed:
 
 def fetch_corporate_actions(ticker: str) -> CorporateActions:
     """Sự kiện liên quan tới vốn và quyền lợi cổ đông, chia theo loại."""
-    from app.services.providers import vci_direct
-    from app.services.providers.vci_direct import VciError
-
     ticker = ticker.upper().strip()
-    try:
-        events = _event_items(vci_direct.events(ticker))
-    except VciError as exc:
-        raise ProviderError(f"Không lấy được sự kiện doanh nghiệp của {ticker}: {exc}") from exc
+    events = _corporate_events(ticker)
 
     if not events:
         raise ProviderError(f"Không có sự kiện doanh nghiệp nào cho {ticker}.")

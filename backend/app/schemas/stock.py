@@ -307,6 +307,27 @@ class TradingBoard(BaseModel):
     note: str = ""
 
 
+# ── Giá khớp gần realtime (polling nhẹ, cache ngắn ở backend) ────────────────
+class Quote(BaseModel):
+    """Giá khớp của một mã cho việc cập nhật gần realtime trên thẻ/ watchlist."""
+
+    symbol: str
+    price: Optional[float] = Field(None, description="Giá khớp gần nhất (nghìn đ)")
+    ref: Optional[float] = Field(None, description="Giá tham chiếu (nghìn đ)")
+    change: Optional[float] = Field(None, description="Thay đổi so tham chiếu (nghìn đ)")
+    change_pct: Optional[float] = Field(None, description="% thay đổi so tham chiếu")
+    volume: Optional[float] = Field(None, description="KL lũy kế trong phiên (triệu cp)")
+    time: str = Field("", description="Giờ khớp gần nhất HH:MM (giờ VN)")
+
+
+class QuoteBatch(BaseModel):
+    """Lô giá nhiều mã trong 1 lần gọi — nhẹ để frontend poll định kỳ."""
+
+    quotes: list[Quote]
+    is_open: bool = Field(..., description="Thị trường đang trong giờ giao dịch?")
+    asof: str = Field("", description="Mốc dữ liệu HH:MM (giờ VN)")
+
+
 # ── Tab Dòng tiền: chỉ báo theo NGÀY (không phải áp lực trong phiên) ─────────
 class FlowPoint(BaseModel):
     d: str

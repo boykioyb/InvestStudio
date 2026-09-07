@@ -115,6 +115,7 @@ def price_board(symbols: Iterable[str]) -> list[dict]:
             "accumulated_value": mp.get("accumulatedValue"),
             "foreign_buy_value": mp.get("foreignBuyValue"),
             "foreign_sell_value": mp.get("foreignSellValue"),
+            "sending_time": mp.get("sendingTime") or li.get("sendingTime"),
         })
     return out
 
