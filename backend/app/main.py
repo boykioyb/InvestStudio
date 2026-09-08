@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -13,7 +14,7 @@ from app.api.routes import (admin, auth, chat, market, notifications, portfolio,
 from app.core import ratelimit, settings_store
 from app.core.config import DEV_JWT_SECRET, get_settings
 from app.db.session import init_db
-from app.schemas.stock import HealthResponse
+from app.schemas.stock import DependencyHealth, HealthResponse
 
 settings = get_settings()
 
@@ -127,6 +128,63 @@ app.include_router(market.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 
+def _check(name: str, probe, *, required: bool) -> tuple[DependencyHealth, bool]:
+    """Chạy một phép thử, đo thời gian, KHÔNG để lỗi lọt ra ngoài.
+
+    Trả kèm cờ "có làm hỏng trạng thái chung không" — Gemini chưa cấu hình thì
+    trợ lý tắt, nhưng phần phân tích cổ phiếu vẫn chạy, nên không thể coi là sập.
+    """
+    started = time.monotonic()
+    try:
+        detail = probe() or ""
+        took = int((time.monotonic() - started) * 1000)
+        return DependencyHealth(name=name, ok=True, detail=detail, latency_ms=took), False
+    except Exception as exc:  # noqa: BLE001 - health check không được tự ném lỗi
+        took = int((time.monotonic() - started) * 1000)
+        return DependencyHealth(name=name, ok=False, detail=str(exc)[:200],
+                                latency_ms=took), required
+
+
 @app.get("/api/health", response_model=HealthResponse, tags=["system"])
 def health() -> HealthResponse:
-    return HealthResponse(status="ok")
+    """Kiểm tra sống CÓ THỰC CHẤT: chạm thật vào DB, Redis và cấu hình Gemini.
+
+    Bản cũ luôn trả "ok" kể cả khi cơ sở dữ liệu đã sập — bộ giám sát thấy xanh
+    trong khi người dùng không đăng nhập được. Sập DB/Redis → 503 để bộ cân bằng
+    tải rút container này ra khỏi vòng phục vụ.
+    """
+    from sqlalchemy import text
+
+    from app.core.budget import status_snapshot
+    from app.core.ratelimit import redis_client
+    from app.db.session import engine
+
+    def _db() -> str:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return "kết nối được"
+
+    def _redis() -> str:
+        redis_client().ping()
+        return "kết nối được"
+
+    def _gemini() -> str:
+        if not settings.gemini_api_key:
+            raise RuntimeError("chưa cấu hình APP_GEMINI_API_KEY — trợ lý sẽ không chạy")
+        snap = status_snapshot()
+        return f"đã dùng {snap['used']}/{snap['cap']} request hôm nay ({snap['level']})"
+
+    checks, hong = [], False
+    for name, probe, required in (("database", _db, True), ("redis", _redis, True),
+                                  ("gemini", _gemini, False)):
+        result, lam_hong = _check(name, probe, required=required)
+        checks.append(result)
+        hong = hong or lam_hong
+
+    status_text = "ok" if all(c.ok for c in checks) else "degraded"
+    body = HealthResponse(status=status_text, version=settings.version, checks=checks)
+    if hong:
+        #  Thành phần BẮT BUỘC hỏng → 503, không phải 200 kèm chữ "degraded":
+        #  bộ giám sát nào cũng hiểu mã trạng thái, không phải cái nào cũng đọc thân.
+        return JSONResponse(body.model_dump(mode="json"), status_code=503)
+    return body

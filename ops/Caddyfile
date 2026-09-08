@@ -1,0 +1,43 @@
+# HTTPS tự động (Let's Encrypt). Caddy là thứ DUY NHẤT nhìn thấy Internet;
+# backend, frontend và admin đều nằm trong mạng nội bộ của compose.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# SSE của phần phân tích và trợ lý cần đẩy từng khối, không được gom buffer.
+	reverse_proxy frontend:3010 {
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}
+
+admin.{$DOMAIN} {
+	encode zstd gzip
+
+	# Rào NGOÀI CÙNG của khu quản trị, đứng trước cả đăng nhập: gỡ hai dòng dưới
+	# ra và điền dải IP của bạn. Backend còn một lớp nữa (APP_ADMIN_IP_ALLOWLIST)
+	# nhưng chặn ngay ở đây thì kẻ lạ không chạm được tới cả trang đăng nhập.
+	# @ngoai not remote_ip 113.161.0.0/16
+	# respond @ngoai 404
+
+	reverse_proxy admin:3020 {
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# Khu quản trị KHÔNG được lập chỉ mục tìm kiếm.
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+}

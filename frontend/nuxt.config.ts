@@ -54,6 +54,8 @@ export default defineNuxtConfig({
 
   typescript: {
     strict: true,
+    //  Tắt lúc dev cho nhanh (vue-tsc chạy mỗi lần đổi file rất nặng); CI chạy
+    //  `npm run typecheck` mỗi lần push nên vẫn không lọt lỗi kiểu ra nhánh chính.
     typeCheck: false
   }
 })

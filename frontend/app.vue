@@ -9,6 +9,8 @@
   <!-- Nhắc xác minh email: đặt ở vỏ app để mọi trang đều thấy. -->
   <VerifyEmailBanner />
   <NuxtPage />
+  <!-- Miễn trừ trách nhiệm + trang pháp lý: phải có ở mọi trang, không chỉ README. -->
+  <AppFooter />
   <!-- Trợ lý RAG nổi ở góc — dùng được ở mọi trang, tự bắt mã đang xem. -->
   <ChatWidget />
 </template>

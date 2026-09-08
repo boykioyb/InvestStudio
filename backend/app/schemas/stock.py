@@ -140,8 +140,26 @@ class StockAnalysis(BaseModel):
     score: Score
 
 
+class DependencyHealth(BaseModel):
+    """Tình trạng một thành phần phụ thuộc."""
+
+    name: str
+    ok: bool
+    detail: str = ""
+    latency_ms: int | None = None
+
+
 class HealthResponse(BaseModel):
-    status: Literal["ok"]
+    """Kiểm tra sống.
+
+    `status` = "ok" khi mọi thứ BẮT BUỘC (DB, Redis) còn chạy; "degraded" khi
+    chỉ phần không bắt buộc hỏng (Gemini chưa cấu hình, nguồn dữ liệu chậm).
+    Bộ giám sát nên cảnh báo ở "degraded" chứ đừng đánh thức người trực.
+    """
+
+    status: Literal["ok", "degraded"]
+    version: str = ""
+    checks: list[DependencyHealth] = []
 
 
 # ── Lịch sử giá theo khung thời gian ─────────────────────────────────────────

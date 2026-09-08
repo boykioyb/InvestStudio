@@ -48,7 +48,7 @@ function phanTich(): void {
       </template>
 
       <div class="loi-nav">
-        <NuxtLink to="/" class="btn" @click="clearError">← Về trang chủ</NuxtLink>
+        <NuxtLink to="/" class="btn" @click="() => clearError()">← Về trang chủ</NuxtLink>
         <NuxtLink to="/screener" class="btn">Danh sách mã</NuxtLink>
       </div>
     </div>

@@ -1,0 +1,109 @@
+# Chồng lên docker-compose.yml để chạy THẬT:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Khác bản dev ở bốn điểm sống còn:
+#   1. KHÔNG publish cổng của backend / admin / frontend ra ngoài — chỉ Caddy
+#      (80/443) nhìn thấy Internet. Trước đây backend nằm ở cổng 8010 công khai
+#      nên mọi rào CORS/proxy đều vô nghĩa và /docs phơi toàn bộ API.
+#   2. HTTPS thật + cookie Secure + HSTS (APP_ENV=prod cũng tự tắt /docs).
+#   3. Mật khẩu Postgres và JWT secret lấy từ .env.prod, không dùng giá trị mặc định.
+#   4. Có service sao lưu chạy hằng đêm.
+#
+# Cần một tệp .env.prod (xem .env.prod.example) và DNS trỏ cả <domain> lẫn
+# admin.<domain> về máy chủ này.
+
+x-prod-env: &prod-env
+  APP_ENV: prod
+  APP_DATABASE_URL: postgresql+psycopg://invest:${POSTGRES_PASSWORD:?can dat POSTGRES_PASSWORD}@postgres:5432/phantichma
+  APP_JWT_SECRET: ${APP_JWT_SECRET:?can dat APP_JWT_SECRET ngau nhien >=32 ky tu}
+  APP_COOKIE_SECURE: "true"
+  APP_COOKIE_DOMAIN: ".${DOMAIN:?can dat DOMAIN}"
+  APP_PUBLIC_BASE_URL: "https://${DOMAIN}"
+  APP_CORS_ORIGINS: '["https://${DOMAIN}","https://admin.${DOMAIN}"]'
+  #  Caddy đứng trước Nuxt, Nuxt đứng trước backend → tin header IP thật từ mạng nội bộ.
+  APP_TRUSTED_PROXIES: '["172.16.0.0/12"]'
+  APP_ADMIN_IP_ALLOWLIST: '${ADMIN_IP_ALLOWLIST:-[]}'
+  APP_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  APP_SMTP_HOST: ${SMTP_HOST:-}
+  APP_SMTP_PORT: ${SMTP_PORT:-587}
+  APP_SMTP_USER: ${SMTP_USER:-}
+  APP_SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  APP_SMTP_FROM: ${SMTP_FROM:-}
+  APP_CELERY_BROKER_URL: redis://redis:6379/0
+  APP_CELERY_RESULT_BACKEND: redis://redis:6379/1
+  APP_RATE_LIMIT_REDIS_URL: redis://redis:6379/2
+  TZ: Asia/Ho_Chi_Minh
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./ops/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data      # chứng chỉ Let's Encrypt — MẤT là phải xin lại
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - admin
+    restart: unless-stopped
+
+  postgres:
+    environment:
+      POSTGRES_USER: invest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: phantichma
+      TZ: Asia/Ho_Chi_Minh
+    #  Không publish cổng: chỉ các container cùng mạng mới nối được.
+    ports: !reset []
+
+  backend:
+    environment:
+      <<: *prod-env
+    ports: !reset []
+
+  worker:
+    environment:
+      <<: *prod-env
+
+  beat:
+    environment:
+      <<: *prod-env
+
+  frontend:
+    environment:
+      NUXT_API_PROXY_TARGET: http://backend:8000
+      TZ: Asia/Ho_Chi_Minh
+    ports: !reset []
+
+  admin:
+    environment:
+      NUXT_API_PROXY_TARGET: http://backend:8000
+      TZ: Asia/Ho_Chi_Minh
+    ports: !reset []
+
+  #  Sao lưu hằng đêm. Dùng chung image Postgres nên chắc chắn khớp phiên bản
+  #  pg_dump ↔ máy chủ (lệch phiên bản là bản dump không phục hồi được).
+  backup:
+    image: pgvector/pgvector:pg16
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_AT: ${BACKUP_AT:-02:00}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      TZ: Asia/Ho_Chi_Minh
+    entrypoint: ["/bin/bash", "/ops/backup.sh"]
+    volumes:
+      - ./ops:/ops:ro
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
