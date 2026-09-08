@@ -28,6 +28,12 @@ const sessionText = computed(() =>
       <span class="dot" :class="{ live: inSession }" />{{ sessionText }}
     </div>
     <h1>Đánh giá cổ phiếu trước mỗi quyết định đầu tư.</h1>
+    <!-- Câu định vị: nói THẲNG người dùng nhận được gì, thay vì để họ tự đoán
+         từ ba gạch đầu dòng bên dưới. -->
+    <p class="promise">
+      Nhập một mã — máy chấm 14 tiêu chí tài chính, định giá và kỹ thuật, rồi nói
+      thẳng mã đó <b>mạnh yếu ở đâu</b> và <b>bạn mất bao nhiêu nếu kịch bản xấu xảy ra</b>.
+    </p>
     <ul class="bullets">
       <li v-for="b in BULLETS" :key="b"><Check class="ck" />{{ b }}</li>
     </ul>
@@ -51,6 +57,9 @@ const sessionText = computed(() =>
 
 h1 { font-size: clamp(30px, 4vw, 52px); line-height: 1.12; margin: 0 auto 18px; font-weight: 700;
   letter-spacing: -0.8px; max-width: 820px; text-wrap: balance; }
+.promise { max-width: 720px; margin: 0 auto 22px; font-size: clamp(15px, 1.6vw, 17px);
+  line-height: 1.55; color: var(--text-2); text-wrap: pretty; }
+.promise b { color: var(--text); font-weight: 600; }
 .bullets { list-style: none; margin: 0 auto 28px; padding: 0; display: flex; flex-wrap: wrap;
   justify-content: center; gap: 8px 22px; font-size: 15.5px; color: var(--text-2); max-width: 1000px; }
 .bullets li { display: inline-flex; align-items: center; gap: 8px; }

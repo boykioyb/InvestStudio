@@ -23,7 +23,7 @@
 
 ---
 
-## 🟠 S4 — Rõ sản phẩm *(chặn ship: thiếu là người lạ không dùng được)*
+## 🟠 S4 — Rõ sản phẩm ✅ *(đã xong 2026-09-08)*
 
 **Ba trang còn thiếu — backend đã xong từ S1, chỉ thiếu giao diện:**
 - [x] `/verify-email?token=` — nhận link trong thư, gọi `POST /api/auth/verify`
@@ -37,12 +37,12 @@
 - [x] Trang `/account`: thông tin · đổi mật khẩu · hạn mức · xóa tài khoản
 
 **Định vị & onboarding:**
-- [ ] Chốt một câu sản phẩm hứa gì, đặt lên hero
-- [ ] Onboarding 3 bước cho lần đầu vào
+- [x] Câu định vị trên hero: nói thẳng nhận được gì (điểm 14 tiêu chí + mất bao nhiêu nếu kịch bản xấu)
+- [x] Onboarding 3 bước cho lần đầu vào (`OnboardingTour`, tự tắt vĩnh viễn khi đóng)
 - [x] Trang `/scoring` giải thích 14 tiêu chí — nội dung sinh từ `criteria.py` qua API mới `GET /api/stocks/scoring-model`
 - [x] Trang lỗi 404 / 500 (`error.vue`) — 404 cho luôn ô nhập mã để đi tiếp
-- [ ] Trạng thái rỗng cho mọi bảng
-- [ ] Rà soát mobile — bảng screener 10+ cột chưa có phương án
+- [x] Trạng thái rỗng cho mọi bảng (thiếu mỗi bảng screener — đã bổ sung; các bảng khác đã có sẵn)
+- [x] Rà soát mobile: ghim cột mã khi cuộn ngang ở screener; 7 trang chính không tràn ngang ở 375px
 
 ---
 

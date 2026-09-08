@@ -99,7 +99,12 @@ const heat = computed(() => {
           <i v-for="(h, i) in heat" :key="i" :style="{ background: h.col }" :title="`${h.pct}%`" />
         </div>
 
-        <div class="board">
+        <p v-if="!data.rows.length" class="rong">
+          Rổ <b>{{ data.group }}</b> chưa có dòng nào — thường là do nguồn dữ liệu chưa trả
+          kịp. Thử chọn rổ khác hoặc tải lại sau ít phút.
+        </p>
+
+        <div v-else class="board">
           <table class="grid">
             <caption class="sr-only">Danh sách rổ {{ data.group }}, sắp theo {{ sort }} {{ order }}</caption>
             <thead>
@@ -202,11 +207,28 @@ td.stale { color: var(--muted); font-style: italic; }
 .foot-note { margin: 0; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+.rong { margin: 0; padding: 28px 18px; text-align: center; color: var(--muted);
+  border: 1px dashed var(--line); border-radius: var(--radius); background: var(--panel); }
+
 @media (max-width: 1023px) {
+  /* Cột tên công ty là cột dài nhất mà ít quyết định nhất → bỏ trước. */
   th:nth-child(2), td:nth-child(2) { display: none; }
 }
+
 @media (max-width: 640px) {
   .stage { padding: 14px 12px 40px; }
+  /* Bảng rộng hơn màn hình thì cuộn ngang, KHÔNG ép chữ nhỏ lại tới mức không đọc nổi. */
   .grid { font-size: 12.5px; min-width: max-content; }
+
+  /*  GHIM cột mã khi cuộn ngang: cuộn tới cột thứ 8 mà không biết đang xem mã
+      nào thì cả bảng thành vô dụng trên điện thoại. */
+  th:first-child, td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--panel-solid, #0f1626);
+    box-shadow: 1px 0 0 var(--line);
+  }
+  thead th:first-child { z-index: 3; }
 }
 </style>

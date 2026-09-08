@@ -21,6 +21,7 @@ useHead({ title: 'Phân Tích Mã — Đầu tư có cơ sở' })
 </script>
 
 <template>
+  <OnboardingTour />
   <div class="home">
     <AppHeader />
     <TickerTape :items="mostActive" />
