@@ -112,3 +112,139 @@ class TotpSetupOut(BaseModel):
     otpauth_url: str
     note: str = ("Quét mã bằng ứng dụng xác thực (Google Authenticator, Authy…) rồi "
                  "nhập mã 6 số để bật.")
+
+
+# ── Hội thoại ────────────────────────────────────────────────────────────────
+
+class AdminConversation(BaseModel):
+    """Metadata một cuộc trò chuyện. Nội dung xem ở endpoint riêng (ghi audit)."""
+
+    id: int
+    user_id: int
+    user_email: str = ""
+    title: str
+    ticker: Optional[str] = None
+    message_count: int = 0
+    updated_at: datetime
+
+
+class AdminMessage(BaseModel):
+    id: int
+    at: datetime
+    ticker: Optional[str] = None
+    question: str
+    answer: str
+    citations: list = []
+    attachments: list = []
+
+
+class ChatSearchHit(BaseModel):
+    message_id: int
+    conversation_id: Optional[int] = None
+    user_id: int
+    user_email: str = ""
+    at: datetime
+    ticker: Optional[str] = None
+    #  Đoạn khớp, đã cắt ngắn — muốn xem đủ thì mở cả cuộc trò chuyện.
+    snippet: str
+
+
+# ── Thiết bị ─────────────────────────────────────────────────────────────────
+
+class AdminDevice(BaseModel):
+    model_config = {"from_attributes": True}
+
+    fp_hash: str
+    first_seen: datetime
+    last_seen: datetime
+    user_agent: str = ""
+    last_ip: str = ""
+    request_count: int = 0
+    account_count: int = 0
+    blocked: bool = False
+    blocked_reason: str = ""
+    emails: list[str] = []
+
+
+class DeviceBlockIn(BaseModel):
+    reason: str = Field("", max_length=300)
+
+
+# ── Kho tri thức (RAG) ───────────────────────────────────────────────────────
+
+class RagDocOut(BaseModel):
+    id: int
+    ticker: str
+    doc_type: str
+    title: str
+    created_at: datetime
+    chars: int
+
+
+class RagStatusOut(BaseModel):
+    documents: int
+    tickers: int
+    running: bool
+    last_message: str = ""
+    #  Tài liệu cũ nhất bao nhiêu ngày — kho đứng yên là trợ lý trả lời bằng dữ
+    #  liệu cũ mà không ai biết.
+    oldest_days: Optional[int] = None
+    newest_days: Optional[int] = None
+    by_type: dict[str, int] = {}
+
+
+# ── Job & hàng đợi ───────────────────────────────────────────────────────────
+
+class JobOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    task_id: str
+    status: str
+    message: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class QueueOut(BaseModel):
+    jobs: list[JobOut]
+    queue_length: int = 0
+    #  Redis hỏng thì không đọc được độ dài hàng đợi — nói thật thay vì trả 0.
+    queue_ok: bool = True
+
+
+# ── Nguồn dữ liệu ────────────────────────────────────────────────────────────
+
+class ProviderOut(BaseModel):
+    name: str
+    ok: bool
+    latency_ms: int
+    detail: str = ""
+    checked_at: datetime
+
+
+# ── Cache ────────────────────────────────────────────────────────────────────
+
+class CacheOut(BaseModel):
+    name: str
+    size: int
+    maxsize: int
+    ttl_seconds: int
+
+
+class CacheReport(BaseModel):
+    caches: list[CacheOut]
+    #  Cảnh báo bắt buộc: cache nằm TRONG tiến trình, nhiều worker thì mỗi worker
+    #  một bản — số ở đây là của đúng tiến trình vừa trả lời request này.
+    note: str
+
+
+# ── Thông báo hệ thống ───────────────────────────────────────────────────────
+
+class BroadcastIn(BaseModel):
+    message: str = Field(..., min_length=5, max_length=500)
+    only_verified: bool = Field(True, description="Chỉ gửi cho tài khoản đã xác minh email")
+
+
+class BroadcastOut(BaseModel):
+    sent: int

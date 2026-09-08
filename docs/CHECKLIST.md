@@ -46,17 +46,16 @@
 
 ---
 
-## 🟡 S3 — Khu quản trị đầy đủ *(8 trang còn lại, không chặn ship)*
+## 🟡 S3 — Khu quản trị đầy đủ ✅ *(đã xong 2026-09-08 — 12/12 trang)*
 
-- [ ] **Sử dụng & hạn mức** — biểu đồ theo khoảng ngày, top 20 người/mã, tỷ lệ trúng cache
-- [ ] **Hội thoại** — xem đầy đủ nội dung hỏi–đáp, tìm toàn văn *(bạn đã chốt: admin xem hết)*
-- [ ] **Thiết bị & chống lạm dụng** — xếp theo số tài khoản chung một máy, nút chặn
-      *(dữ liệu đã có từ S1: `device_fingerprints`, `device_accounts`)*
-- [ ] **Trợ lý (RAG)** — số tài liệu, tuổi dữ liệu, nút reindex
-- [ ] **Job & hàng đợi** — job Celery đang chạy/thất bại, nút chạy lại
-- [ ] **Nguồn dữ liệu** — VCI · DNSE · CafeF · Google News · Gemini: sống/chết, độ trễ
-- [ ] **Cache** — xem/xóa cache theo mã khi nguồn trả số sai
-- [ ] **Thông báo** — gửi thông báo hệ thống tới người dùng
+- [x] **Sử dụng & hạn mức** — chuỗi ngày theo loại, top người/mã, số request Gemini mỗi lượt hỏi
+- [x] **Hội thoại** — xem đầy đủ nội dung + tìm toàn văn; mỗi lần mở ghi audit
+- [x] **Thiết bị & chống lạm dụng** — xếp theo số tài khoản chung một máy, chặn/bỏ chặn kèm lý do
+- [x] **Kho tri thức (RAG)** — số tài liệu, tuổi dữ liệu (cảnh báo khi >3 ngày), reindex, xóa tài liệu
+- [x] **Job & hàng đợi** — job gần đây, độ dài hàng đợi, lịch chạy nền
+- [x] **Nguồn dữ liệu** — thử thật 5 nguồn, độ trễ, nút thử ngay (nhớ 60s)
+- [x] **Cache** — xem/xóa theo mã hoặc toàn bộ, kèm cảnh báo cache là của một tiến trình
+- [x] **Thông báo** — gửi thông báo hệ thống (chuông trong app, không phải email)
 
 ---
 

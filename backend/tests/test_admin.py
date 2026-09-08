@@ -216,3 +216,82 @@ def test_me_bao_da_bat_2_lop_chua(admin_client, db):
         "email": "sep@gmail.com", "password": _PW,
         "totp_code": pyotp.TOTP(setup["secret"]).now()})
     assert admin_client.get("/api/auth/me").json()["totp_enabled"] is True
+
+
+# ── S3: các trang vận hành ───────────────────────────────────────────────────
+
+def test_xem_noi_dung_hoi_thoai_luon_ghi_audit(admin_client, db):
+    """Đọc dữ liệu riêng tư thì phải để lại vết — bất biến của khu quản trị."""
+    from app.models.admin import AuditLog
+    from app.models.rag import ChatMessage, Conversation
+    from app.models.user import User
+
+    user = db.query(User).filter(User.email == "sep@gmail.com").one()
+    conv = Conversation(user_id=user.id, title="Thử", ticker="FPT")
+    db.add(conv)
+    db.flush()
+    db.add(ChatMessage(user_id=user.id, conversation_id=conv.id, ticker="FPT",
+                       question="FPT thế nào?", answer="Câu trả lời mẫu."))
+    db.commit()
+
+    r = admin_client.get(f"/api/admin/conversations/{conv.id}/messages")
+    assert r.status_code == 200
+    assert r.json()[0]["question"] == "FPT thế nào?"
+
+    vet = db.query(AuditLog).filter(AuditLog.action == "view_user_data",
+                                    AuditLog.target_type == "conversation").all()
+    assert len(vet) == 1 and vet[0].target_id == str(conv.id)
+
+
+def test_tim_toan_van_tra_ve_doan_khop(admin_client, db):
+    from app.models.rag import ChatMessage
+    from app.models.user import User
+
+    user = db.query(User).filter(User.email == "sep@gmail.com").one()
+    db.add(ChatMessage(user_id=user.id, question="Cổ tức VCB năm nay ra sao?",
+                       answer="VCB chia cổ tức bằng cổ phiếu."))
+    db.commit()
+
+    hits = admin_client.get("/api/admin/chat/search?q=cổ tức").json()
+    assert hits and "cổ tức" in hits[0]["snippet"].lower()
+    assert hits[0]["user_email"] == "sep@gmail.com"
+
+
+def test_chan_thiet_bi_thi_thiet_bi_do_khong_dung_duoc_nua(admin_client, db):
+    from app.core import fingerprint
+    from app.models.device import DeviceFingerprint
+
+    db.add(DeviceFingerprint(fp_hash="a" * 64))
+    db.commit()
+
+    r = admin_client.post("/api/admin/devices/" + "a" * 64 + "/block",
+                          json={"reason": "tạo tài khoản hàng loạt"})
+    assert r.status_code == 204
+
+    bi_chan, ly_do = fingerprint.is_blocked(db, "a" * 64)
+    assert bi_chan and "hàng loạt" in ly_do
+
+    assert admin_client.post("/api/admin/devices/" + "a" * 64 + "/unblock").status_code == 204
+    assert fingerprint.is_blocked(db, "a" * 64)[0] is False
+
+
+def test_thong_bao_he_thong_chi_gui_cho_tai_khoan_da_xac_minh(admin_client, db):
+    from app.models.user import Notification, User
+
+    db.add(User(email="chua-xac-minh@gmail.com", display_name="X", password_hash="x"))
+    db.commit()
+
+    kq = admin_client.post("/api/admin/broadcast",
+                           json={"message": "Bảo trì 22:00 hôm nay.", "only_verified": True})
+    assert kq.status_code == 200
+    #  Chỉ tài khoản admin (đã xác minh trong fixture) nhận được.
+    nhan = db.query(Notification).all()
+    assert kq.json()["sent"] == len(nhan)
+    assert all(n.kind == "system" for n in nhan)
+
+
+def test_bao_cao_cache_noi_ro_gioi_han(admin_client):
+    """Con số cache chỉ đúng cho MỘT tiến trình — phải nói ra, không để hiểu nhầm."""
+    r = admin_client.get("/api/admin/cache").json()
+    assert len(r["caches"]) == 3
+    assert "tiến trình" in r["note"]
