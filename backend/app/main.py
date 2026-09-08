@@ -1,6 +1,7 @@
 """Điểm khởi tạo FastAPI cho Phân Tích Mã API."""
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -11,7 +12,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import (admin, auth, chat, market, notifications, portfolio,
                             screener, stocks, watchlist)
-from app.core import ratelimit, settings_store
+from app.core import applog, ratelimit, settings_store
 from app.core.config import DEV_JWT_SECRET, get_settings
 from app.db.session import init_db
 from app.schemas.stock import DependencyHealth, HealthResponse
@@ -37,9 +38,13 @@ def _check_secrets() -> None:
               "Đặt APP_JWT_SECRET trước khi triển khai thật.", file=sys.stderr)
 
 
+logger = logging.getLogger("app")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     #  Tạo extension pgvector + bảng nếu chưa có. Chạy đúng một lần lúc khởi động.
+    applog.setup()
     _check_secrets()
     init_db()
     yield
@@ -76,6 +81,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def _ghi_log(request: Request, status_code: int, started: float) -> None:
+    """Một dòng cho mỗi request API. Lỗi 5xx lên mức error để lọc riêng được."""
+    muc = logging.ERROR if status_code >= 500 else (
+        logging.WARNING if status_code >= 400 else logging.INFO)
+    logger.log(muc, "%s %s %s", request.method, request.url.path, status_code, extra={
+        "method": request.method,
+        "path": request.url.path,
+        "status": status_code,
+        "duration_ms": int((time.monotonic() - started) * 1000),
+        "ip": ratelimit.client_ip(request),
+    })
+
+
 #  Các đường KHÔNG tính vào giới hạn tần suất chung: health cho bộ giám sát,
 #  SSE vì một luồng chỉ là MỘT request nhưng sống lâu.
 _RATE_LIMIT_EXEMPT = ("/api/health",)
@@ -89,6 +107,12 @@ async def rate_limit_and_headers(request: Request, call_next):
     hoàn toàn — ai cũng quét được cả sàn ~1600 mã. Rào này FAIL-OPEN: Redis hỏng
     thì cho qua, vì mất trang còn tệ hơn chịu tải.
     """
+    #  Mã request: gắn vào mọi dòng log phát sinh bên trong, và trả về header để
+    #  người dùng báo lỗi kèm mã là tra được đúng vệt log.
+    rid = request.headers.get("x-request-id") or applog.new_request_id()
+    applog.request_id.set(rid)
+    started = time.monotonic()
+
     path = request.url.path
     if path.startswith("/api") and not path.startswith(_RATE_LIMIT_EXEMPT):
         try:
@@ -96,18 +120,23 @@ async def rate_limit_and_headers(request: Request, call_next):
         except HTTPException as exc:
             #  Middleware nằm NGOÀI hệ thống xử lý ngoại lệ của FastAPI nên phải
             #  tự dựng phản hồi, không thể để HTTPException bay lên.
+            _ghi_log(request, exc.status_code, started)
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code,
-                                headers=exc.headers or {})
+                                headers={**(exc.headers or {}), "X-Request-Id": rid})
 
     #  Chế độ bảo trì: chặn API cho người dùng thường, /admin và đăng nhập vẫn
     #  mở để quản trị còn vào tắt cờ được (nếu không thì tự nhốt mình bên ngoài).
     if (path.startswith("/api") and settings_store.flag("maintenance_mode")
             and not path.startswith(("/api/health", "/api/admin", "/api/auth"))):
+        _ghi_log(request, 503, started)
         return JSONResponse(
             {"detail": "Hệ thống đang bảo trì, vui lòng quay lại sau ít phút."},
-            status_code=503)
+            status_code=503, headers={"X-Request-Id": rid})
 
     response = await call_next(request)
+    if path.startswith("/api"):
+        _ghi_log(request, response.status_code, started)
+    response.headers["X-Request-Id"] = rid
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("X-Frame-Options", "DENY")

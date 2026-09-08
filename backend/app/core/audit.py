@@ -6,7 +6,7 @@ bằng chứng, không phải cái khóa.
 """
 from __future__ import annotations
 
-import sys
+import logging
 from typing import Any
 
 from fastapi import Request
@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.core.ratelimit import client_ip
 
+
+
+logger = logging.getLogger("app.audit")
 
 def log(db: Session, actor, action: str, *, request: Request | None = None,
         target_type: str = "", target_id: str | int = "",
@@ -30,4 +33,4 @@ def log(db: Session, actor, action: str, *, request: Request | None = None,
         db.commit()
     except Exception as exc:  # noqa: BLE001
         db.rollback()
-        print(f"[audit] không ghi được ({action}): {exc}", file=sys.stderr)
+        logger.error("Không ghi được nhật ký kiểm toán", extra={"action": action, "error": str(exc)})

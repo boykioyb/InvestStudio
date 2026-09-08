@@ -24,3 +24,4 @@ google-genai>=1.0          # SDK Gemini (embedding + sinh câu trả lời)
 celery>=5.4                # job queue — worker chạy reindex tách khỏi web process
 redis>=5.0                 # broker + result backend cho Celery
 pyotp>=2.9                # xác thực 2 lớp (TOTP) cho tài khoản quản trị
+sentry-sdk>=2.0           # báo lỗi (chỉ bật khi có APP_SENTRY_DSN, không có vẫn chạy)

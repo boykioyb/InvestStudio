@@ -26,13 +26,15 @@ THẤP HƠN quota thật (chừa biên + chừa phần cho job nền), đừng �
 """
 from __future__ import annotations
 
-import sys
+import logging
 import time
 from contextlib import contextmanager
 from datetime import date
 
 from app.core import settings_store
 from app.core.config import get_settings
+
+logger = logging.getLogger("app.budget")
 from app.core.ratelimit import redis_client
 
 
@@ -66,7 +68,7 @@ def used_today() -> int:
         raw = redis_client().get(_day_key())
         return int(raw) if raw else 0
     except Exception as exc:  # noqa: BLE001
-        print(f"[budget] không đọc được bộ đếm: {exc}", file=sys.stderr)
+        logger.warning("Không đọc được bộ đếm quota", extra={"error": str(exc)})
         return _cap()
 
 

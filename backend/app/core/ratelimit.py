@@ -14,14 +14,16 @@ là sạch quota, và trợ lý im lặng với TẤT CẢ người dùng tới 
 """
 from __future__ import annotations
 
+import logging
 import ipaddress
-import sys
 from datetime import date
 from functools import lru_cache
 
 from fastapi import HTTPException, Request, status
 
 from app.core.config import get_settings
+
+logger = logging.getLogger("app.ratelimit")
 
 
 @lru_cache
@@ -112,7 +114,7 @@ def enforce_window(request: Request, scope: str, limit: int, window_seconds: int
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001 - Redis trục trặc không được chặn cả trang
-        print(f"[ratelimit] bỏ qua vì Redis lỗi: {exc}", file=sys.stderr)
+        logger.warning("Bỏ qua giới hạn tần suất vì Redis lỗi", extra={"scope": scope, "error": str(exc)})
 
 
 def clear(request: Request, scope: str) -> None:
@@ -151,9 +153,9 @@ def enforce_daily(subject: str, scope: str, limit: int, *, fail_open: bool = Fal
             client.expire(key, 86400)
     except Exception as exc:  # noqa: BLE001
         if fail_open:
-            print(f"[quota] bỏ qua vì Redis lỗi: {exc}", file=sys.stderr)
+            logger.warning("Bỏ qua hạn mức vì Redis lỗi (fail-open)", extra={"scope": scope, "error": str(exc)})
             return
-        print(f"[quota] TỪ CHỐI vì Redis lỗi (fail-closed): {exc}", file=sys.stderr)
+        logger.error("Từ chối vì Redis lỗi (fail-closed)", extra={"scope": scope, "error": str(exc)})
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Hệ thống hạn mức tạm thời không sẵn sàng. Vui lòng thử lại sau.") from exc

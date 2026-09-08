@@ -10,6 +10,7 @@ Hai đích đến:
 """
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from contextlib import contextmanager
@@ -19,6 +20,9 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.ratelimit import redis_client
+
+
+logger = logging.getLogger("app.usage")
 
 _current: ContextVar[dict | None] = ContextVar("usage_current", default=None)
 
@@ -76,7 +80,7 @@ def _bump_redis(kind: str, user_id: int | None, ticker: str, data: dict, status:
             pipe.expire(f"usage:{today}:top:ticker", 86400 * 8)
         pipe.execute()
     except Exception as exc:  # noqa: BLE001 - số liệu hỏng không được hỏng tính năng
-        print(f"[usage] không ghi được bộ đếm: {exc}", file=sys.stderr)
+        logger.warning("Không ghi được bộ đếm sử dụng", extra={"kind": kind, "error": str(exc)})
 
 
 def record(db: Session | None, kind: str, *, user_id: int | None = None, ip: str = "",
@@ -95,7 +99,7 @@ def record(db: Session | None, kind: str, *, user_id: int | None = None, ip: str
         db.commit()
     except Exception as exc:  # noqa: BLE001
         db.rollback()
-        print(f"[usage] không ghi được usage_events: {exc}", file=sys.stderr)
+        logger.warning("Không ghi được usage_events", extra={"kind": kind, "error": str(exc)})
 
 
 def today_counters() -> dict[str, dict[str, int]]:
@@ -108,7 +112,7 @@ def today_counters() -> dict[str, dict[str, int]]:
             raw = client.hgetall(f"usage:{today}:{kind}") or {}
             out[kind] = {k.decode(): int(v) for k, v in raw.items()}
     except Exception as exc:  # noqa: BLE001
-        print(f"[usage] không đọc được bộ đếm: {exc}", file=sys.stderr)
+        logger.warning("Không đọc được bộ đếm sử dụng", extra={"error": str(exc)})
     return out
 
 

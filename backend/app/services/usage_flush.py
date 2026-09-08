@@ -8,11 +8,15 @@ bằng số hiện tại chứ không cộng dồn.
 """
 from __future__ import annotations
 
+import logging
 import sys
 from datetime import date
 
 from app.core.ratelimit import redis_client
 from app.db.session import SessionLocal
+
+
+logger = logging.getLogger("app.usage_flush")
 
 _KINDS = ("chat", "analyze", "embed")
 
@@ -58,7 +62,7 @@ def flush(day: date | None = None) -> dict[str, int]:
         db.commit()
     except Exception as exc:  # noqa: BLE001 - job số liệu không được làm sập worker
         db.rollback()
-        print(f"[usage_flush] lỗi: {exc}", file=sys.stderr)
+        logger.error("Dồn bộ đếm thất bại", extra={"day": key_day, "error": str(exc)})
     finally:
         db.close()
     return {"rows": written, "day": key_day}

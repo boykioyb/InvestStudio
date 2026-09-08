@@ -9,6 +9,7 @@ mỗi request phải truy vấn cơ sở dữ liệu.
 """
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from typing import Any
@@ -49,6 +50,9 @@ SCHEMA: dict[str, dict[str, Any]] = {
                             "label": "Số vòng gọi công cụ tối đa mỗi câu", "group": "Gemini"},
 }
 
+
+logger = logging.getLogger("app.settings")
+
 _CACHE: dict[str, Any] = {}
 _CACHE_AT: float = 0.0
 _TTL = 30.0
@@ -66,7 +70,7 @@ def _load() -> dict[str, Any]:
         _CACHE = {row.key: (row.value or {}).get("v") for row in rows}
         _CACHE_AT = time.monotonic()
     except Exception as exc:  # noqa: BLE001 - cấu hình hỏng không được làm sập trang
-        print(f"[settings_store] đọc thất bại, dùng mặc định: {exc}", file=sys.stderr)
+        logger.warning("Đọc cấu hình thất bại, dùng mặc định", extra={"error": str(exc)})
     finally:
         db.close()
     return _CACHE

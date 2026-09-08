@@ -8,11 +8,13 @@ bao giờ nhận được thư xác minh và cũng không tự lấy lại đư�
 """
 from __future__ import annotations
 
+import logging
 import smtplib
-import sys
 from email.message import EmailMessage
 
 from app.core.config import get_settings
+
+logger = logging.getLogger("app.mailer")
 
 
 def smtp_configured() -> bool:
@@ -29,8 +31,8 @@ def send(to: str, subject: str, body: str) -> bool:
     settings = get_settings()
     if not smtp_configured():
         #  Chế độ dev: in ra log để tự lấy link, không im lặng nuốt mất.
-        print(f"[mailer] (CHƯA CẤU HÌNH SMTP) gửi tới {to}: {subject}\n{body}",
-              file=sys.stderr)
+        logger.warning("CHƯA CẤU HÌNH SMTP — in nội dung thư ra log",
+                       extra={"to": to, "subject": subject, "body": body})
         return False
 
     message = EmailMessage()
@@ -51,7 +53,7 @@ def send(to: str, subject: str, body: str) -> bool:
             server.send_message(message)
         return True
     except Exception as exc:  # noqa: BLE001 - hạ tầng thư hỏng không được chặn đăng ký
-        print(f"[mailer] gửi thất bại tới {to}: {exc}", file=sys.stderr)
+        logger.error("Gửi thư thất bại", extra={"to": to, "error": str(exc)})
         return False
 
 

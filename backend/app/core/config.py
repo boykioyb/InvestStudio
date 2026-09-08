@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     #  Số lượt hội thoại gần nhất frontend gửi kèm để agent giữ ngữ cảnh ("nó"…).
     rag_history_turns: int = 4
 
+    # ── Log & giám sát ───────────────────────────────────────────────────────
+    #  Có DSN thì bật Sentry; rỗng = tắt hẳn, không cài cũng chạy được.
+    sentry_dsn: str = ""
+    sentry_traces_sample_rate: float = 0.05
+
     # ── Khu quản trị (/admin) ────────────────────────────────────────────────
     #  Danh sách IP/dải CIDR được vào /api/admin. RỖNG = không giới hạn (chỉ hợp
     #  cho dev). Ở môi trường thật hãy khai IP nhà/VPN: đây là rào NGOÀI CÙNG,

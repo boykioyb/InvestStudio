@@ -7,7 +7,7 @@ web process — nó được đẩy vào hàng đợi Celery cho worker xử lý
 from __future__ import annotations
 
 import json
-import sys
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
@@ -40,6 +40,7 @@ from app.services.rag.gemini import GeminiError, QuotaError
 from app.services.rag.tasks import reindex_task
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger("app.chat")
 
 
 def _check_quota(user: User, request: Request, db: Session, fp_hash: str) -> None:
@@ -161,7 +162,7 @@ def ask(payload: ChatRequest, request: Request, user: User = Depends(require_ver
     except GeminiError as exc:
         #  Không lộ chi tiết lỗi upstream ra client (che thông tin hạ tầng);
         #  ghi log phía máy chủ để còn gỡ lỗi.
-        print(f"[chat] GeminiError: {exc}", file=sys.stderr)
+        logger.error("Trợ lý lỗi", extra={"user_id": user.id, "error": str(exc)})
         usage.record(db, "chat", user_id=user.id, ip=ratelimit.client_ip(request),
                      fp_hash=fp_hash, ticker=ticker or "", status="error")
         raise HTTPException(
@@ -230,7 +231,8 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                 yield _sse("error", {"detail": str(exc)})
                 return
             except GeminiError as exc:
-                print(f"[chat] stream GeminiError: {exc}", file=sys.stderr)
+                logger.error("Trợ lý lỗi (stream)",
+                             extra={"user_id": user.id, "error": str(exc)})
                 usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash,
                              ticker=tk or "", status="error")
                 yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
@@ -399,7 +401,7 @@ def reindex(deep: bool = Query(False, description="Kèm điểm số/ROE qua ana
     try:
         task = reindex_task.delay(None, True, deep)
     except Exception as exc:  # noqa: BLE001 - broker (Redis) không tới được
-        print(f"[chat] enqueue reindex thất bại: {exc}", file=sys.stderr)
+        logger.error("Đẩy job lập chỉ mục thất bại", extra={"error": str(exc)})
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Hệ thống hàng đợi tạm thời không sẵn sàng. Vui lòng thử lại sau.") from exc

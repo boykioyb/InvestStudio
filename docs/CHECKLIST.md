@@ -60,29 +60,26 @@
 
 ---
 
-## 🟡 S5 — Vận hành & pháp lý *(chặn ship khi mở công khai)*
+## 🟡 S5 — Vận hành & pháp lý ✅ *(đã xong 2026-09-08, trừ test khói frontend)*
 
 **Hạ tầng:**
-- [ ] `docker-compose.prod.yml` — **không publish cổng backend (8010) và admin (3020)**,
-      chỉ reverse proxy ra ngoài
-- [ ] HTTPS (Caddy/Nginx) + `APP_COOKIE_SECURE=true` + `APP_ENV=prod` (tự tắt `/docs`)
-- [ ] Đổi mật khẩu Postgres (đang là `invest/invest`)
-- [ ] `APP_JWT_SECRET` ngẫu nhiên ≥32 ký tự *(app tự từ chối khởi động nếu quên khi bật HTTPS)*
-- [ ] Sao lưu `pg_dump` hằng đêm **và thử phục hồi một lần thật**
+- [x] `docker-compose.prod.yml` — không publish cổng backend/admin/frontend, chỉ Caddy 80/443
+- [x] HTTPS tự động qua Caddy (`ops/Caddyfile`) + cookie Secure + `APP_ENV=prod`
+- [x] Mật khẩu Postgres bắt buộc truyền từ `.env.prod` (compose báo lỗi nếu thiếu)
+- [x] `APP_JWT_SECRET` bắt buộc truyền từ `.env.prod`
+- [x] Sao lưu `pg_dump` hằng đêm (`ops/backup.sh`) + `ops/restore.sh`; **đã thử phục hồi thật**, dữ liệu khớp
 
 **Lưới an toàn:**
-- [ ] CI (`.github/workflows`) chạy pytest + typecheck khi push — **chưa có**
-- [ ] Bật `typeCheck: true` cho frontend (`nuxt.config.ts:44` đang `false`)
-- [ ] Test cho `position._decide` (quy tắc cắt lỗ — sai là mất tiền thật) và `portfolio.review`
-- [ ] Một test khói frontend: nhập mã → thấy điểm
-- [ ] Log JSON + Sentry; `/api/health` mở rộng (DB · Redis · Gemini · nguồn dữ liệu)
+- [x] CI (`.github/workflows/ci.yml`): pytest + typecheck mỗi push/PR
+- [x] Typecheck sạch (sửa lỗi kiểu cuối cùng); chạy ở CI thay vì bật lúc dev cho nhanh
+- [x] 14 test cho `position._decide` và `portfolio.review`
+- [ ] Một test khói frontend: nhập mã → thấy điểm *(chưa làm — cần dựng Playwright/Vitest)*
+- [x] Log JSON + mã request + Sentry (bật khi có DSN); `/api/health` chạm thật DB · Redis · Gemini, trả 503 khi hỏng
 
 **Pháp lý (Nghị định 13/2023):**
-- [ ] Trang Điều khoản sử dụng
-- [ ] Trang Chính sách quyền riêng tư — **phải nêu rõ 2 điều**: đội vận hành có thể xem
-      nội dung hội thoại; hệ thống thu thập đặc điểm thiết bị để chống lạm dụng hạn mức
-- [ ] Miễn trừ "không phải khuyến nghị đầu tư" hiển thị trên giao diện
-      *(hiện chỉ nằm trong README và mô tả API — người dùng không đọc được)*
+- [x] Trang `/terms` Điều khoản sử dụng
+- [x] Trang `/privacy` — đã nêu rõ cả 2 điều bắt buộc (xem nội dung hội thoại · thu thập đặc điểm thiết bị)
+- [x] Miễn trừ trách nhiệm ở `AppFooter` (mọi trang) + trong từng màn hình chính
 
 ---
 

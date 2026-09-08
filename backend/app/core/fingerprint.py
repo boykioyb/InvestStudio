@@ -20,6 +20,7 @@ riêng tư phải nêu rõ việc thu thập này để chống lạm dụng h�
 """
 from __future__ import annotations
 
+import logging
 import hashlib
 import ipaddress
 import sys
@@ -32,6 +33,9 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.ratelimit import client_ip
 from app.core.security import create_purpose_token, decode_purpose_token
+
+
+logger = logging.getLogger("app.fingerprint")
 
 DEVICE_COOKIE = "did"        # id thiết bị do máy chủ cấp (httpOnly, có ký)
 CLIENT_COOKIE = "fpjs"       # visitorId do FingerprintJS tính phía trình duyệt
@@ -127,7 +131,7 @@ def record(db: Session, fp_hash: str, request: Request, user_id: int | None) -> 
         db.commit()
     except Exception as exc:  # noqa: BLE001
         db.rollback()
-        print(f"[fingerprint] không ghi được: {exc}", file=sys.stderr)
+        logger.warning("Không ghi được vân tay thiết bị", extra={"error": str(exc)})
 
 
 def is_blocked(db: Session, fp_hash: str) -> tuple[bool, str]:
