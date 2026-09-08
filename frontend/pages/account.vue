@@ -2,7 +2,8 @@
 /** Tài khoản: thông tin, đổi mật khẩu, hạn mức trợ lý, và xóa tài khoản. */
 definePageMeta({ middleware: 'auth' })
 
-const { user, changePassword, deleteAccount, resendVerification, pending, error } = useAuth()
+const { user, changePassword, deleteAccount, resendVerification, setAlertEmail,
+        pending, error } = useAuth()
 const { quota, load: loadQuota } = useChatQuota()
 
 useHead({ title: 'Tài khoản — Phân Tích Mã' })
@@ -63,6 +64,18 @@ async function xoa(): Promise<void> {
         </dd>
         <dt>Tên hiển thị</dt>
         <dd>{{ user?.display_name }}</dd>
+        <dt>Email cảnh báo</dt>
+        <dd>
+          <!-- Người dùng đặt ngưỡng thì mặc định muốn được báo; ai không thích
+               thì tắt ở đây thay vì phải đi tìm trong thư rác. -->
+          <label class="cong-tac">
+            <input type="checkbox" :checked="user?.alert_email"
+                   :disabled="pending"
+                   @change="setAlertEmail(($event.target as HTMLInputElement).checked)" />
+            Gửi email khi mã theo dõi chạm ngưỡng giá hoặc điểm
+          </label>
+          <span v-if="!user?.email_verified" class="tag warn">cần xác minh email trước</span>
+        </dd>
         <dt>Hạn mức trợ lý hôm nay</dt>
         <dd>
           <template v-if="quota">
@@ -137,6 +150,8 @@ h2 { margin: 0 0 10px; font-size: 16px; }
 .info dt { color: var(--muted); }
 .info dd { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+.cong-tac { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.cong-tac input { width: 15px; height: 15px; }
 .tag { padding: 1px 7px; border-radius: 999px; font-size: 11px; }
 .tag.ok { color: var(--good); border: 1px solid color-mix(in oklab, var(--good) 45%, transparent); }
 .tag.warn { color: var(--warn, #d9a441); border: 1px solid color-mix(in oklab, var(--warn, #d9a441) 45%, transparent); }

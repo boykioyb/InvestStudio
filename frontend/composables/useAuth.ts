@@ -190,6 +190,21 @@ export function useAuth() {
     }
   }
 
+  async function setAlertEmail(bat: boolean): Promise<boolean> {
+    pending.value = true
+    error.value = ''
+    try {
+      user.value = await call<UserOut>('/api/auth/preferences',
+                                       { method: 'PATCH', body: { alert_email: bat } })
+      return true
+    } catch (err) {
+      error.value = messageOf(err, 'Chưa lưu được tùy chọn. Thử lại sau.')
+      return false
+    } finally {
+      pending.value = false
+    }
+  }
+
   /** Xóa tài khoản — KHÔNG hoàn tác được, backend xóa cả dữ liệu con. */
   async function deleteAccount(password: string): Promise<boolean> {
     pending.value = true
@@ -217,5 +232,5 @@ export function useAuth() {
 
   return { user, ready, pending, error, solvingChallenge, isLoggedIn, fetchMe, ensureLoaded, register, login,
            changePassword, logout, verifyEmail, resendVerification, forgotPassword,
-           resetPassword, deleteAccount }
+           resetPassword, deleteAccount, setAlertEmail }
 }

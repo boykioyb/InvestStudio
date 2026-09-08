@@ -11,6 +11,8 @@ export interface UserOut {
   /** Chưa xác minh email thì chưa dùng được trợ lý (backend chặn ở require_verified). */
   email_verified: boolean
   totp_enabled?: boolean
+  /** Nhận email khi mã theo dõi chạm ngưỡng. */
+  alert_email: boolean
   created_at: string
 }
 
