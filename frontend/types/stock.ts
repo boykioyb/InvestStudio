@@ -628,3 +628,40 @@ export interface MarketHighlights {
   news: MarketNewsItem[]
   leaders: MarketLeader[]
 }
+
+/* ── Mô tả mô hình chấm điểm (GET /api/stocks/scoring-model) ───────────────── */
+
+export interface ScoringBand {
+  text: string
+  /** 0 = yếu · 1 = trung bình · 2 = tốt */
+  level: number
+}
+
+export interface ScoringCriterion {
+  key: string
+  label: string
+  max: number
+  what: string
+  why: string
+  how: string
+  manual: boolean
+  bands: ScoringBand[]
+}
+
+export interface ScoringGroup {
+  name: string
+  max: number
+  criteria: ScoringCriterion[]
+}
+
+export interface ScoringGrade {
+  min_total: number
+  text: string
+  level: 'good' | 'warn' | 'bad'
+}
+
+export interface ScoringModel {
+  total: number
+  groups: ScoringGroup[]
+  grades: ScoringGrade[]
+}

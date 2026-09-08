@@ -163,3 +163,28 @@ def test_horizons_present_and_bounded():
     assert {h.key for h in score.horizons} == {"short", "mid", "long"}
     assert all(0 <= h.value <= 100 for h in score.horizons)
     assert score.best_horizon.key == max(score.horizons, key=lambda h: h.value).key
+
+
+def test_mo_ta_mo_hinh_khop_voi_bo_cham():
+    """Trang "Cách chấm điểm" đọc mô tả này — nó phải sinh từ criteria.py,
+    không phải một bản chép tay dễ lệch."""
+    from app.services import criteria, scoring
+
+    model = scoring.describe_model()
+    assert model.total == 100
+    assert sum(g.max for g in model.groups) == 100
+    assert [(g.name, g.max) for g in model.groups] == [
+        (name, maximum) for name, maximum, _ in criteria.GROUPS]
+    assert sum(len(g.criteria) for g in model.groups) == 14
+    #  Điểm tối đa của các tiêu chí trong nhóm phải cộng đúng bằng điểm nhóm.
+    for group in model.groups:
+        assert sum(c.max for c in group.criteria) == group.max
+
+
+def test_thang_xep_loai_khop_verdict_that():
+    """Ngưỡng hiển thị và ngưỡng máy chấm dùng CHUNG một bảng — không được lệch."""
+    from app.services.scoring import _verdict, describe_model
+
+    for grade in describe_model().grades:
+        assert _verdict(grade.min_total).text == grade.text
+        assert _verdict(grade.min_total).level == grade.level

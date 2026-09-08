@@ -51,6 +51,8 @@ async function submit(): Promise<void> {
       <p class="note switch">
         Chưa có tài khoản?
         <NuxtLink :to="{ path: '/register', query: route.query }">Đăng ký</NuxtLink>
+        <span class="sep">·</span>
+        <NuxtLink to="/forgot-password">Quên mật khẩu?</NuxtLink>
       </p>
     </div>
   </div>
@@ -92,5 +94,10 @@ h1 {
 .switch {
   margin-top: 16px;
   text-align: center;
+}
+
+.sep {
+  margin: 0 6px;
+  opacity: 0.5;
 }
 </style>

@@ -14,6 +14,7 @@ const {
   conversations, activeConvId, loadConversations, openConversation, newConversation, deleteConversation
 } = useChat()
 const { isLoggedIn, ensureLoaded } = useAuth()
+const { quota, load: loadQuota, dungMotLuot } = useChatQuota()
 const activeTicker = useActiveTicker()
 
 const open = ref(false)
@@ -39,6 +40,7 @@ async function syncConversations(): Promise<void> {
 onMounted(async () => {
   await ensureLoaded()
   await syncConversations()
+  if (isLoggedIn.value) await loadQuota()
 })
 
 //  Ẩn widget ở những nơi thừa: trang trợ lý toàn màn hình và trang đăng nhập/ký.
@@ -79,6 +81,8 @@ function submit(): void {
   //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới. Có mã + giới hạn → hỏi trong mã đó.
   askStream(q, ticker.value && scoped.value ? ticker.value : '',
     activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
+  dungMotLuot()
+  setTimeout(() => void loadQuota(), 3000)
 }
 
 //  Bấm câu gợi ý → điền rồi GỬI luôn (không dừng ở ô nhập).
@@ -197,6 +201,12 @@ function onDelete(c: ConversationOut): void {
                   :disabled="pending" @click="pick(ex)">{{ ex }}</button>
         </div>
 
+        <p v-if="quota" class="han-muc" :class="{ het: quota.remaining <= 0 }">
+          {{ quota.remaining > 0
+            ? `Còn ${quota.remaining}/${quota.limit} lượt hôm nay`
+            : 'Hết lượt hôm nay — quay lại sau 0h' }}
+        </p>
+
         <form class="ask" @submit.prevent="submit">
           <label v-if="ticker" class="scope" :title="`Chỉ tìm trong dữ liệu của ${ticker}`">
             <input v-model="scoped" type="checkbox" /> chỉ {{ ticker }}
@@ -215,6 +225,18 @@ function onDelete(c: ConversationOut): void {
 </template>
 
 <style scoped>
+.han-muc {
+  margin: 0 0 6px;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.han-muc.het {
+  color: var(--bad);
+  font-weight: 700;
+}
+
 .widget {
   position: fixed;
   right: 18px;

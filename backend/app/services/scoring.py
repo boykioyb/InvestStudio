@@ -29,6 +29,11 @@ from app.schemas.stock import (
     Score,
     ScoreCategory,
     ScoreItem,
+    ScoringBand,
+    ScoringCriterion,
+    ScoringGrade,
+    ScoringGroup,
+    ScoringModel,
     Verdict,
     WorstCase,
 )
@@ -120,13 +125,45 @@ def _build_categories(m: Metrics) -> list[ScoreCategory]:
 
 
 def _verdict(total: int) -> Verdict:
-    if total >= 80:
-        return Verdict(text="Xuất sắc — ưu tiên giải ngân", level="good")
-    if total >= 65:
-        return Verdict(text="Tốt — có thể đầu tư, canh điểm mua", level="good")
-    if total >= 50:
-        return Verdict(text="Trung bình — theo dõi / thăm dò nhỏ", level="warn")
-    return Verdict(text="Yếu — nên tránh", level="bad")
+    for minimum, text, level in _GRADES:
+        if total >= minimum:
+            return Verdict(text=text, level=level)
+    return Verdict(text=_GRADES[-1][1], level=_GRADES[-1][2])  # pragma: no cover
+
+
+#  Bậc xếp loại — khai một chỗ, dùng cho cả `_verdict` lẫn phần mô tả mô hình
+#  trả ra API, để trang "Cách chấm điểm" không thể nói khác máy chấm.
+_GRADES: tuple[tuple[int, str, Level], ...] = (
+    (80, "Xuất sắc — ưu tiên giải ngân", "good"),
+    (65, "Tốt — có thể đầu tư, canh điểm mua", "good"),
+    (50, "Trung bình — theo dõi / thăm dò nhỏ", "warn"),
+    (0, "Yếu — nên tránh", "bad"),
+)
+
+
+def describe_model() -> ScoringModel:
+    """Mô tả mô hình chấm điểm, sinh TỪ `criteria.GROUPS`.
+
+    Có hàm này thì trang giải thích ở frontend không phải chép lại trọng số và
+    ngưỡng — sửa `criteria.py` là trang đó tự đúng theo.
+    """
+    return ScoringModel(
+        groups=[
+            ScoringGroup(
+                name=name, max=maximum,
+                criteria=[
+                    ScoringCriterion(
+                        key=spec.key, label=spec.label, max=spec.max, what=spec.what,
+                        why=spec.why, how=spec.how, manual=spec.manual,
+                        bands=[ScoringBand(text=b.text, level=b.level) for b in spec.bands],
+                    )
+                    for spec in specs
+                ],
+            )
+            for name, maximum, specs in criteria.GROUPS
+        ],
+        grades=[ScoringGrade(min_total=m, text=t, level=lv) for m, t, lv in _GRADES],
+    )
 
 
 def _horizon_fit(value: int) -> tuple[Level, str]:

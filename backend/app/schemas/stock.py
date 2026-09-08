@@ -328,6 +328,49 @@ class QuoteBatch(BaseModel):
     asof: str = Field("", description="Mốc dữ liệu HH:MM (giờ VN)")
 
 
+# ── Mô tả mô hình chấm điểm (cho trang "Cách chấm điểm") ────────────────────
+class ScoringBand(BaseModel):
+    """Một mốc của thang điểm: đạt mức nào thì mô tả ra sao."""
+
+    text: str
+    level: int = Field(..., description="0 = yếu · 1 = trung bình · 2 = tốt")
+
+
+class ScoringCriterion(BaseModel):
+    key: str
+    label: str
+    max: int
+    what: str = Field(..., description="Đo cái gì")
+    why: str = Field(..., description="Vì sao nó quan trọng")
+    how: str = Field(..., description="Chấm bằng cách nào")
+    manual: bool = Field(False, description="Người dùng tự chấm (máy không crawl được)")
+    bands: list[ScoringBand]
+
+
+class ScoringGroup(BaseModel):
+    name: str
+    max: int
+    criteria: list[ScoringCriterion]
+
+
+class ScoringGrade(BaseModel):
+    min_total: int
+    text: str
+    level: Level
+
+
+class ScoringModel(BaseModel):
+    """Toàn bộ mô hình, sinh TỪ criteria.py — nguồn sự thật duy nhất.
+
+    Frontend chỉ hiển thị: không khai lại ngưỡng hay trọng số ở phía giao diện,
+    vì hai bản cài đặt ở hai ngôn ngữ sớm muộn cũng lệch nhau.
+    """
+
+    total: int = 100
+    groups: list[ScoringGroup]
+    grades: list[ScoringGrade]
+
+
 # ── Tab Dòng tiền: chỉ báo theo NGÀY (không phải áp lực trong phiên) ─────────
 class FlowPoint(BaseModel):
     d: str

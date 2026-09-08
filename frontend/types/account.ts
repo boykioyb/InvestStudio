@@ -7,7 +7,22 @@ export interface UserOut {
   id: number
   email: string
   display_name: string
+  role: string
+  /** Chưa xác minh email thì chưa dùng được trợ lý (backend chặn ở require_verified). */
+  email_verified: boolean
+  totp_enabled?: boolean
   created_at: string
+}
+
+/** Hạn mức trợ lý còn lại — GET /api/chat/quota. */
+export interface ChatQuota {
+  limit: number
+  used: number
+  /** Số NHỎ NHẤT giữa rổ tài khoản và rổ thiết bị: đúng cái thực sự còn dùng được. */
+  remaining: number
+  /** ok = bình thường · saving = quota chung đang cạn · exhausted = chỉ phục vụ người đã hỏi. */
+  level: 'ok' | 'saving' | 'exhausted'
+  email_verified: boolean
 }
 
 export interface WatchlistItem {

@@ -23,7 +23,9 @@ async function onLogout(): Promise<void> {
   <div class="auth-nav">
     <template v-if="isLoggedIn">
       <NotificationBell />
-      <span class="who" :title="user?.email"><User /> {{ user?.display_name }}</span>
+      <NuxtLink class="who" to="/account" :title="`${user?.email} · mở trang tài khoản`">
+        <User /> {{ user?.display_name }}
+      </NuxtLink>
       <button type="button" class="chip" @click="onLogout">Thoát</button>
     </template>
     <NuxtLink
@@ -44,6 +46,9 @@ async function onLogout(): Promise<void> {
 }
 
 .who {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   font-weight: 700;
   color: var(--accent);
@@ -51,6 +56,11 @@ async function onLogout(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-decoration: none;
+}
+
+.who:hover {
+  text-decoration: underline;
 }
 
 .chip {

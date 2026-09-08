@@ -29,10 +29,11 @@ from app.schemas.stock import (
     SourceMode,
     StatementKey,
     StockAnalysis,
+    ScoringModel,
     StockStats,
     TradingBoard,
 )
-from app.services import alerts, analyzer, details, feed, history, market, position
+from app.services import alerts, analyzer, details, feed, history, market, position, scoring
 from app.services.providers.base import ProviderError
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
@@ -108,6 +109,21 @@ def _cache_key(symbol: str, pos: int, mgmt: int, cat: int,
             round(pe_sec, 2) if pe_sec is not None else None,
             round(pb_fair, 2) if pb_fair is not None else None,
             source)
+
+
+@router.get("/scoring-model", response_model=ScoringModel, tags=["stocks"],
+            summary="Mô tả mô hình chấm điểm (14 tiêu chí / 4 nhóm / thang xếp loại)")
+def scoring_model() -> ScoringModel:
+    """Cho trang "Cách chấm điểm" ở giao diện.
+
+    Sinh TỪ `criteria.py` nên frontend không phải chép lại trọng số/ngưỡng —
+    đúng quy tắc bất di bất dịch của dự án: mô hình chỉ tồn tại ở một nơi.
+    Không chạm nguồn dữ liệu nên không tính vào hạn mức phân tích.
+
+    ĐẶT TRƯỚC route `/{ticker}` — nếu không, "scoring-model" sẽ bị hiểu là một
+    mã cổ phiếu và không bao giờ tới được đây.
+    """
+    return scoring.describe_model()
 
 
 @router.get(

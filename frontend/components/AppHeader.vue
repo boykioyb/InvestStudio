@@ -16,7 +16,8 @@ const LINKS = [
   { to: '/analysis', label: 'Phân tích' },
   { to: '/screener', label: 'Danh sách mã' },
   { to: '/watchlist', label: 'Theo dõi' },
-  { to: '/assistant', label: 'Trợ lý' }
+  { to: '/assistant', label: 'Trợ lý' },
+  { to: '/scoring', label: 'Cách chấm điểm' }
 ]
 const isOn = (to: string): boolean => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 

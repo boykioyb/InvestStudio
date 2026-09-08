@@ -72,8 +72,18 @@ const examples = [
   'So sánh định giá P/E của VCB và CTG.'
 ]
 
+const { quota, load: loadQuota, dungMotLuot } = useChatQuota()
+
+//  Nói trước còn bao nhiêu lượt, thay vì để người dùng đâm vào 429 rồi mới biết.
+const nhanHanMuc = computed(() => {
+  if (!quota.value) return ''
+  if (quota.value.remaining <= 0) return 'Hết lượt hôm nay — quay lại sau 0h'
+  return `Còn ${quota.value.remaining}/${quota.value.limit} lượt hôm nay`
+})
+
 onMounted(async () => {
   await ensureLoaded()  // middleware đã đảm bảo đăng nhập
+  await loadQuota()
   await fetchStatus()
   await loadConversations()
   //  Mở sẵn cuộc gần nhất để có gì đó để xem; chưa có thì để khung trống.
@@ -93,6 +103,10 @@ function submit(): void {
   //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới ngay ở lượt hỏi này.
   askStream(q, ticker.value,
     activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
+  //  Trừ ngay phía giao diện cho con số khớp cảm nhận; nạp lại sau ít giây để
+  //  lấy số THẬT từ máy chủ (rổ thiết bị/IP có thể trừ nhiều hơn rổ tài khoản).
+  dungMotLuot()
+  setTimeout(() => void loadQuota(), 3000)
 }
 
 function onRename(c: ConversationOut): void {
@@ -231,6 +245,13 @@ async function startReindex(): Promise<void> {
         </div>
         <p v-if="uploadErr" class="upload-err">{{ uploadErr }}</p>
 
+        <p v-if="nhanHanMuc" class="han-muc" :class="{ het: (quota?.remaining ?? 1) <= 0 }">
+          {{ nhanHanMuc }}
+          <span v-if="quota?.level === 'saving'" class="tiet-kiem">
+            · hệ thống đang tiết kiệm hạn mức chung nên câu trả lời gọn hơn
+          </span>
+        </p>
+
         <form class="askbar" @submit.prevent="submit">
           <button type="button" class="btn attach" title="Đính kèm ảnh/PDF"
                   @click="fileInput?.click()">
@@ -264,6 +285,21 @@ async function startReindex(): Promise<void> {
 </template>
 
 <style scoped>
+.han-muc {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.han-muc.het {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.tiet-kiem {
+  color: var(--warn, #d9a441);
+}
+
 .head {
   display: flex;
   align-items: center;

@@ -6,6 +6,8 @@
   <!-- Nền toàn cục: aurora + lưới mờ (chỉ trình bày, không chặn tương tác). -->
   <div class="app-aura" aria-hidden="true" />
   <div class="app-grid" aria-hidden="true" />
+  <!-- Nhắc xác minh email: đặt ở vỏ app để mọi trang đều thấy. -->
+  <VerifyEmailBanner />
   <NuxtPage />
   <!-- Trợ lý RAG nổi ở góc — dùng được ở mọi trang, tự bắt mã đang xem. -->
   <ChatWidget />
