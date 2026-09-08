@@ -46,7 +46,7 @@ function ariaSort(column: ScreenerColumn): 'ascending' | 'descending' | 'none' {
 
 /** Bấm một dòng là mở màn hình phân tích của đúng mã đó. */
 function analyze(row: ScreenerRow): void {
-  void navigateTo({ path: '/phan-tich', query: { ma: row.symbol } })
+  void navigateTo({ path: '/analysis', query: { symbol: row.symbol } })
 }
 
 /** Dải nhiệt: cường độ theo |change_pct| thật; ẩn khi ngoài phiên (toàn null). */

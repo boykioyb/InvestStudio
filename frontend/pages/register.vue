@@ -31,7 +31,7 @@ async function submit(): Promise<void> {
 
 <template>
   <div class="wrap auth">
-    <NuxtLink to="/phan-tich" class="back">← Về phân tích mã</NuxtLink>
+    <NuxtLink to="/analysis" class="back">← Về phân tích mã</NuxtLink>
 
     <div class="card">
       <h1>Đăng ký tài khoản</h1>
@@ -62,7 +62,7 @@ async function submit(): Promise<void> {
 
       <p class="note switch">
         Đã có tài khoản?
-        <NuxtLink :to="{ path: '/dang-nhap', query: route.query }">Đăng nhập</NuxtLink>
+        <NuxtLink :to="{ path: '/login', query: route.query }">Đăng nhập</NuxtLink>
       </p>
     </div>
   </div>

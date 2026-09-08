@@ -12,7 +12,7 @@ const {
 
 function go(code: string): void {
   const c = code.trim().toUpperCase()
-  if (c) void navigateTo({ path: '/phan-tich', query: { ma: c } })
+  if (c) void navigateTo({ path: '/analysis', query: { symbol: c } })
 }
 
 onMounted(() => { void load() })

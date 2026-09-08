@@ -6,7 +6,7 @@ const me = useAdminUser()
 
 //  Bị đẩy sang đây vì chưa bật 2 lớp → nói rõ lý do ngay đầu trang, thay vì để
 //  người dùng ngơ ngác không hiểu sao vừa bấm Tổng quan lại nhảy sang Cài đặt.
-const cangBat2Lop = computed(() => route.query.canh_bao === '2fa' || me.value?.totp_enabled === false)
+const cangBat2Lop = computed(() => route.query.warn === '2fa' || me.value?.totp_enabled === false)
 
 const { data, pending, refresh } = await useAsyncData('settings', () =>
   api.get<any[]>('/admin/settings').catch(() => [])
@@ -65,7 +65,7 @@ async function bat() {
     //  đưa về trang đăng nhập thay vì để người dùng bấm tiếp rồi ăn 401.
     thongBao.value = 'Đã bật xác thực 2 lớp. Đang đưa bạn về trang đăng nhập…'
     me.value = null
-    setTimeout(() => navigateTo('/dang-nhap?next=/'), 1800)
+    setTimeout(() => navigateTo('/login?next=/'), 1800)
   } catch (e: any) {
     loi.value = e.message
   }

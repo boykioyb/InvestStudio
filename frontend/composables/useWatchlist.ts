@@ -4,7 +4,7 @@ import type { WatchlistItem, WatchlistItemInput } from '~/types/account'
  * Danh sách mã theo dõi của người dùng đang đăng nhập.
  *
  * Chỉ gọi API và dịch lỗi. Danh sách dùng chung qua useState để nút ⭐ ở mọi
- * nơi và trang /theo-doi luôn thấy cùng một trạng thái.
+ * nơi và trang /watchlist luôn thấy cùng một trạng thái.
  */
 export function useWatchlist() {
   const config = useRuntimeConfig()

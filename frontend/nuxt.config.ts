@@ -18,6 +18,19 @@ export default defineNuxtConfig({
     }
   },
 
+  //  Đường dẫn cũ (tiếng Việt) → đường dẫn mới (tiếng Anh). Chỉ để tab và
+  //  bookmark đang mở không gãy trong lúc chuyển đổi — sản phẩm chưa phát hành
+  //  nên xóa khối này sau vài tuần là được.
+  routeRules: {
+    '/dang-nhap': { redirect: { to: '/login', statusCode: 301 } },
+    '/dang-ky': { redirect: { to: '/register', statusCode: 301 } },
+    '/phan-tich': { redirect: { to: '/analysis', statusCode: 301 } },
+    '/danh-sach': { redirect: { to: '/screener', statusCode: 301 } },
+    '/theo-doi': { redirect: { to: '/watchlist', statusCode: 301 } },
+    '/danh-muc': { redirect: { to: '/portfolio', statusCode: 301 } },
+    '/tro-ly': { redirect: { to: '/assistant', statusCode: 301 } }
+  },
+
   devServer: {
     port: 3010,
     host: '0.0.0.0'

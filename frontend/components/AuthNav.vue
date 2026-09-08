@@ -29,7 +29,7 @@ async function onLogout(): Promise<void> {
     <NuxtLink
       v-else
       class="chip login"
-      :to="{ path: '/dang-nhap', query: { next: route.fullPath } }"
+      :to="{ path: '/login', query: { next: route.fullPath } }"
     >
       <LogIn /> Đăng nhập
     </NuxtLink>

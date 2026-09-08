@@ -93,8 +93,8 @@ lưu dạng băm **bcrypt**, không bao giờ lưu bản thô.
 | `POST /api/chat` | Hỏi trợ lý một câu (RAG) |
 | `POST /api/chat/reindex` · `GET /api/chat/status` | Lập chỉ mục lại VN30 + tin / xem trạng thái |
 
-Trang web tương ứng: <http://localhost:3010/dang-nhap> · `/theo-doi` (⭐ mã theo dõi)
-· `/tro-ly` (💬 trợ lý). Nút ⭐ nằm ngay trong màn hình phân tích của mỗi mã.
+Trang web tương ứng: <http://localhost:3010/login> · `/watchlist` (⭐ mã theo dõi)
+· `/assistant` (💬 trợ lý). Nút ⭐ nằm ngay trong màn hình phân tích của mỗi mã.
 
 **RAG hoạt động thế nào** (một nguồn sự thật vẫn ở backend):
 
@@ -110,7 +110,7 @@ Trang web tương ứng: <http://localhost:3010/dang-nhap> · `/theo-doi` (⭐ m
 **Lập chỉ mục chạy như một JOB NỀN qua Celery** (service `worker` + `redis`), tách
 khỏi web process nên không chặn request và sống sót qua restart. Tiến độ ghi vào
 bảng `index_jobs`, đọc qua `GET /api/chat/status`. Kích hoạt lần đầu (cần
-`GEMINI_API_KEY`) bằng nút trên trang `/tro-ly`, hoặc bằng dòng lệnh:
+`GEMINI_API_KEY`) bằng nút trên trang `/assistant`, hoặc bằng dòng lệnh:
 
 ```bash
 docker compose exec backend python -m scripts.reindex          # đẩy job: cả VN30 + tin
@@ -122,7 +122,7 @@ docker compose logs -f worker                                   # xem worker x�
 
 ## Danh sách mã — sắp xếp ở MÁY CHỦ
 
-Trang <http://localhost:3010/danh-sach>: chọn rổ (VN30 · VN100 · HNX30 · toàn HOSE),
+Trang <http://localhost:3010/screener>: chọn rổ (VN30 · VN100 · HNX30 · toàn HOSE),
 bấm tiêu đề cột để sắp xếp, bấm một dòng là mở thẳng màn hình phân tích của mã đó.
 
 Sắp xếp chạy ở backend chứ không ở frontend — cùng lý do với mô hình chấm điểm:
@@ -224,7 +224,7 @@ backend/           FastAPI
   tests/           khóa hành vi mô hình chấm điểm
 frontend/          Nuxt 3 (chỉ render)
   composables/     useAuth · useWatchlist · useChat (chỉ gọi API, không logic)
-  pages/           index · danh-sach · dang-nhap · dang-ky · theo-doi · tro-ly
+  pages/           index · screener · login · register · watchlist · assistant
 legacy/            bản cũ (HTML tĩnh + CLI Python) — giữ để tham khảo
 ```
 

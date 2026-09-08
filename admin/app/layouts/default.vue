@@ -5,14 +5,14 @@ const me = useAdminUser()
 async function dangXuat() {
   await $fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
   me.value = null
-  await navigateTo('/dang-nhap')
+  await navigateTo('/login')
 }
 
 const links = [
   { label: 'Tổng quan', icon: 'i-lucide-gauge', to: '/' },
-  { label: 'Người dùng', icon: 'i-lucide-users', to: '/nguoi-dung' },
-  { label: 'Cài đặt', icon: 'i-lucide-sliders-horizontal', to: '/cai-dat' },
-  { label: 'Nhật ký', icon: 'i-lucide-scroll-text', to: '/nhat-ky' }
+  { label: 'Người dùng', icon: 'i-lucide-users', to: '/users' },
+  { label: 'Cài đặt', icon: 'i-lucide-sliders-horizontal', to: '/settings' },
+  { label: 'Nhật ký', icon: 'i-lucide-scroll-text', to: '/audit' }
 ]
 </script>
 

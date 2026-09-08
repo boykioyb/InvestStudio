@@ -13,7 +13,7 @@ const sign = (v: number | null | undefined) =>
 const withSign = (v: number | null | undefined) => (v != null && v > 0 ? '+' : '')
 
 function open(row: PortfolioRow): void {
-  void navigateTo({ path: '/phan-tich', query: { ma: row.ticker } })
+  void navigateTo({ path: '/analysis', query: { symbol: row.ticker } })
 }
 </script>
 
@@ -38,7 +38,7 @@ function open(row: PortfolioRow): void {
           Vào một mã → tab <b>“Vị thế của tôi”</b> để nhập các đợt mua. Dữ liệu lưu
           ngay trong trình duyệt này, tổng hợp sẽ hiện ở đây.
         </p>
-        <NuxtLink to="/danh-sach" class="btn primary">Khám phá danh sách mã →</NuxtLink>
+        <NuxtLink to="/screener" class="btn primary">Khám phá danh sách mã →</NuxtLink>
       </div>
 
       <p v-else-if="pending && !data" class="note loading">Đang tổng hợp danh mục…</p>

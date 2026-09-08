@@ -12,8 +12,8 @@ const canMa = ref(false)          // chỉ hiện ô mã khi backend báo là c�
 const dangGui = ref(false)
 const loi = ref('')
 
-//  Vào thẳng trang này với ?loi=quyen nghĩa là đăng nhập được nhưng không phải admin.
-if (route.query.loi === 'quyen') {
+//  Vào thẳng trang này với ?error=forbidden nghĩa là đăng nhập được nhưng không phải admin.
+if (route.query.error === 'forbidden') {
   loi.value = 'Tài khoản này không có quyền quản trị.'
 }
 

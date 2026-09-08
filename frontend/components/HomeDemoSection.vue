@@ -153,8 +153,8 @@ onUnmounted(() => cancelAnimationFrame(raf))
           </div>
 
           <div class="ctas">
-            <NuxtLink :to="{ path: '/phan-tich', query: { ma: 'FPT' } }" class="cta-main">Mở phân tích đầy đủ FPT →</NuxtLink>
-            <NuxtLink to="/theo-doi" class="cta-alt">☆ Theo dõi FPT <span class="muted">· cần đăng nhập</span></NuxtLink>
+            <NuxtLink :to="{ path: '/analysis', query: { symbol: 'FPT' } }" class="cta-main">Mở phân tích đầy đủ FPT →</NuxtLink>
+            <NuxtLink to="/watchlist" class="cta-alt">☆ Theo dõi FPT <span class="muted">· cần đăng nhập</span></NuxtLink>
           </div>
         </div>
       </div>

@@ -51,7 +51,7 @@ watch(() => props.group, (g) => void load(g))
         <div v-else-if="events.length" class="rows">
           <NuxtLink
             v-for="e in events" :key="e.date + e.symbol + e.kind"
-            :to="{ path: '/phan-tich', query: { ma: e.symbol } }" class="row ev"
+            :to="{ path: '/analysis', query: { symbol: e.symbol } }" class="row ev"
           >
             <span class="cal tnum"><span class="d">{{ day(e.date) }}</span><span class="m">{{ mon(e.date) }}</span></span>
             <span class="sym tnum">{{ e.symbol }}</span>
@@ -74,7 +74,7 @@ watch(() => props.group, (g) => void load(g))
             v-for="n in news" :key="n.symbol + n.title"
             v-bind="n.url
               ? { href: n.url, target: '_blank', rel: 'noopener noreferrer' }
-              : { to: { path: '/phan-tich', query: { ma: n.symbol } } }"
+              : { to: { path: '/analysis', query: { symbol: n.symbol } } }"
             class="row nw"
           >
             <span class="sym tnum">{{ n.symbol }}</span>
@@ -98,14 +98,14 @@ watch(() => props.group, (g) => void load(g))
           <div class="rows">
             <NuxtLink
               v-for="l in leaders" :key="l.symbol"
-              :to="{ path: '/phan-tich', query: { ma: l.symbol } }" class="row ld"
+              :to="{ path: '/analysis', query: { symbol: l.symbol } }" class="row ld"
             >
               <span class="sym tnum">{{ l.symbol }}</span>
               <span class="track"><span class="fill" :style="{ width: l.score + '%' }" /></span>
               <span class="score tnum">{{ l.score }}<span class="muted">/100</span></span>
             </NuxtLink>
           </div>
-          <NuxtLink to="/danh-sach" class="all">Xem cả bảng {{ group }} →</NuxtLink>
+          <NuxtLink to="/screener" class="all">Xem cả bảng {{ group }} →</NuxtLink>
         </template>
         <p v-else class="hint">Chưa có dữ liệu.</p>
       </div>

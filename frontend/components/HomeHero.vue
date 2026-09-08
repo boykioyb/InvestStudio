@@ -3,7 +3,7 @@ import { Check } from 'lucide-vue-next'
 
 /**
  * Hero trang chủ: nhãn trạng thái phiên (thật), tiêu đề, 3 điểm bán, ô tìm mã
- * và các mã ví dụ. Không có màn loading giả — trang /phan-tich tự lo phần đó.
+ * và các mã ví dụ. Không có màn loading giả — trang /analysis tự lo phần đó.
  */
 const props = defineProps<{ inSession: boolean; sessionLabel: string }>()
 const emit = defineEmits<{ pick: [code: string] }>()

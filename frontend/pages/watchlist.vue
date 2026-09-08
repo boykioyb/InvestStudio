@@ -72,7 +72,7 @@ async function quickAdd(): Promise<void> {
 
 /** Mở màn hình phân tích của mã (giống bấm dòng ở trang Danh sách). */
 function analyze(ticker: string): void {
-  void navigateTo({ path: '/phan-tich', query: { ma: ticker } })
+  void navigateTo({ path: '/analysis', query: { symbol: ticker } })
 }
 
 function fmtPrice(value: number | null): string {

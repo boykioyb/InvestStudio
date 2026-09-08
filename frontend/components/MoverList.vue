@@ -6,7 +6,7 @@ defineProps<{ items: Mover[]; showPrice?: boolean }>()
 const { num } = useFormat()
 
 function open(code: string): void {
-  void navigateTo({ path: '/phan-tich', query: { ma: code } })
+  void navigateTo({ path: '/analysis', query: { symbol: code } })
 }
 </script>
 

@@ -11,8 +11,8 @@ export function useAdminUser() {
 /** Đưa về trang đăng nhập, nhớ đường đang định vào để quay lại sau khi đăng nhập. */
 export function toLogin(next?: string, loi?: string) {
   const params = new URLSearchParams()
-  if (next && next !== '/dang-nhap') params.set('next', next)
+  if (next && next !== '/login') params.set('next', next)
   if (loi) params.set('loi', loi)
   const query = params.toString()
-  return navigateTo(`/dang-nhap${query ? `?${query}` : ''}`)
+  return navigateTo(`/login${query ? `?${query}` : ''}`)
 }

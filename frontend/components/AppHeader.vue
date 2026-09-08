@@ -12,11 +12,11 @@ import { Menu, X } from 'lucide-vue-next'
 const route = useRoute()
 const LINKS = [
   { to: '/', label: 'Trang chủ' },
-  { to: '/danh-muc', label: 'Danh mục' },
-  { to: '/phan-tich', label: 'Phân tích' },
-  { to: '/danh-sach', label: 'Danh sách mã' },
-  { to: '/theo-doi', label: 'Theo dõi' },
-  { to: '/tro-ly', label: 'Trợ lý' }
+  { to: '/portfolio', label: 'Danh mục' },
+  { to: '/analysis', label: 'Phân tích' },
+  { to: '/screener', label: 'Danh sách mã' },
+  { to: '/watchlist', label: 'Theo dõi' },
+  { to: '/assistant', label: 'Trợ lý' }
 ]
 const isOn = (to: string): boolean => (to === '/' ? route.path === '/' : route.path.startsWith(to))
 

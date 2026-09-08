@@ -22,7 +22,7 @@ const scoped = ref(true)      // mặc định: giới hạn trong mã đang xem
 const showList = ref(false)   // bật panel danh sách câu chuyện
 
 //  Chỉ coi là "đang xem mã" khi ở trang phân tích và đã có mã.
-const ticker = computed(() => (route.path === '/phan-tich' ? activeTicker.value : ''))
+const ticker = computed(() => (route.path === '/analysis' ? activeTicker.value : ''))
 
 //  Nạp danh sách câu chuyện; có thì mở cuộc gần nhất, chưa có thì để cuộc mới trống.
 async function syncConversations(): Promise<void> {
@@ -42,7 +42,7 @@ onMounted(async () => {
 })
 
 //  Ẩn widget ở những nơi thừa: trang trợ lý toàn màn hình và trang đăng nhập/ký.
-const hidden = computed(() => ['/tro-ly', '/dang-nhap', '/dang-ky'].includes(route.path))
+const hidden = computed(() => ['/assistant', '/login', '/register'].includes(route.path))
 
 watch(isLoggedIn, syncConversations)
 //  Mở widget → làm mới danh sách (không đụng cuộc đang xem).
@@ -153,7 +153,7 @@ function onDelete(c: ConversationOut): void {
       <!-- Chưa đăng nhập -->
       <div v-if="!isLoggedIn" class="body center">
         <p class="note">Đăng nhập để dùng trợ lý hỏi đáp.</p>
-        <NuxtLink class="btn primary" :to="{ path: '/dang-nhap', query: { next: route.fullPath } }">
+        <NuxtLink class="btn primary" :to="{ path: '/login', query: { next: route.fullPath } }">
           <LogIn /> Đăng nhập
         </NuxtLink>
       </div>

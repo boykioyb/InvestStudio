@@ -86,10 +86,10 @@ async function runAnalysis(code: string) {
 function submit() {
   const code = ticker.value.trim().toUpperCase()
   if (!code) return
-  if (String(route.query.ma || '').toUpperCase() === code) {
+  if (String(route.query.symbol || '').toUpperCase() === code) {
     void runAnalysis(code)
   } else {
-    void navigateTo({ path: '/phan-tich', query: { ma: code } })
+    void navigateTo({ path: '/analysis', query: { symbol: code } })
   }
 }
 
@@ -98,9 +98,9 @@ function pick(code: string) {
   submit()
 }
 
-//  Nguồn sự thật là ?ma trên URL: đổi mã (từ trang khác, gõ tay, hay nút Phân
+//  Nguồn sự thật là ?symbol trên URL: đổi mã (từ trang khác, gõ tay, hay nút Phân
 //  tích) đều đi qua đây → phân tích đúng một lần.
-watch(() => route.query.ma, (value) => {
+watch(() => route.query.symbol, (value) => {
   const code = String(value || '').trim().toUpperCase()
   if (code) void runAnalysis(code)
 })
@@ -110,7 +110,7 @@ watch(() => route.query.ma, (value) => {
 //   2) Không có → đã đăng nhập & có mã theo dõi thì chuyển URL sang mã GẦN NHẤT.
 //   3) Chưa đăng nhập / chưa theo dõi → giữ màn trống.
 onMounted(async () => {
-  const code = String(route.query.ma || '').trim().toUpperCase()
+  const code = String(route.query.symbol || '').trim().toUpperCase()
   if (code) {
     void runAnalysis(code)
     return
@@ -119,7 +119,7 @@ onMounted(async () => {
   if (!isLoggedIn.value) return
   if (!watchLoaded.value) await loadWatchlist()
   const recent = watchItems.value[0]
-  if (recent) void navigateTo({ path: '/phan-tich', query: { ma: recent.ticker } })
+  if (recent) void navigateTo({ path: '/analysis', query: { symbol: recent.ticker } })
 })
 
 useHead({

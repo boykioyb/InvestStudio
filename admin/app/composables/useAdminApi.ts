@@ -26,7 +26,7 @@ export function useAdminApi() {
         //  Backend đánh dấu bằng header X-Admin-Setup (app/api/deps.py).
         if (error?.response?.headers?.get('x-admin-setup') === 'totp') {
           const route = useRoute()
-          if (route.path !== '/cai-dat') await navigateTo('/cai-dat?canh_bao=2fa')
+          if (route.path !== '/settings') await navigateTo('/settings?warn=2fa')
         }
         throw new Error(detail || 'Tài khoản này không có quyền quản trị.')
       }

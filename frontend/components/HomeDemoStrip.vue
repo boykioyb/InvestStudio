@@ -46,7 +46,7 @@
 
       <div class="foot">
         <span>Chi tiết 14 tiêu chí, biểu đồ giá và kịch bản xấu nhất ở phần dưới.</span>
-        <NuxtLink :to="{ path: '/phan-tich', query: { ma: 'FPT' } }" class="ghost">Mở phân tích đầy đủ FPT →</NuxtLink>
+        <NuxtLink :to="{ path: '/analysis', query: { symbol: 'FPT' } }" class="ghost">Mở phân tích đầy đủ FPT →</NuxtLink>
       </div>
     </div>
   </section>

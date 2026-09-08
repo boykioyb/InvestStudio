@@ -6,7 +6,7 @@
  * middleware thì không trang nào phải tự lo việc này nữa.
  */
 export default defineNuxtRouteMiddleware(async (to) => {
-  if (to.path === '/dang-nhap') return
+  if (to.path === '/login') return
 
   const me = useAdminUser()
   if (me.value) return

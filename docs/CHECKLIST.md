@@ -26,9 +26,9 @@
 ## 🟠 S4 — Rõ sản phẩm *(chặn ship: thiếu là người lạ không dùng được)*
 
 **Ba trang còn thiếu — backend đã xong từ S1, chỉ thiếu giao diện:**
-- [ ] `/xac-minh?token=` — nhận link trong thư, gọi `POST /api/auth/verify`
-- [ ] `/quen-mat-khau` — nhập email, gọi `POST /api/auth/forgot-password`
-- [ ] `/dat-lai-mat-khau?token=` — đặt mật khẩu mới, gọi `POST /api/auth/reset-password`
+- [ ] `/verify-email?token=` — nhận link trong thư, gọi `POST /api/auth/verify`
+- [ ] `/forgot-password` — nhập email, gọi `POST /api/auth/forgot-password`
+- [ ] `/reset-password?token=` — đặt mật khẩu mới, gọi `POST /api/auth/reset-password`
 
 **Trạng thái tài khoản trên giao diện:**
 - [ ] Dải nhắc "hãy xác minh email" khi `email_verified = false`, kèm nút gửi lại thư

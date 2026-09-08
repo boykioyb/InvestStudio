@@ -26,7 +26,7 @@ onMounted(async () => {
 async function toggle(): Promise<void> {
   if (!isLoggedIn.value) {
     //  Lưu đường dẫn hiện tại để đăng nhập xong quay lại đúng chỗ.
-    void navigateTo({ path: '/dang-nhap', query: { next: route.fullPath } })
+    void navigateTo({ path: '/login', query: { next: route.fullPath } })
     return
   }
   busy.value = true
