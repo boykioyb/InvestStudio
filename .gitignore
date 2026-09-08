@@ -9,3 +9,5 @@ node_modules/
 celerybeat-schedule*
 .env.prod
 backups/
+test-results/
+playwright-report/

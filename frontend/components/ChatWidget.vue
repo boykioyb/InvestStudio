@@ -79,7 +79,7 @@ function submit(): void {
   const q = question.value
   question.value = ''
   //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới. Có mã + giới hạn → hỏi trong mã đó.
-  askStream(q, ticker.value && scoped.value ? ticker.value : '',
+  void askStream(q, ticker.value && scoped.value ? ticker.value : '',
     activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
   dungMotLuot()
   setTimeout(() => void loadQuota(), 3000)

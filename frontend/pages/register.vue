@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** Trang đăng ký. Thành công là đăng nhập luôn (backend đặt cookie ngay). */
-const { register, pending, error, ensureLoaded, isLoggedIn } = useAuth()
+const { register, pending, error, solvingChallenge, ensureLoaded, isLoggedIn } = useAuth()
 const route = useRoute()
 
 const email = ref('')
@@ -56,7 +56,8 @@ async function submit(): Promise<void> {
                  autocomplete="new-password" required minlength="6" placeholder="••••••••" />
         </div>
         <button class="btn primary" type="submit" :disabled="pending">
-          {{ pending ? 'Đang tạo tài khoản…' : 'Đăng ký' }}
+          {{ solvingChallenge ? 'Đang xác minh chống tự động…'
+            : pending ? 'Đang tạo tài khoản…' : 'Đăng ký' }}
         </button>
       </form>
 

@@ -17,6 +17,9 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=_MIN_PASSWORD, max_length=128,
                           description=f"Mật khẩu tối thiểu {_MIN_PASSWORD} ký tự")
     display_name: str = Field("", max_length=120, description="Tên hiển thị (tùy chọn)")
+    #  Chỉ cần khi thiết bị đã tạo nhiều tài khoản — xem GET /auth/challenge.
+    pow_nonce: str = Field("", max_length=64)
+    pow_answer: str = Field("", max_length=64)
 
 
 class LoginRequest(BaseModel):
@@ -41,6 +44,12 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=_MIN_PASSWORD, max_length=128)
 
 
+class PreferencesRequest(BaseModel):
+    """Tùy chọn cá nhân — hiện chỉ có công tắc email cảnh báo."""
+
+    alert_email: bool
+
+
 class DeleteAccountRequest(BaseModel):
     """Xóa tài khoản: bắt nhập lại mật khẩu — thao tác không hoàn tác được."""
 
@@ -58,4 +67,5 @@ class UserOut(BaseModel):
     role: str = "user"
     email_verified: bool = False
     totp_enabled: bool = False
+    alert_email: bool = True
     created_at: datetime

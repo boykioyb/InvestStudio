@@ -25,7 +25,7 @@ from app.core.config import get_settings
 from app.schemas.chat import AgentStep, ChatResponse, ChatTurnInput, Citation
 from app.services import alerts, analyzer, details, history, market, screener
 from app.services.providers.base import ProviderError
-from app.services.rag import chat, gemini, store
+from app.services.rag import chat, gemini, guard, store
 from app.services.rag.gemini import GeminiError, QuotaError, embed_texts
 
 _SYSTEM = (
@@ -57,7 +57,8 @@ _SYSTEM = (
     "đắt) so với định giá và điểm số.\n"
     "5) Trả lời bằng tiếng Việt, súc tích, dẫn số cụ thể; đủ dữ liệu thì kết luận "
     "ngay, đừng gọi thêm công cụ. Kết thúc bằng ĐÚNG MỘT dòng nhắc: đây là phân tích "
-    "tham khảo dựa trên dữ liệu, quyết định và rủi ro cuối cùng thuộc về bạn."
+    "tham khảo dựa trên dữ liệu, quyết định và rủi ro cuối cùng thuộc về bạn.\n"
+    + guard.NHAC_NHO
 )
 
 #  Khai báo công cụ cho Gemini (JSON Schema kiểu VIẾT HOA theo yêu cầu function calling).
@@ -212,8 +213,10 @@ def _make_dispatch(db: Session, default_ticker: Optional[str], citations: list[C
         for doc, _score in hits:
             citations.append(Citation(ticker=doc.ticker, doc_type=doc.doc_type,
                                       title=doc.title, snippet=chat._snippet(doc.content)))
-            blocks.append({"ma": doc.ticker, "loai": doc.doc_type,
-                           "tieu_de": doc.title, "noi_dung": chat._snippet(doc.content, 600)})
+            #  Nội dung tài liệu đến từ nguồn NGOÀI → bọc nhãn và ghi log nghi vấn.
+            guard.ghi_nhan(doc.content, nguon=f"agent:{doc.doc_type}", ticker=doc.ticker)
+            blocks.append({"ma": doc.ticker, "loai": doc.doc_type, "tieu_de": doc.title,
+                           "noi_dung": guard.boc(chat._snippet(doc.content, 600))})
         return {"ket_qua": blocks}
 
     def _phan_tich_ma(args: dict) -> dict:

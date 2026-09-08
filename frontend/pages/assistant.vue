@@ -101,7 +101,7 @@ function submit(): void {
   const q = question.value
   question.value = ''
   //  Đang mở cuộc → nối tiếp; chưa có → tạo cuộc mới ngay ở lượt hỏi này.
-  askStream(q, ticker.value,
+  void askStream(q, ticker.value,
     activeConvId.value ? { conversationId: activeConvId.value } : { startConversation: true })
   //  Trừ ngay phía giao diện cho con số khớp cảm nhận; nạp lại sau ít giây để
   //  lấy số THẬT từ máy chủ (rổ thiết bị/IP có thể trừ nhiều hơn rổ tài khoản).

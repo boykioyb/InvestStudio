@@ -49,6 +49,11 @@ class User(Base):
     last_ip: Mapped[str] = mapped_column(String(45), default="", server_default="")
     #  Khóa TOTP (xác thực 2 lớp) — chỉ tài khoản quản trị dùng tới.
     totp_secret: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    #  Nhận email khi mã theo dõi chạm ngưỡng. Mặc định BẬT — người dùng đã tự
+    #  đặt ngưỡng thì hiển nhiên là muốn được báo; ai không thích thì tắt ở
+    #  trang Tài khoản.
+    alert_email: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true",
+                                              nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property

@@ -24,39 +24,71 @@ from app.core.ratelimit import redis_client
 
 logger = logging.getLogger("app.usage")
 
-_current: ContextVar[dict | None] = ContextVar("usage_current", default=None)
+class Tracker:
+    """Bộ cộng dồn của MỘT lượt việc. Là đối tượng thường, không phải ContextVar.
+
+    Vì sao cần tách ra: luồng SSE được Starlette chạy bằng cách gọi `next()`
+    trên generator qua threadpool — mỗi bước có thể rơi vào một ngữ cảnh khác.
+    ContextVar đặt bên trong generator sẽ mất giá trị giữa các bước, và lệnh
+    reset còn ném `ValueError: Token was created in a different Context`.
+    Đối tượng này thì đi theo generator, không phụ thuộc ngữ cảnh nào.
+    """
+
+    __slots__ = ("calls", "tokens_in", "tokens_out", "t0")
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.tokens_in = 0
+        self.tokens_out = 0
+        self.t0 = time.monotonic()
+
+    def add(self, tokens_in: int = 0, tokens_out: int = 0) -> None:
+        self.calls += 1
+        self.tokens_in += int(tokens_in or 0)
+        self.tokens_out += int(tokens_out or 0)
+
+    def snapshot(self) -> dict:
+        return {"calls": self.calls, "tokens_in": self.tokens_in,
+                "tokens_out": self.tokens_out,
+                "latency_ms": int((time.monotonic() - self.t0) * 1000)}
+
+
+_current: ContextVar[Tracker | None] = ContextVar("usage_current", default=None)
 
 
 @contextmanager
-def track():
-    """Mở một phạm vi đo. Lồng nhau thì phạm vi ngoài cùng thắng."""
-    token = _current.set({"calls": 0, "tokens_in": 0, "tokens_out": 0, "t0": time.monotonic()})
+def bind(tracker: Tracker):
+    """Gắn `tracker` vào ngữ cảnh HIỆN TẠI trong đúng một đoạn đồng bộ.
+
+    Dùng cho luồng SSE: bọc quanh TỪNG bước `next()` để set và reset luôn nằm
+    trong cùng một ngữ cảnh, còn số liệu vẫn cộng dồn trên chính đối tượng.
+    """
+    token = _current.set(tracker)
     try:
-        yield
+        yield tracker
     finally:
         _current.reset(token)
 
 
+@contextmanager
+def track():
+    """Mở phạm vi đo cho một lượt việc ĐỒNG BỘ (không có yield ở giữa)."""
+    with bind(Tracker()) as tracker:
+        yield tracker
+
+
 def add_call(tokens_in: int = 0, tokens_out: int = 0) -> None:
     """Tầng gemini.py gọi sau MỖI request thật tới Google."""
-    bucket = _current.get()
-    if bucket is None:
-        return
-    bucket["calls"] += 1
-    bucket["tokens_in"] += int(tokens_in or 0)
-    bucket["tokens_out"] += int(tokens_out or 0)
+    tracker = _current.get()
+    if tracker is not None:
+        tracker.add(tokens_in, tokens_out)
 
 
-def snapshot() -> dict:
-    bucket = _current.get()
-    if bucket is None:
+def snapshot(tracker: Tracker | None = None) -> dict:
+    tracker = tracker or _current.get()
+    if tracker is None:
         return {"calls": 0, "tokens_in": 0, "tokens_out": 0, "latency_ms": 0}
-    return {
-        "calls": bucket["calls"],
-        "tokens_in": bucket["tokens_in"],
-        "tokens_out": bucket["tokens_out"],
-        "latency_ms": int((time.monotonic() - bucket["t0"]) * 1000),
-    }
+    return tracker.snapshot()
 
 
 def _bump_redis(kind: str, user_id: int | None, ticker: str, data: dict, status: str) -> None:
@@ -84,9 +116,10 @@ def _bump_redis(kind: str, user_id: int | None, ticker: str, data: dict, status:
 
 
 def record(db: Session | None, kind: str, *, user_id: int | None = None, ip: str = "",
-           fp_hash: str = "", ticker: str = "", status: str = "ok") -> None:
+           fp_hash: str = "", ticker: str = "", status: str = "ok",
+           tracker: Tracker | None = None) -> None:
     """Chốt sổ một việc đắt: ghi Redis + (nếu có phiên DB) một dòng usage_events."""
-    data = snapshot()
+    data = snapshot(tracker)
     _bump_redis(kind, user_id, ticker, data, status)
     if db is None:
         return

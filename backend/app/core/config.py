@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     #  Số tài khoản tối đa từng đăng nhập trên MỘT thiết bị. Quá ngưỡng thì chặn
     #  tạo tài khoản mới từ thiết bị đó (các tài khoản cũ vẫn dùng bình thường).
     max_accounts_per_device: int = 5
+    #  Từ tài khoản thứ N trên cùng thiết bị, đăng ký phải giải một câu đố
+    #  proof-of-work. Thang leo thang: 0–2 tài khoản đi thẳng, 3–4 phải giải,
+    #  ≥5 chặn hẳn.
+    pow_after_accounts: int = 3
+    #  Số 0 hex đầu chuỗi băm. 4 ≈ 65 nghìn phép thử ≈ dưới 1 giây trên trình duyệt.
+    pow_difficulty: int = 4
 
     #  CHỈ tin X-Forwarded-For khi request đến từ các IP này (proxy của mình).
     #  Rỗng = không tin ai → luôn dùng IP kết nối trực tiếp. Trong Docker, Nuxt

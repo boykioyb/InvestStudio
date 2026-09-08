@@ -123,7 +123,7 @@ export function useChat() {
   }
 
   /** Hỏi và nhận câu trả lời THEO LUỒNG (SSE). Không có EventSource → dùng ask thường. */
-  function askStream(question: string, ticker = '', opts: AskOptions = {}): void {
+  async function askStream(question: string, ticker = '', opts: AskOptions = {}): Promise<void> {
     const q = question.trim()
     if (!q) return
     if (typeof EventSource === 'undefined') {
@@ -136,7 +136,22 @@ export function useChat() {
     turns.value = [...turns.value, turn]
     pending.value = true
 
-    const params = new URLSearchParams({ question: q })
+    //  Xin VÉ trước khi mở luồng. `EventSource` không đặt được header nên bí mật
+    //  phải đi qua query — vé dùng một lần, sống 60 giây, gắn với đúng người xin.
+    //  Nhờ vậy dụ ai đó bấm một đường link /chat/stream không còn trừ được lượt
+    //  của họ nữa.
+    let ticket = ''
+    try {
+      const res = await $fetch<{ ticket: string }>(`${apiBase}/api/chat/stream-ticket`,
+                                                   { method: 'POST', credentials: 'include' })
+      ticket = res.ticket
+    } catch (err) {
+      turn.error = messageOf(err, 'Chưa mở được luồng trả lời. Thử lại sau.')
+      pending.value = false
+      return
+    }
+
+    const params = new URLSearchParams({ question: q, ticket })
     const tk = ticker.trim().toUpperCase()
     if (tk) params.set('ticker', tk)
     if (history.length) params.set('history', JSON.stringify(history))

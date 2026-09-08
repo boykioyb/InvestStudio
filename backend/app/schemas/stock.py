@@ -346,6 +346,13 @@ class QuoteBatch(BaseModel):
     asof: str = Field("", description="Mốc dữ liệu HH:MM (giờ VN)")
 
 
+# ── Gợi ý mã khi gõ ô tìm kiếm ──────────────────────────────────────────────
+class SymbolHit(BaseModel):
+    symbol: str
+    name: str = ""
+    exchange: str = ""
+
+
 # ── Mô tả mô hình chấm điểm (cho trang "Cách chấm điểm") ────────────────────
 class ScoringBand(BaseModel):
     """Một mốc của thang điểm: đạt mức nào thì mô tả ra sao."""

@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_device
-from app.core import fingerprint, mailer, ratelimit, settings_store
+from app.core import challenge, fingerprint, mailer, ratelimit, settings_store
 from app.core.config import get_settings
 from app.core.security import (
     create_access_token,
@@ -29,6 +29,7 @@ from app.schemas.auth import (
     DeleteAccountRequest,
     ForgotPasswordRequest,
     LoginRequest,
+    PreferencesRequest,
     RegisterRequest,
     ResetPasswordRequest,
     UserOut,
@@ -75,12 +76,25 @@ def register(payload: RegisterRequest, request: Request, response: Response,
             detail="Đăng ký tài khoản mới đang tạm đóng. Vui lòng quay lại sau.")
     #  Thang leo thang theo THIẾT BỊ: đăng ký thêm email trên cùng một máy là
     #  cách rẻ nhất để nhân hạn mức. Tài khoản cũ trên máy đó vẫn dùng bình thường.
-    max_accounts = get_settings().max_accounts_per_device
-    if fingerprint.accounts_on_device(db, fp_hash) >= max_accounts:
+    settings = get_settings()
+    max_accounts = settings_store.quota("max_accounts_per_device") or settings.max_accounts_per_device
+    da_co = fingerprint.accounts_on_device(db, fp_hash)
+    if da_co >= max_accounts:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Thiết bị này đã tạo {max_accounts} tài khoản. "
                    "Nếu bạn thực sự cần thêm, vui lòng liên hệ hỗ trợ.")
+
+    #  Thang leo thang: từ tài khoản thứ N trên cùng máy thì phải giải câu đố.
+    #  Người dùng bình thường (máy chưa có tài khoản nào) không thấy bước này.
+    nguong_do = settings_store.quota("pow_after_accounts") or settings.pow_after_accounts
+    if da_co >= nguong_do and not challenge.kiem(payload.pow_nonce, payload.pow_answer):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="Thiết bị này đã tạo nhiều tài khoản. Hãy hoàn tất bước xác minh "
+                   "chống tự động rồi thử lại.",
+            #  Header để giao diện biết cần lấy câu đố, thay vì đoán từ câu chữ.
+            headers={"X-Challenge-Required": "pow"})
     email = payload.email.lower().strip()
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Email này đã được đăng ký.")
@@ -99,6 +113,19 @@ def register(payload: RegisterRequest, request: Request, response: Response,
     _send_verification(user)
     _set_auth_cookie(response, user)  # đăng ký xong đăng nhập luôn (nhưng chưa xác minh)
     return user
+
+
+@router.get("/challenge", summary="Lấy câu đố chống tự động (khi thiết bị đáng ngờ)")
+def get_challenge(fp_hash: str = Depends(get_device), db: Session = Depends(get_db)) -> dict:
+    """Trả về câu đố + cho biết thiết bị này có BẮT BUỘC phải giải không.
+
+    Giao diện gọi trước khi hiện form đăng ký: `required=false` thì không làm
+    phiền người dùng, `true` thì giải sẵn trong nền để bấm Đăng ký là xong.
+    """
+    settings = get_settings()
+    nguong = settings_store.quota("pow_after_accounts") or settings.pow_after_accounts
+    can = fingerprint.accounts_on_device(db, fp_hash) >= nguong
+    return {"required": can, **challenge.phat(settings.pow_difficulty)}
 
 
 @router.post("/login", response_model=UserOut, summary="Đăng nhập")
@@ -230,6 +257,15 @@ def reset_password(payload: ResetPasswordRequest, request: Request,
         #  Nhận được thư ở hòm thư đó ⇒ đã chứng minh sở hữu email.
         user.email_verified_at = datetime.now(timezone.utc)
     db.commit()
+
+
+@router.patch("/preferences", response_model=UserOut, summary="Đổi tùy chọn cá nhân")
+def update_preferences(payload: PreferencesRequest, user: User = Depends(get_current_user),
+                       db: Session = Depends(get_db)) -> User:
+    user.alert_email = payload.alert_email
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT,

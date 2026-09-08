@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
@@ -34,7 +35,7 @@ from app.schemas.chat import (
     ConversationRename,
     IndexStatus,
 )
-from app.services.rag import agent, store
+from app.services.rag import agent, guard, store
 from app.services.rag import attachments as attach_store
 from app.services.rag.gemini import GeminiError, QuotaError
 from app.services.rag.tasks import reindex_task
@@ -76,6 +77,45 @@ def _check_quota(user: User, request: Request, db: Session, fp_hash: str) -> Non
         ("rag:net", fingerprint.subnet_of(ip), get_settings().chat_daily_per_subnet),
     ])
     fingerprint.record(db, fp_hash, request, user.id)
+
+
+#  ── Vé dùng-một-lần cho luồng SSE (H11) ─────────────────────────────────────
+#
+#  `EventSource` của trình duyệt KHÔNG đặt được header, nên bí mật buộc phải đi
+#  qua query string. Vì vậy nó phải: dùng đúng MỘT lần, sống ngắn, và gắn với
+#  đúng người đã xin. Trước đây `GET /chat/stream` chỉ cần cookie: dụ nạn nhân
+#  bấm một đường link là tạo hội thoại và trừ mất lượt của họ.
+_TICKET_TTL = 60
+
+
+def _ticket_key(ticket: str) -> str:
+    return f"chat:ticket:{ticket}"
+
+
+def _cap_ve(user_id: int) -> str:
+    ticket = secrets.token_urlsafe(24)
+    ratelimit.redis_client().set(_ticket_key(ticket), str(user_id), ex=_TICKET_TTL)
+    return ticket
+
+
+def _dung_ve(ticket: str, user_id: int) -> None:
+    """Đổi vé lấy quyền mở luồng. Xóa NGAY khi đọc nên không dùng lại được."""
+    if not ticket:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail="Thiếu vé mở luồng. Hãy tải lại trang rồi hỏi lại.")
+    try:
+        client = ratelimit.redis_client()
+        #  GETDEL: đọc và xóa trong MỘT lệnh — hai tab bấm cùng lúc cũng chỉ một
+        #  bên lấy được, không có kẽ hở giữa đọc và xóa.
+        raw = client.getdel(_ticket_key(ticket))
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Không kiểm được vé mở luồng", extra={"error": str(exc)})
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Hệ thống tạm thời bận. Vui lòng thử lại.") from exc
+
+    if raw is None or raw.decode() != str(user_id):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail="Vé mở luồng không hợp lệ hoặc đã dùng rồi.")
 
 
 def _title_from(question: str) -> str:
@@ -150,6 +190,7 @@ def ask(payload: ChatRequest, request: Request, user: User = Depends(require_ver
     conv = _resolve_conversation(db, user, conversation_id=payload.conversation_id,
                                  start_conversation=payload.start_conversation,
                                  question=question, ticker=ticker)
+    guard.ghi_nhan(question, nguon="cau_hoi", ticker=ticker or "")
     parts, refs = _load_attachments(db, user, payload.attachment_ids)
     try:
         with usage.track():
@@ -189,6 +230,16 @@ def _parse_history(raw: Optional[str]) -> list[ChatTurnInput]:
         return []
 
 
+@router.post("/stream-ticket", summary="Xin vé mở luồng SSE (dùng một lần, 60 giây)")
+def stream_ticket(user: User = Depends(require_verified)) -> dict:
+    """Frontend gọi ngay trước khi mở `EventSource`.
+
+    Tách riêng vì POST không bị kích hoạt bằng cách dụ bấm link — đó chính là
+    thứ chặn kiểu tấn công mà endpoint GET không tự chặn được.
+    """
+    return {"ticket": _cap_ve(user.id), "expires_in": _TICKET_TTL}
+
+
 @router.get("/stream", summary="Hỏi trợ lý (RAG) — phát câu trả lời theo luồng (SSE)")
 def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                ticker: Optional[str] = Query(None, max_length=12),
@@ -196,10 +247,14 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
                conversation_id: Optional[int] = Query(None),
                start_conversation: bool = Query(False),
                attachment_ids: Optional[str] = Query(None, description="Id các tệp, cách nhau dấu phẩy"),
+               ticket: str = Query("", description="Vé lấy từ POST /chat/stream-ticket"),
                request: Request = None,  # type: ignore[assignment]
                user: User = Depends(require_verified),
                fp_hash: str = Depends(get_device),
                db: Session = Depends(get_db)) -> StreamingResponse:
+    #  Kiểm vé TRƯỚC quota: request không có vé thì không được phép chạm tới
+    #  hạn mức của người dùng, dù cookie có hợp lệ.
+    _dung_ve(ticket, user.id)
     _check_quota(user, request, db, fp_hash)
     tk = ticker.upper().strip() if ticker else None
     q = question.strip()
@@ -208,36 +263,50 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
     conv = _resolve_conversation(db, user, conversation_id=conversation_id,
                                  start_conversation=start_conversation, question=q, ticker=tk)
     cid = conv.id if conv else None
+    guard.ghi_nhan(q, nguon="cau_hoi", ticker=tk or "")
     att_ids = [int(x) for x in (attachment_ids or "").split(",") if x.strip().isdigit()]
     parts, refs = _load_attachments(db, user, att_ids)
 
     def gen():
         final = None
         ip = ratelimit.client_ip(request)
-        with usage.track():
+        #  Tracker là ĐỐI TƯỢNG, không phải ContextVar: Starlette gọi next() trên
+        #  generator này qua threadpool nên mỗi bước có thể ở một ngữ cảnh khác.
+        #  `usage.bind` chỉ bọc quanh phần chạy đồng bộ của từng bước.
+        do = usage.Tracker()
+        buoc = agent.answer_stream(db, q, tk, hist, parts or None)
+
+        def ghi(trang_thai: str = "ok") -> None:
+            usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash,
+                         ticker=tk or "", status=trang_thai, tracker=do)
+
+        while True:
             try:
-                for kind, payload in agent.answer_stream(db, q, tk, hist, parts or None):
-                    if kind == "delta":
-                        yield _sse("delta", {"text": payload})
-                    elif kind == "step":
-                        yield _sse("step", payload)
-                    else:
-                        payload.conversation_id = cid
-                        final = payload
-                        yield _sse("final", payload.model_dump(mode="json"))
+                with usage.bind(do):
+                    kind, payload = next(buoc)
+            except StopIteration:
+                break
             except QuotaError as exc:
-                usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash,
-                             ticker=tk or "", status="quota")
+                ghi("quota")
                 yield _sse("error", {"detail": str(exc)})
                 return
             except GeminiError as exc:
                 logger.error("Trợ lý lỗi (stream)",
                              extra={"user_id": user.id, "error": str(exc)})
-                usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash,
-                             ticker=tk or "", status="error")
+                ghi("error")
                 yield _sse("error", {"detail": "Trợ lý tạm thời không phản hồi được. Thử lại sau."})
                 return
-            usage.record(db, "chat", user_id=user.id, ip=ip, fp_hash=fp_hash, ticker=tk or "")
+
+            if kind == "delta":
+                yield _sse("delta", {"text": payload})
+            elif kind == "step":
+                yield _sse("step", payload)
+            else:
+                payload.conversation_id = cid
+                final = payload
+                yield _sse("final", payload.model_dump(mode="json"))
+
+        ghi()
         #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời).
         if final is not None:
             _save_turn(db, user, conv, ticker=tk, question=q, resp=final, attachments=refs)

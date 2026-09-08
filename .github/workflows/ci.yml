@@ -81,3 +81,45 @@ jobs:
       - name: Kiểm kiểu
         working-directory: frontend
         run: npm run typecheck
+
+  e2e:
+    name: Frontend · test khói (Playwright)
+    runs-on: ubuntu-latest
+    #  Cần cả ngăn xếp: web gọi API, API gọi nguồn dữ liệu thật. Vì vậy dựng
+    #  bằng docker compose thay vì chỉ chạy Nuxt đơn lẻ.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Dựng ngăn xếp
+        run: |
+          docker compose up -d --build backend frontend postgres redis
+          #  Chờ web sẵn sàng — Nuxt dev mất một lúc để biên dịch lần đầu.
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3010/ >/dev/null && break
+            sleep 5
+          done
+          curl -sf http://localhost:8010/api/health || (docker compose logs backend && exit 1)
+
+      - name: Cài Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Chạy test khói
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Gom dấu vết khi hỏng
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace
+          path: frontend/test-results/
+          retention-days: 7

@@ -31,9 +31,11 @@ from app.schemas.stock import (
     StockAnalysis,
     ScoringModel,
     StockStats,
+    SymbolHit,
     TradingBoard,
 )
-from app.services import alerts, analyzer, details, feed, history, market, position, scoring
+from app.services import (alerts, analyzer, details, feed, history, market, position,
+                          scoring, symbols)
 from app.services.providers.base import ProviderError
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
@@ -109,6 +111,17 @@ def _cache_key(symbol: str, pos: int, mgmt: int, cat: int,
             round(pe_sec, 2) if pe_sec is not None else None,
             round(pb_fair, 2) if pb_fair is not None else None,
             source)
+
+
+@router.get("/search", response_model=list[SymbolHit], tags=["stocks"],
+            summary="Gợi ý mã theo mã hoặc tên công ty")
+def search_symbols(q: str = Query(..., min_length=1, max_length=60),
+                   limit: int = Query(8, ge=1, le=20)) -> list[SymbolHit]:
+    """Cho ô tìm mã ở giao diện. Danh bạ cache 1 giờ nên gõ phím không gọi nguồn.
+
+    ĐẶT TRƯỚC route `/{ticker}` — nếu không, "search" bị hiểu là một mã cổ phiếu.
+    """
+    return symbols.search(q, limit)
 
 
 @router.get("/scoring-model", response_model=ScoringModel, tags=["stocks"],

@@ -75,3 +75,17 @@ def send_password_reset(to: str, token: str) -> bool:
         f"{link}\n\n"
         "Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần. Nếu bạn "
         "không yêu cầu đổi mật khẩu, hãy bỏ qua thư này — tài khoản vẫn an toàn.\n"))
+
+
+def send_alert(to: str, ticker: str, message: str) -> bool:
+    """Báo mã theo dõi chạm ngưỡng.
+
+    Ngắn gọn có chủ ý: thư cảnh báo dài không ai đọc, và mỗi câu thừa là một cơ
+    hội để người nhận hiểu đây là khuyến nghị mua bán.
+    """
+    base = get_settings().public_base_url
+    return send(to, f"[{ticker}] {message[:60]}", (
+        f"{message}\n\n"
+        f"Xem phân tích đầy đủ: {base}/analysis?symbol={ticker}\n"
+        f"Tắt email cảnh báo: {base}/account\n\n"
+        "Đây là cảnh báo theo ngưỡng BẠN tự đặt, không phải khuyến nghị đầu tư.\n"))

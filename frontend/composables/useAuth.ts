@@ -46,17 +46,43 @@ export function useAuth() {
     if (!ready.value) await fetchMe()
   }
 
+  /** Trạng thái cho giao diện biết đang phải giải câu đố chống tự động. */
+  const solvingChallenge = ref(false)
+
+  async function solveChallenge(): Promise<{ pow_nonce: string; pow_answer: string }> {
+    const { nonce, difficulty } = await call<{ nonce: string; difficulty: number }>(
+      '/api/auth/challenge')
+    solvingChallenge.value = true
+    try {
+      return { pow_nonce: nonce, pow_answer: await solveProofOfWork(nonce, difficulty) }
+    } finally {
+      solvingChallenge.value = false
+    }
+  }
+
   async function register(email: string, password: string, displayName = ''): Promise<boolean> {
     pending.value = true
     error.value = ''
+    const body: Record<string, unknown> = { email, password, display_name: displayName }
     try {
-      user.value = await call<UserOut>('/api/auth/register', {
-        method: 'POST',
-        body: { email, password, display_name: displayName }
-      })
+      user.value = await call<UserOut>('/api/auth/register', { method: 'POST', body })
       ready.value = true
       return true
     } catch (err) {
+      //  Thiết bị đã tạo nhiều tài khoản → backend đòi câu đố. Giải rồi gửi lại
+      //  MỘT lần, thay vì bắt người dùng tự hiểu và bấm lại.
+      const canDo = (err as { response?: Response })?.response?.headers?.get?.('x-challenge-required')
+      if (canDo === 'pow') {
+        try {
+          Object.assign(body, await solveChallenge())
+          user.value = await call<UserOut>('/api/auth/register', { method: 'POST', body })
+          ready.value = true
+          return true
+        } catch (err2) {
+          error.value = messageOf(err2, 'Đăng ký không thành công. Thử lại sau.')
+          return false
+        }
+      }
       error.value = messageOf(err, 'Đăng ký không thành công. Thử lại sau.')
       return false
     } finally {
@@ -189,7 +215,7 @@ export function useAuth() {
     user.value = null
   }
 
-  return { user, ready, pending, error, isLoggedIn, fetchMe, ensureLoaded, register, login,
+  return { user, ready, pending, error, solvingChallenge, isLoggedIn, fetchMe, ensureLoaded, register, login,
            changePassword, logout, verifyEmail, resendVerification, forgotPassword,
            resetPassword, deleteAccount }
 }

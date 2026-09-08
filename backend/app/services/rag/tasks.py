@@ -6,6 +6,7 @@ dõi realtime nếu cần). Worker KHÔNG chạy lifespan của FastAPI nên t�
 """
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from app.core.celery_app import celery_app
@@ -44,6 +45,19 @@ def reindex_task(self, symbols: Optional[list[str]] = None, include_news: bool =
         db.close()
 
 
+def _bao_email(email: str | None, ticker: str, message: str) -> None:
+    """Gửi email cảnh báo. Hỏng thì bỏ qua — thông báo trong app đã tạo rồi,
+    không được để hạ tầng thư làm chết cả job quét ngưỡng."""
+    if not email:
+        return
+    from app.core import mailer
+    try:
+        mailer.send_alert(email, ticker, message)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("app.alerts").warning(
+            "Không gửi được email cảnh báo", extra={"ticker": ticker, "error": str(exc)})
+
+
 @celery_app.task(name="watchlist.check_alerts")
 def check_watchlist_alerts() -> dict:
     """Quét ngưỡng giá/điểm của mọi mã theo dõi → tạo thông báo trong app.
@@ -53,7 +67,7 @@ def check_watchlist_alerts() -> dict:
     """
     from sqlalchemy import select
 
-    from app.models.user import Notification, WatchlistItem
+    from app.models.user import Notification, User, WatchlistItem
     from app.services import analyzer
     from app.services.providers import vci_direct
     from app.services.providers.vci_direct import VciError
@@ -85,6 +99,15 @@ def check_watchlist_alerts() -> dict:
             except Exception:  # noqa: BLE001 - mã lỗi thì bỏ qua, không chặn cả job
                 pass
 
+        #  Tra email một lần cho mọi user liên quan (thay vì mỗi cảnh báo một
+        #  truy vấn). Chỉ lấy người ĐÃ xác minh email và còn bật nhận cảnh báo.
+        nguoi_nhan: dict[int, str] = dict(db.execute(
+            select(User.id, User.email).where(
+                User.id.in_({it.user_id for it in items}),
+                User.email_verified_at.is_not(None),
+                User.alert_email.is_(True),
+                User.status == "active")).all())
+
         def has_unread(user_id: int, ticker: str, kind: str) -> bool:
             return db.scalar(select(Notification).where(
                 Notification.user_id == user_id, Notification.ticker == ticker,
@@ -94,16 +117,19 @@ def check_watchlist_alerts() -> dict:
             price = prices.get(it.ticker)
             if (it.target_price is not None and price is not None and price >= it.target_price
                     and not has_unread(it.user_id, it.ticker, "price")):
-                db.add(Notification(
-                    user_id=it.user_id, ticker=it.ticker, kind="price",
-                    message=f"{it.ticker} đạt {price} nghìn đ (mục tiêu {it.target_price})."))
+                loi_nhan = f"{it.ticker} đạt {price} nghìn đ (mục tiêu {it.target_price})."
+                db.add(Notification(user_id=it.user_id, ticker=it.ticker, kind="price",
+                                    message=loi_nhan))
+                _bao_email(nguoi_nhan.get(it.user_id), it.ticker, loi_nhan)
                 created += 1
             score = scores.get(it.ticker)
             if (it.target_score is not None and score is not None and score >= it.target_score
                     and not has_unread(it.user_id, it.ticker, "score")):
-                db.add(Notification(
-                    user_id=it.user_id, ticker=it.ticker, kind="score",
-                    message=f"{it.ticker} đạt {score}/100 điểm (mục tiêu {int(it.target_score)})."))
+                loi_nhan = (f"{it.ticker} đạt {score}/100 điểm "
+                            f"(mục tiêu {int(it.target_score)}).")
+                db.add(Notification(user_id=it.user_id, ticker=it.ticker, kind="score",
+                                    message=loi_nhan))
+                _bao_email(nguoi_nhan.get(it.user_id), it.ticker, loi_nhan)
                 created += 1
 
         db.commit()

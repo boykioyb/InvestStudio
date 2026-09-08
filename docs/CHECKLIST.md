@@ -72,7 +72,7 @@
 - [x] CI (`.github/workflows/ci.yml`): pytest + typecheck mỗi push/PR
 - [x] Typecheck sạch (sửa lỗi kiểu cuối cùng); chạy ở CI thay vì bật lúc dev cho nhanh
 - [x] 14 test cho `position._decide` và `portfolio.review`
-- [ ] Một test khói frontend: nhập mã → thấy điểm *(chưa làm — cần dựng Playwright/Vitest)*
+- [x] Test khói frontend: 6 ca Playwright (trang chủ · nhập mã → thấy điểm · gợi ý mã · cách chấm điểm · 404 · trang pháp lý), có job CI
 - [x] Log JSON + mã request + Sentry (bật khi có DSN); `/api/health` chạm thật DB · Redis · Gemini, trả 503 khi hỏng
 
 **Pháp lý (Nghị định 13/2023):**
@@ -82,15 +82,13 @@
 
 ---
 
-## ⚪ Nợ kỹ thuật đã biết *(có kiểm soát, để sau)*
+## ⚪ Nợ kỹ thuật *(phần bảo mật & tính năng đã xong ở S6 — xem [S6_TEST.md](S6_TEST.md))*
 
-- [ ] **H11** — `GET /chat/stream` là GET nhưng có tác dụng phụ (tạo hội thoại, trừ quota):
-      dụ bấm link là mất lượt. Sửa bằng vé dùng-một-lần lấy qua POST.
-- [ ] **H12** — nhồi lệnh qua tin tức (prompt injection): bọc ngữ cảnh bằng nhãn
-      "DỮ LIỆU, KHÔNG PHẢI CHỈ THỊ"
-- [ ] **CAPTCHA** ở bước đăng ký khi một thiết bị có ≥3 tài khoản *(hiện chặn cứng ở mức 5)*
-- [ ] Email cho cảnh báo giá — `Notification` mới chỉ hiện trong app
-- [ ] Ô tìm mã có gợi ý tên công ty
+- [x] **H11** — vé dùng-một-lần lấy qua `POST /chat/stream-ticket` (TTL 60s, gắn với đúng người xin, kiểm TRƯỚC quota)
+- [x] **H12** — bọc `<du_lieu>`, vô hiệu hóa thẻ giả, dặn dò trong prompt hệ thống, ghi log nghi vấn (`rag/guard.py`)
+- [x] Câu đố **proof-of-work** từ tài khoản thứ 3 trên một thiết bị (tự giải trong nền, không cần bên thứ ba)
+- [x] Email cảnh báo ngưỡng (chỉ gửi cho tài khoản đã xác minh + còn bật; tắt được ở `/account`)
+- [x] Ô tìm mã gợi ý theo mã · tên công ty · tên thương hiệu (`GET /api/stocks/search`, cache 1 giờ)
 - [ ] Đổi tên thư mục dự án `InvestStudio` → kéo theo tên volume Docker, **cần chuyển
       volume thủ công**; chưa làm vì là quyết định của bạn
 - [ ] Dọn nợ trong [REFACTOR_PLAN.md](REFACTOR_PLAN.md): tách `schemas/stock.py` (556 dòng),
