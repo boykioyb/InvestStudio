@@ -1,6 +1,6 @@
 # Việc còn lại trước khi ship — Phân Tích Mã
 
-> Cập nhật 2026-09-07 · Nhánh `feat/bao-mat-han-muc` (11 commit, **chưa push**)
+> Cập nhật 2026-09-08 (S4 phần lớn đã xong) · Nhánh `feat/bao-mat-han-muc` (11 commit, **chưa push**)
 > Đã xong: [S0](S0_DONE.md) chặn thủng quota · [S1](S1_DONE.md) tài khoản + vân tay thiết bị · [S2](S2_DONE.md) khu quản trị lõi
 > Kế hoạch gốc: [SHIP_PLAN.md](SHIP_PLAN.md)
 
@@ -26,21 +26,22 @@
 ## 🟠 S4 — Rõ sản phẩm *(chặn ship: thiếu là người lạ không dùng được)*
 
 **Ba trang còn thiếu — backend đã xong từ S1, chỉ thiếu giao diện:**
-- [ ] `/verify-email?token=` — nhận link trong thư, gọi `POST /api/auth/verify`
-- [ ] `/forgot-password` — nhập email, gọi `POST /api/auth/forgot-password`
-- [ ] `/reset-password?token=` — đặt mật khẩu mới, gọi `POST /api/auth/reset-password`
+- [x] `/verify-email?token=` — nhận link trong thư, gọi `POST /api/auth/verify`
+- [x] `/forgot-password` — nhập email, gọi `POST /api/auth/forgot-password`
+- [x] `/reset-password?token=` — đặt mật khẩu mới, gọi `POST /api/auth/reset-password`
 
 **Trạng thái tài khoản trên giao diện:**
-- [ ] Dải nhắc "hãy xác minh email" khi `email_verified = false`, kèm nút gửi lại thư
-- [ ] Hiện "còn N/5 lượt hỏi hôm nay" từ `GET /api/chat/quota` (đang có API, chưa dùng)
-- [ ] Màn hình 429 tử tế (nói rõ rổ nào chạm trần: tài khoản · thiết bị · IP)
-- [ ] Trang xóa tài khoản trong phần cài đặt cá nhân (`DELETE /api/auth/me` đã có)
+- [x] Dải nhắc "hãy xác minh email" khi `email_verified = false`, kèm nút gửi lại thư
+- [x] Hiện "còn N/5 lượt hỏi hôm nay" — trang Trợ lý, widget nổi và trang Tài khoản
+- [x] Thông báo 429 nói rõ rổ nào chạm trần (backend đã trả câu chữ, giao diện hiện nguyên văn)
+- [x] Trang `/account`: thông tin · đổi mật khẩu · hạn mức · xóa tài khoản
 
 **Định vị & onboarding:**
 - [ ] Chốt một câu sản phẩm hứa gì, đặt lên hero
 - [ ] Onboarding 3 bước cho lần đầu vào
-- [ ] Trang "Cách chấm điểm" giải thích 14 tiêu chí cho người ngoài
-- [ ] Trang lỗi 404 / 500 + trạng thái rỗng cho mọi bảng
+- [x] Trang `/scoring` giải thích 14 tiêu chí — nội dung sinh từ `criteria.py` qua API mới `GET /api/stocks/scoring-model`
+- [x] Trang lỗi 404 / 500 (`error.vue`) — 404 cho luôn ô nhập mã để đi tiếp
+- [ ] Trạng thái rỗng cho mọi bảng
 - [ ] Rà soát mobile — bảng screener 10+ cột chưa có phương án
 
 ---
