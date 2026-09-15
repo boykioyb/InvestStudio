@@ -38,16 +38,26 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      htmlAttrs: { lang: 'vi' },
+      //  Sơn nền tối ngay trên thẻ <html> → paint đầu tiên đã tối, không lóe
+      //  trắng trong lúc CSS ngoài đang tải (rõ nhất ở dev, nơi CSS tách nhiều file).
+      htmlAttrs: { lang: 'vi', style: 'background:#070b16' },
       title: 'Phân Tích Mã — công cụ phân tích cổ phiếu Việt Nam',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        //  Báo trình duyệt dùng bảng màu tối ngay từ đầu (nền UA, thanh cuộn,
+        //  ô nhập mặc định) — thêm một lớp chống lóe trắng.
+        { name: 'color-scheme', content: 'dark' },
+        { name: 'theme-color', content: '#070b16' },
         {
           name: 'description',
           content:
             'Công cụ hỗ trợ tư duy đầu tư: nhập mã cổ phiếu, xem sức khỏe tài chính, định giá, kỹ thuật và điểm tổng hợp.'
         }
+      ],
+      //  CSS tối thiểu chèn thẳng vào <head>, đứng TRƯỚC mọi stylesheet ngoài.
+      style: [
+        { innerHTML: 'html{background:#070b16;color-scheme:dark}body{margin:0;background:#070b16;color:#eef3ff}' }
       ]
     }
   },

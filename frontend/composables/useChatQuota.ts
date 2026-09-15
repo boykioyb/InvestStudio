@@ -13,10 +13,16 @@ export function useChatQuota() {
 
   const quota = useState<ChatQuota | null>('chat-quota', () => null)
 
+  //  Ở SSR chuyển tiếp cookie httpOnly để backend nhận ra phiên → quota render
+  //  sẵn từ khung hình đầu (giống useAuth), không chớp skeleton rồi mới ra số.
+  const reqCookie = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+
   async function load(): Promise<void> {
     try {
-      quota.value = await $fetch<ChatQuota>(`${apiBase}/api/chat/quota`,
-                                            { credentials: 'include' })
+      quota.value = await $fetch<ChatQuota>(`${apiBase}/api/chat/quota`, {
+        credentials: 'include',
+        ...(reqCookie ? { headers: reqCookie } : {})
+      })
     } catch {
       //  Chưa đăng nhập / mạng lỗi → không hiện gì, đừng làm hỏng trang.
       quota.value = null

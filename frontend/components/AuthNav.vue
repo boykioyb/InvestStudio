@@ -8,7 +8,7 @@
  */
 import { LogIn, User } from 'lucide-vue-next'
 
-const { user, isLoggedIn, ensureLoaded, logout } = useAuth()
+const { user, isLoggedIn, ready, ensureLoaded, logout } = useAuth()
 const route = useRoute()
 
 onMounted(ensureLoaded)
@@ -21,7 +21,10 @@ async function onLogout(): Promise<void> {
 
 <template>
   <div class="auth-nav">
-    <template v-if="isLoggedIn">
+    <!-- Chưa biết trạng thái (đang gọi /me) → chỗ trống trung tính, KHÔNG hiện
+         "Đăng nhập" rồi lật sang tên user gây nháy khi reload. -->
+    <span v-if="!ready" class="auth-skeleton" aria-hidden="true" />
+    <template v-else-if="isLoggedIn">
       <NotificationBell />
       <NuxtLink class="who" to="/account" :title="`${user?.email} · mở trang tài khoản`">
         <User /> {{ user?.display_name }}
@@ -43,6 +46,17 @@ async function onLogout(): Promise<void> {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Chỗ giữ trạng thái trong lúc chờ /me — bằng cỡ chip để không giật layout. */
+.auth-skeleton {
+  display: inline-block;
+  width: 88px;
+  height: 26px;
+  border-radius: 20px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  opacity: 0.5;
 }
 
 .who {
