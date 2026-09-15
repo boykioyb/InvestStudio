@@ -11,3 +11,6 @@ celerybeat-schedule*
 backups/
 test-results/
 playwright-report/
+
+# Thư mục nháp của trợ lý khi làm việc: bản nháp, log lệnh dài, script dùng một lần.
+.awog/
