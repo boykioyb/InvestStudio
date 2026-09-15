@@ -130,5 +130,61 @@ export function usePositionBook() {
     }
   }
 
-  return { lots, accountValue, review, pending, error, listAll, load, addLot, removeLot, clear, saveAccount, evaluate }
+  /**
+   * Nhập đợt khớp đã đồng bộ (server) vào Vị thế của tôi, TRỪ FIFO theo lệnh bán.
+   *
+   * Mỗi mã: xếp các đợt theo NGÀY (cùng ngày ưu tiên MUA trước BÁN vì txdate chỉ có
+   * ngày, mất thứ tự trong phiên); duyệt lần lượt, đợt bán trừ dần các đợt mua cũ
+   * nhất còn lại → phần còn lại = vị thế đang giữ. Giá server theo ĐỒNG → ÷1000.
+   * Ghi ĐÈ các mã có trong dữ liệu đồng bộ, giữ nguyên mã khác (nhập tay).
+   */
+  async function importFromServer(): Promise<{ tickers: number; lots: number }> {
+    interface ServerLot { ticker: string; side: string; quantity: number; price: number; txdate: string }
+    const rows = await $fetch<ServerLot[]>(`${apiBase}/api/portfolio/lots`, { credentials: 'include' })
+
+    //  Gom theo mã.
+    const perTicker = new Map<string, ServerLot[]>()
+    for (const r of rows) {
+      if (!(r.quantity > 0)) continue
+      const code = r.ticker.toUpperCase()
+      const arr = perTicker.get(code) || []
+      arr.push(r)
+      perTicker.set(code, arr)
+    }
+
+    const byTicker = new Map<string, PositionLot[]>()
+    let totalLots = 0
+    for (const [code, events] of perTicker) {
+      //  Ngày tăng dần; cùng ngày: mua (0) trước bán (1).
+      events.sort((a, b) =>
+        (a.txdate || '').localeCompare(b.txdate || '') ||
+        (a.side === 'buy' ? 0 : 1) - (b.side === 'buy' ? 0 : 1))
+
+      const queue: PositionLot[] = [] // hàng đợi đợt mua còn lại (FIFO)
+      for (const e of events) {
+        if (e.side === 'buy' && e.price > 0) {
+          queue.push({ price: Number((e.price / 1000).toFixed(2)), quantity: e.quantity, date: e.txdate || '' })
+        } else if (e.side === 'sell') {
+          let remain = e.quantity
+          while (remain > 0 && queue.length) {
+            const lot = queue[0]
+            if (lot.quantity > remain) { lot.quantity = Number((lot.quantity - remain).toFixed(4)); remain = 0 }
+            else { remain -= lot.quantity; queue.shift() } // bán hết đợt mua cũ nhất
+          }
+          //  remain > 0 (bán nhiều hơn mua trong dữ liệu) → bỏ qua phần dôi.
+        }
+      }
+      const kept = queue.filter((l) => l.quantity > 0)
+      if (kept.length) { byTicker.set(code, kept); totalLots += kept.length }
+    }
+
+    if (import.meta.client && byTicker.size) {
+      const all = readAll()
+      for (const [code, ls] of byTicker) all[code] = { lots: ls, account: all[code]?.account }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(all)) } catch { /* hết dung lượng — bỏ qua */ }
+    }
+    return { tickers: byTicker.size, lots: totalLots }
+  }
+
+  return { lots, accountValue, review, pending, error, listAll, load, addLot, removeLot, clear, saveAccount, evaluate, importFromServer }
 }

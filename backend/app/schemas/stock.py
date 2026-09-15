@@ -644,6 +644,106 @@ class PortfolioReview(BaseModel):
     note: str = ""
 
 
+# ── Đồng bộ danh mục từ công ty chứng khoán (extension TCBS) ──────────────────
+class PortfolioImportItem(BaseModel):
+    """Một vị thế do extension gửi lên. Giá theo ĐỒNG (như nguồn TCBS trả về)."""
+
+    #  Chấp nhận key camelCase từ extension (avgPrice/marketPrice) lẫn snake_case.
+    model_config = {"populate_by_name": True}
+
+    ticker: str = Field(..., min_length=2, max_length=12)
+    qty: float = Field(..., ge=0, description="Tổng số lượng đang giữ")
+    avg_price: Optional[float] = Field(None, alias="avgPrice", description="Giá vốn (đồng/cp)")
+    market_price: Optional[float] = Field(None, alias="marketPrice", description="Giá thị trường (đồng/cp)")
+    available: Optional[float] = Field(None, description="Số bán được ngay")
+
+
+class PortfolioRealizedItem(BaseModel):
+    """Lãi/lỗ ĐÃ THỰC HIỆN của một mã (từ portfolio_gainloss của TCBS), đơn vị ĐỒNG."""
+
+    model_config = {"populate_by_name": True}
+
+    ticker: str = Field(..., min_length=2, max_length=12)
+    actual_pnl: Optional[float] = Field(None, alias="actualPnl", description="Lãi/lỗ đã thực hiện (đồng)")
+    sell_qty: Optional[float] = Field(None, alias="sellQtty")
+    buy_qty: Optional[float] = Field(None, alias="buyQtty")
+
+
+class PortfolioImportRequest(BaseModel):
+    source: str = Field("TCBS", max_length=16)
+    account: str = Field("", max_length=24, description="Số tiểu khoản (VD 0001M18951)")
+    holdings: list[PortfolioImportItem] = Field(..., min_length=1, max_length=100)
+    #  Lãi/lỗ đã thực hiện (tuỳ chọn) — extension lấy kèm để hiện cạnh lãi/lỗ hiện tại.
+    realized: list[PortfolioRealizedItem] = Field(default_factory=list, max_length=200)
+
+
+class PortfolioImportResult(BaseModel):
+    imported: int = Field(0, description="Số mã đã lưu")
+    tickers: list[str] = []
+    account: str = ""
+    updated_at: str = ""
+
+
+class ImportedHoldingOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    ticker: str
+    quantity: float
+    avg_price: Optional[float] = None
+    market_price: Optional[float] = None
+    realized_pnl: Optional[float] = Field(None, description="Lãi/lỗ đã thực hiện (đồng)")
+    source: str = "TCBS"
+    account_no: str = ""
+    updated_at: Optional[str] = None
+
+
+class ImportTokenOut(BaseModel):
+    token: str
+    expires_days: int
+    email: str = ""
+    name: str = ""
+
+
+# ── Đồng bộ từng đợt khớp (lots) ─────────────────────────────────────────────
+class LotImportItem(BaseModel):
+    """Một đợt khớp từ lịch sử lệnh TCBS. Giá theo ĐỒNG."""
+
+    model_config = {"populate_by_name": True}
+
+    ticker: str = Field(..., min_length=2, max_length=12)
+    side: str = Field("buy", pattern="^(buy|sell)$")
+    qty: float = Field(..., gt=0)
+    price: float = Field(..., ge=0, description="Giá khớp (đồng/cp)")
+    fee: Optional[float] = None
+    tax: Optional[float] = None
+    txdate: str = Field("", max_length=16)
+    order_id: str = Field("", alias="orderId", max_length=32)
+
+
+class PortfolioLotsImportRequest(BaseModel):
+    source: str = Field("TCBS", max_length=16)
+    account: str = Field("", max_length=24)
+    lots: list[LotImportItem] = Field(..., max_length=3000)
+
+
+class PortfolioLotsImportResult(BaseModel):
+    imported: int = 0
+    tickers: list[str] = []
+
+
+class ImportedLotOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    ticker: str
+    side: str
+    quantity: float
+    price: float
+    fee: Optional[float] = None
+    tax: Optional[float] = None
+    txdate: str = ""
+    order_id: str = ""
+
+
 # ── Danh sách mã (screener) ──────────────────────────────────────────────────
 SortOrder = Literal["asc", "desc"]
 ColumnType = Literal["text", "number"]

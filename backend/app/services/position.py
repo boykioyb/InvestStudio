@@ -18,7 +18,9 @@ Ngưỡng cắt lỗ và trần tỷ trọng lấy từ `scoring.py` để khôn
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from app.schemas.stock import (
     LotResult,
@@ -26,8 +28,10 @@ from app.schemas.stock import (
     PositionRequest,
     PositionReview,
 )
-from app.services import analyzer, scoring
+from app.services import analyzer, quote, scoring
 from app.services.scoring import STOP_LOSS_PCT
+
+_ICT = ZoneInfo("Asia/Ho_Chi_Minh")
 
 _ADD_MIN_SCORE = 65   # dưới mức "Tốt" thì không bao giờ gợi ý mua thêm
 _CUT_MAX_SCORE = 50   # dưới mức này coi như luận điểm đã sai
@@ -41,8 +45,22 @@ def review(ticker: str, request: PositionRequest) -> PositionReview:
         ticker, pos=request.pos, mgmt=request.mgmt, cat=request.cat,
         pe_sec=request.pe_sec, pb_fair=request.pb_fair,
     )
-    price = analysis.price
     score = analysis.score
+
+    #  Giá thị trường cho P&L: đang phiên & có giá khớp → giá LIVE (gần realtime,
+    #  cùng nguồn với thẻ phân tích). Ngoài phiên → giá đóng cửa gần nhất.
+    #  CHỦ Ý: chấm điểm (analysis.score) vẫn tính trên giá ĐÓNG CỬA — không đổi.
+    price = analysis.price
+    asof = analysis.asof
+    try:
+        batch = quote.fetch_quotes([ticker])
+        live = batch.quotes[0] if batch.quotes else None
+        if batch.is_open and live is not None and live.price is not None:
+            price = live.price
+            today = datetime.now(_ICT).strftime("%Y-%m-%d")
+            asof = f"{today} · {live.time}" if live.time else today
+    except Exception:
+        pass  # nguồn giá live lỗi → im lặng dùng giá đóng cửa
 
     total_quantity = sum(lot.quantity for lot in request.lots)
     total_cost = sum(lot.price * lot.quantity for lot in request.lots)
@@ -105,7 +123,7 @@ def review(ticker: str, request: PositionRequest) -> PositionReview:
     return PositionReview(
         ticker=ticker,
         current_price=price,
-        asof=analysis.asof,
+        asof=asof,
         score_total=score.total,
         verdict=score.verdict.text,
         verdict_level=score.verdict.level,

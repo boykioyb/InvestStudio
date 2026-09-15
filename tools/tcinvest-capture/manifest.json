@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "TCInvest Capture → InvestStudio",
+  "version": "0.3.0",
+  "description": "Bắt danh mục + lãi/lỗ trên TCInvest và đồng bộ về InvestStudio để chấm điểm. Token đồng bộ tự lấy. Chỉ dùng cá nhân.",
+  "host_permissions": [
+    "https://*.tcbs.com.vn/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "permissions": ["storage", "scripting"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.tcbs.com.vn/*"],
+      "js": ["interceptor.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://*.tcbs.com.vn/*"],
+      "js": ["collector.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["instudio.js"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ]
+}

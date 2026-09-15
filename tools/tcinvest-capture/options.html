@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>TCInvest Capture — Cài đặt</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #fff; --panel-hi: #f1f5f9; --line: #e2e8f0; --line-hi: #cbd5e1;
+      --text: #0f172a; --text-2: #334155; --muted: #64748b; --accent: #16a34a; --bad: #dc2626;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { max-width: 940px; margin: 0 auto; padding: 24px 20px 60px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
+
+    .layout { display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: start; }
+
+    /* Sidebar */
+    .side { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .prof { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+    .logo { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; color: #fff; background: linear-gradient(135deg, #16a34a, #0ea5e9); }
+    .who { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .who b { font-size: 14px; }
+    .who .email { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .nav { display: flex; flex-direction: column; gap: 2px; }
+    .nav-item { text-align: left; padding: 10px 13px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--text-2); font-size: 14px; font-weight: 500; cursor: pointer; }
+    .nav-item:hover { background: var(--panel-hi); }
+    .nav-item.on { background: var(--panel-hi); border-color: var(--line-hi); color: var(--text); font-weight: 600; }
+
+    /* Content */
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+    label.fld { display: block; font-weight: 600; margin: 4px 0 6px; }
+    input.txt { width: 100%; padding: 9px 11px; border: 1px solid var(--line-hi); border-radius: 8px; font: 14px system-ui; }
+    .hint { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+    code { background: var(--panel-hi); padding: 1px 6px; border-radius: 5px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+    button { border: 0; border-radius: 8px; padding: 9px 14px; font: 600 14px system-ui; cursor: pointer; color: #fff; background: var(--accent); }
+    button.ghost { background: #1f2937; }
+    button.danger { background: var(--bad); }
+    #status { margin-top: 12px; min-height: 18px; font-size: 13px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); display: inline-block; }
+    .dot.on { background: var(--accent); }
+    pre { margin: 12px 0 0; background: #0b1220; color: #e5e7eb; padding: 12px; border-radius: 8px; max-height: 380px; overflow: auto; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; }
+    @media (max-width: 760px) {
+      .layout { grid-template-columns: 1fr; }
+      .side { position: static; }
+      .nav { flex-direction: row; flex-wrap: wrap; }
+      .nav-item { flex: 1; min-width: 110px; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>TCInvest Capture</h1>
+    <p class="sub">Đồng bộ danh mục &amp; lãi/lỗ từ TCInvest về InvestStudio.</p>
+
+    <div class="layout">
+      <aside class="side">
+        <div class="prof">
+          <div class="logo">TC</div>
+          <div class="who">
+            <b>Đồng bộ TCInvest</b>
+            <span class="email" id="side-link">Chưa liên kết</span>
+          </div>
+        </div>
+        <nav class="nav">
+          <button type="button" class="nav-item on" data-sec="ket-noi">Kết nối</button>
+          <button type="button" class="nav-item" data-sec="tai-khoan">Tài khoản liên kết</button>
+          <button type="button" class="nav-item" data-sec="nhat-ky">Nhật ký</button>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <!-- Kết nối -->
+        <section class="card" data-panel="ket-noi">
+          <h2>Kết nối</h2>
+          <label class="fld" for="url">URL InvestStudio</label>
+          <input id="url" class="txt" placeholder="http://localhost:3010" autocomplete="off">
+          <div class="hint">
+            Địa chỉ web InvestStudio bạn đăng nhập. Với <code>localhost</code>/<code>127.0.0.1</code>
+            token tự lấy ngay; với domain khác, bấm Lưu sẽ hỏi cấp quyền cho trang đó.
+          </div>
+          <div class="row"><button id="save">Lưu URL</button></div>
+          <div id="status"></div>
+        </section>
+
+        <!-- Tài khoản liên kết -->
+        <section class="card" data-panel="tai-khoan" hidden>
+          <h2>Tài khoản liên kết</h2>
+          <div class="row" style="margin-top:0"><span id="tokdot" class="dot"></span><span id="tokinfo">Chưa liên kết</span></div>
+          <div class="row">
+            <button id="link">Liên kết tài khoản InvestStudio</button>
+            <button id="switch" class="ghost" hidden>Đổi tài khoản</button>
+            <button id="unlink" class="danger" hidden>Huỷ liên kết</button>
+          </div>
+          <div class="hint">
+            Đồng bộ ghi vào <b>đúng tài khoản đang liên kết</b>. Muốn ghi sang tài khoản khác:
+            bấm <b>Đổi tài khoản</b> → trên tab InvestStudio, đăng xuất rồi đăng nhập tài khoản đó.
+          </div>
+        </section>
+
+        <!-- Nhật ký -->
+        <section class="card" data-panel="nhat-ky" hidden>
+          <h2>Nhật ký (logs)</h2>
+          <p class="hint" style="margin-top:0">Theo dõi từng lần đồng bộ &amp; lấy token để gỡ lỗi. Giữ 50 dòng gần nhất.</p>
+          <div class="row">
+            <button id="reloadLogs" class="ghost">Tải lại</button>
+            <button id="copyLogs" class="ghost">Copy</button>
+            <button id="clearLogs" class="danger">Xoá logs</button>
+          </div>
+          <pre id="logs"></pre>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
