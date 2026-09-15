@@ -38,6 +38,10 @@ def upsert_documents(db: Session, docs: list[DocInput]) -> int:
             "content": stmt.excluded.content,
             "meta": stmt.excluded.meta,
             "embedding": stmt.excluded.embedding,
+            #  Bump mốc thời gian mỗi lần GHI ĐÈ: "Tuổi dữ liệu" ở trang RAG tính
+            #  từ max(created_at). Không cập nhật thì reindex thành công vẫn hiện
+            #  "kho đang cũ" y như cũ — người vận hành tưởng nút hỏng.
+            "created_at": func.now(),
         },
     )
     db.execute(stmt)

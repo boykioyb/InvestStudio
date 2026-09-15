@@ -32,7 +32,10 @@ celery_app.conf.beat_schedule = {
     "reindex-vn30-daily": {
         "task": "rag.reindex",
         "schedule": crontab(hour=8, minute=0),
-        "args": (None, True, False),  # (symbols, include_news, deep)
+        #  (symbols, include_news, deep, skip_existing). skip_existing=False:
+        #  job SÁNG phải LÀM MỚI cả rổ, ghi đè doc cũ. Nếu để True (resume) thì
+        #  sau lần nạp đầu mọi mã đã có news:* nên bị bỏ qua sạch → kho đứng yên.
+        "args": (None, True, False, False),
     },
     "check-watchlist-alerts": {
         "task": "watchlist.check_alerts",

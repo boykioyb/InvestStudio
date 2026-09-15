@@ -5,8 +5,12 @@ const { dateTime } = useAdminFormat()
 
 const { data, pending, refresh } = await useAsyncData('jobs', () => api.get<any>('/admin/jobs'))
 
+//  Trạng thái do worker ghi vào bảng index_jobs là RUNNING/DONE/ERROR
+//  (app/services/rag/tasks.py); Celery còn có SUCCESS/FAILURE. Map cả hai bộ
+//  để badge không rơi về xám khi job đã xong.
 const MAU: Record<string, string> = {
-  SUCCESS: 'success', RUNNING: 'primary', QUEUED: 'neutral', FAILURE: 'error'
+  SUCCESS: 'success', DONE: 'success', RUNNING: 'primary',
+  QUEUED: 'neutral', PENDING: 'neutral', FAILURE: 'error', ERROR: 'error'
 }
 
 //  Lịch khai trong app/core/celery_app.py — hiện ra đây để người vận hành không
@@ -32,8 +36,19 @@ const LICH = [
           <template v-if="data?.queue_ok">{{ data.queue_length }} job đang chờ</template>
           <span v-else class="text-error">không đọc được</span>
         </p>
-        <p v-if="!data?.queue_ok" class="text-xs text-muted">
+
+        <!--  0 job đang chờ KHÔNG phải lỗi khi có worker: worker hút job ngay nên
+              hàng đợi gần như luôn rỗng. Thứ đáng lo là KHÔNG có worker nào. -->
+        <p v-if="!data?.queue_ok" class="text-xs text-error">
           Redis không phản hồi — job nền có thể đang không chạy.
+        </p>
+        <p v-else-if="data && data.workers_online > 0" class="text-xs text-muted">
+          {{ data.workers_online }} worker đang chạy — “0 đang chờ” là bình thường,
+          worker nhặt job gần như tức thì (xem “Job gần đây” bên dưới).
+        </p>
+        <p v-else class="text-xs text-error">
+          ⚠ Không có worker nào trả lời — job nền sẽ nằm chờ mãi. Kiểm tra service
+          <code>worker</code> (Celery).
         </p>
       </UCard>
 

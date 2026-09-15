@@ -257,8 +257,18 @@ def jobs(limit: int = Query(20, ge=1, le=100), db: Session = Depends(get_db)) ->
     except Exception as exc:  # noqa: BLE001
         logger.warning("Không đọc được hàng đợi Celery", extra={"error": str(exc)})
         on = False
+
+    #  Hàng đợi 0 mà không có worker nào = job nền chết lặng. Hỏi thẳng Celery
+    #  xem có worker nào trả lời không (timeout ngắn để trang giám sát không treo).
+    workers = 0
+    try:
+        replies = celery_app.control.ping(timeout=1.0)
+        workers = len(replies or [])
+    except Exception as exc:  # noqa: BLE001 - broker không tới được
+        logger.warning("Không ping được worker Celery", extra={"error": str(exc)})
+
     return QueueOut(jobs=[JobOut.model_validate(r) for r in rows],
-                    queue_length=do_dai, queue_ok=on)
+                    queue_length=do_dai, queue_ok=on, workers_online=workers)
 
 
 # ── Nguồn dữ liệu ────────────────────────────────────────────────────────────
