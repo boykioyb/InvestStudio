@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_device, require_admin, require_verified
-from app.core import budget, fingerprint, ratelimit, settings_store, usage
+from app.core import budget, fingerprint, plans, ratelimit, settings_store, usage
 from app.core.celery_app import celery_app
 from app.core.config import get_settings
 from app.db.session import get_db
@@ -71,7 +71,10 @@ def _check_quota(user: User, request: Request, db: Session, fp_hash: str) -> Non
 
     ip = ratelimit.client_ip(request)
     ratelimit.enforce_daily_buckets([
-        ("rag", str(user.id), settings_store.quota("rag_daily_quota")),
+        #  Rổ của tài khoản đi qua plans.effective: riêng người → theo hạng →
+        #  mức chung (app/core/plans.py). Ba rổ dưới là rào theo thiết bị/mạng,
+        #  cố ý KHÔNG gắn tài khoản.
+        ("rag", str(user.id), plans.effective(user, "chat")),
         ("rag:device", fp_hash, settings_store.quota("chat_daily_per_device")),
         ("rag:ip", ip, settings_store.quota("chat_daily_per_ip")),
         ("rag:net", fingerprint.subnet_of(ip), get_settings().chat_daily_per_subnet),
@@ -468,7 +471,10 @@ def reindex(deep: bool = Query(False, description="Kèm điểm số/ROE qua ana
         raise HTTPException(status.HTTP_409_CONFLICT,
                             detail="Đang có job lập chỉ mục chạy, vui lòng đợi.")
     try:
-        task = reindex_task.delay(None, True, deep)
+        #  skip_existing=False: người bấm "Chạy lại" muốn dữ liệu MỚI, phải nạp
+        #  lại cả rổ và ghi đè doc cũ — không phải resume (resume sẽ bỏ qua mọi
+        #  mã đã có news:* rồi báo "0 đoạn", trông như nút hỏng).
+        task = reindex_task.delay(None, True, deep, False)
     except Exception as exc:  # noqa: BLE001 - broker (Redis) không tới được
         logger.error("Đẩy job lập chỉ mục thất bại", extra={"error": str(exc)})
         raise HTTPException(
@@ -492,8 +498,9 @@ def chat_quota(user: User = Depends(get_current_user),
     `level`: `ok` (bình thường) · `saving` (quota chung đang cạn → trả lời gọn
     hơn, không dùng agent) · `exhausted` (chỉ phục vụ người đã hỏi hôm nay).
     """
-    settings = get_settings()
-    limit = settings_store.quota("rag_daily_quota")
+    #  Hạn mức hiệu lực của CHÍNH người này (riêng người → theo hạng → mức
+    #  chung) — đúng con số sẽ chặn họ ở _check_quota.
+    limit = plans.effective(user, "chat")
     #  Hiện số NHỎ NHẤT giữa rổ tài khoản và rổ thiết bị — đúng cái người dùng
     #  thực sự còn, thay vì hứa 5 lượt rồi chặn ở lượt thứ 2.
     remaining = min(

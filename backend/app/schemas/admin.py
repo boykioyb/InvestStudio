@@ -15,6 +15,8 @@ class AdminUserOut(BaseModel):
     display_name: str
     role: str
     status: str
+    #  Hạng tài khoản ('free' | 'vip' — app/core/plans.py).
+    plan: str = "free"
     email_verified: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
@@ -22,6 +24,13 @@ class AdminUserOut(BaseModel):
     watchlist_count: int = 0
     chat_count: int = 0
     device_count: int = 0
+    #  Hạn mức RIÊNG của tài khoản. `None` = chưa đặt (rơi về hạng → mức chung);
+    #  khác hẳn 0 = chặn hoàn toàn. Bảng quản trị cần cả hai con số dưới đây vì
+    #  không tự suy ra được mức hiệu lực từ ba tầng.
+    chat_daily_quota: Optional[int] = None
+    analyze_daily_quota: Optional[int] = None
+    chat_quota_effective: int = 0
+    analyze_quota_effective: int = 0
 
 
 class AdminUserList(BaseModel):
@@ -32,11 +41,22 @@ class AdminUserList(BaseModel):
 
 
 class AdminUserPatch(BaseModel):
-    """Chỉ những trường quản trị được đổi. Mọi thay đổi đều ghi audit."""
+    """Chỉ những trường quản trị được đổi. Mọi thay đổi đều ghi audit.
+
+    `plan` cố ý KHÔNG ràng buộc `pattern`: danh sách hạng hợp lệ nằm ở
+    `app/core/plans.PLANS`, ràng buộc ở đây thì thêm hạng phải sửa hai nơi.
+
+    Hai trường hạn mức để `None` được vì `null` là giá trị HỢP LỆ — nghĩa là XÓA
+    hạn mức riêng để rơi về hạng/mức chung. Route phân biệt "không gửi trường
+    này" với "gửi null" bằng `model_fields_set`.
+    """
 
     role: Optional[str] = Field(None, pattern="^(user|admin)$")
     status: Optional[str] = Field(None, pattern="^(active|suspended)$")
     email_verified: Optional[bool] = None
+    plan: Optional[str] = None
+    chat_daily_quota: Optional[int] = Field(None, ge=0, le=1000)
+    analyze_daily_quota: Optional[int] = Field(None, ge=0, le=1000)
     reason: str = Field("", max_length=500)
 
 
@@ -208,9 +228,15 @@ class JobOut(BaseModel):
 
 class QueueOut(BaseModel):
     jobs: list[JobOut]
+    #  `queue_length` = số job CÒN NẰM chờ trong broker, chưa worker nào nhặt.
+    #  Worker khỏe thì hút ngay → gần như luôn 0; số này chỉ phồng khi worker
+    #  chết hoặc job dồn nhanh hơn xử lý. Đọc kèm `workers_online` mới có nghĩa.
     queue_length: int = 0
     #  Redis hỏng thì không đọc được độ dài hàng đợi — nói thật thay vì trả 0.
     queue_ok: bool = True
+    #  Số worker Celery đang trả lời ping. 0 = KHÔNG ai xử lý job nền, dù hàng
+    #  đợi hiện 0 (job sẽ nằm chờ mãi). Đây mới là thứ người vận hành cần thấy.
+    workers_online: int = 0
 
 
 # ── Nguồn dữ liệu ────────────────────────────────────────────────────────────

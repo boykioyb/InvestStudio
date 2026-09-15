@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, sta
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user_optional
-from app.core import ratelimit, settings_store, usage
+from app.core import plans, ratelimit, settings_store, usage
 from app.core.config import get_settings
 from app.models.user import User
 from app.schemas.stock import (
@@ -79,8 +79,10 @@ def _analyze_quota(request: Request, user: Optional[User], *, refresh: bool) -> 
         ratelimit.enforce_daily(f"ip:{ratelimit.client_ip(request)}", "analyze",
                                 settings_store.quota("guest_analyze_daily"), fail_open=True)
         return
+    #  Hạn mức hiệu lực của tài khoản (riêng người → theo hạng → mức chung).
+    #  Rổ "analyze" dùng CHUNG bộ đếm với portfolio.py — sửa một nơi phải sửa cả hai.
     ratelimit.enforce_daily(f"u:{user.id}", "analyze",
-                            settings_store.quota("member_analyze_daily"), fail_open=True)
+                            plans.effective(user, "analyze"), fail_open=True)
     if refresh:
         ratelimit.enforce_daily(f"u:{user.id}", "refresh",
                                 get_settings().member_refresh_daily, fail_open=True)

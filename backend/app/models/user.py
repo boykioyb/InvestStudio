@@ -26,8 +26,17 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     #  Tên hiển thị (tùy chọn) — mặc định lấy phần trước @ của email.
     display_name: Mapped[str] = mapped_column(String(120), default="")
-    #  Chỉ lưu MẬT KHẨU ĐÃ BĂM (bcrypt), không bao giờ lưu mật khẩu thô.
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    #  Chỉ lưu MẬT KHẨU ĐÃ BĂM (bcrypt), không bao giờ lưu mật khẩu thô. Tài khoản
+    #  đăng nhập bằng Google KHÔNG có mật khẩu → để chuỗi rỗng (verify_password sẽ
+    #  luôn trả False nên không ai đăng nhập bằng mật khẩu vào tài khoản đó được).
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False, default="",
+                                               server_default="")
+    #  'password' | 'google'. Cách tài khoản này đăng nhập.
+    auth_provider: Mapped[str] = mapped_column(String(16), default="password",
+                                               server_default="password", nullable=False)
+    #  Định danh ổn định của Google (`sub` trong id_token). Khớp lại người dùng cũ
+    #  kể cả khi họ đổi email hiển thị. NULL với tài khoản mật khẩu.
+    oauth_sub: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     #  'user' | 'admin'. Chỉ admin được chạm vào việc tiêu hạn mức chung (lập
     #  chỉ mục RAG) — xem app/api/deps.py:require_admin.
     role: Mapped[str] = mapped_column(String(16), default="user", server_default="user",
@@ -35,6 +44,10 @@ class User(Base):
     #  'active' | 'suspended'. Khóa tài khoản mà không xóa dữ liệu.
     status: Mapped[str] = mapped_column(String(16), default="active", server_default="active",
                                         nullable=False)
+    #  Hạng tài khoản ('free' | 'vip' — xem app/core/plans.py). Hạng quyết định
+    #  hạn mức mặc định; muốn thêm hạng thì sửa PLANS, không sửa cột này.
+    plan: Mapped[str] = mapped_column(String(16), default="free", server_default="free",
+                                      nullable=False)
     #  None = chưa xác minh email → chưa được dùng trợ lý (chống tạo tài khoản
     #  hàng loạt để nhân hạn mức).
     email_verified_at: Mapped[datetime | None] = mapped_column(
@@ -54,12 +67,23 @@ class User(Base):
     #  trang Tài khoản.
     alert_email: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true",
                                               nullable=False)
+    #  Hạn mức riêng của tài khoản, ĐÈ lên mức của hạng và mức chung.
+    #  NULL = chưa đặt (rơi về hạng → mức chung). 0 = chặn hoàn toàn — vẫn là một
+    #  giá trị thật, dùng được như "tắt trợ lý cho riêng người này". Đừng đổi
+    #  sang `or` khi đọc, hãy dùng app/core/plans.effective().
+    chat_daily_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    analyze_daily_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property
     def totp_enabled(self) -> bool:
         """Cho DTO đọc — frontend chỉ cần biết đã bật hay chưa, không cần khóa."""
         return bool(self.totp_secret)
+
+    @property
+    def has_password(self) -> bool:
+        """Tài khoản Google chưa từng đặt mật khẩu → frontend ẩn ô đổi mật khẩu."""
+        return bool(self.password_hash)
 
     @property
     def email_verified(self) -> bool:

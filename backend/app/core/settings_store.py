@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.plans import KIND_LABEL, KINDS, PLAN_LABEL, PLANS, tier_key
 from app.db.session import SessionLocal
 
 #  Khai báo các khóa cho phép chỉnh + giá trị mặc định lấy từ đâu.
@@ -55,6 +56,28 @@ SCHEMA: dict[str, dict[str, Any]] = {
     "rag_agent_max_steps": {"type": "int", "default": None,
                             "label": "Số vòng gọi công cụ tối đa mỗi câu", "group": "Gemini"},
 }
+
+
+def _khoa_theo_hang() -> dict[str, dict[str, Any]]:
+    """Khóa hạn mức theo HẠNG — sinh từ app/core/plans.py.
+
+    Thêm hạng mới trong PLANS là khóa cấu hình xuất hiện luôn trong /admin,
+    không phải sửa file này. `default: None` = CHƯA ĐẶT, nên ô để trống được và
+    hạn mức rơi xuống mức chung — xem app/core/plans.effective().
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for hang in PLANS:
+        for loai in KINDS:
+            out[tier_key(hang, loai)] = {
+                "type": "int", "default": None,
+                "label": (f"Hạng {PLAN_LABEL[hang]} — {KIND_LABEL[loai]} / ngày "
+                          "(trống = dùng mức chung)"),
+                "group": "Hạn mức",
+            }
+    return out
+
+
+SCHEMA.update(_khoa_theo_hang())
 
 
 logger = logging.getLogger("app.settings")
@@ -109,11 +132,25 @@ def quota(key: str) -> int:
 
 
 def set_value(db: Session, key: str, value: Any, actor_email: str = "") -> Any:
-    """Ghi một khóa (chỉ khóa có trong SCHEMA) rồi làm mới cache ngay."""
+    """Ghi một khóa (chỉ khóa có trong SCHEMA) rồi làm mới cache ngay.
+
+    `None` / chuỗi rỗng = XÓA giá trị đã lưu → khóa quay về mặc định. Cần cho
+    khóa hạn mức theo hạng: ô để trống nghĩa là "dùng mức chung", mà trước đây
+    `int("")` ném ValueError nên không có cách nào trả một khóa về mặc định.
+    """
     from app.models.admin import AppSetting
     if key not in SCHEMA:
         raise KeyError(key)
     kind = SCHEMA[key]["type"]
+
+    if kind != "bool" and (value is None or value == ""):
+        row = db.get(AppSetting, key)
+        if row is not None:
+            db.delete(row)
+            db.commit()
+        invalidate()
+        return None
+
     value = bool(value) if kind == "bool" else int(value)
 
     row = db.get(AppSetting, key)

@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
-from app.core import audit, budget, settings_store, usage
+from app.core import audit, budget, plans, settings_store, usage
 from app.db.session import get_db
 from app.models.admin import AuditLog
 from app.models.device import DeviceAccount
@@ -50,6 +50,13 @@ def _user_out(db: Session, user: User) -> AdminUserOut:
         id=user.id, email=user.email, display_name=user.display_name, role=user.role,
         status=user.status, email_verified=user.email_verified_at is not None,
         created_at=user.created_at, last_login_at=user.last_login_at, last_ip=user.last_ip,
+        #  Hạng + hạn mức riêng, kèm mức CÓ HIỆU LỰC — bảng quản trị hiện con số
+        #  thật sẽ chặn người này, thay vì để người vận hành tự cộng ba tầng.
+        plan=plans.plan_of(user),
+        chat_daily_quota=user.chat_daily_quota,
+        analyze_daily_quota=user.analyze_daily_quota,
+        chat_quota_effective=plans.effective(user, "chat"),
+        analyze_quota_effective=plans.effective(user, "analyze"),
         **counts)
 
 
@@ -146,7 +153,8 @@ def get_user(user_id: int, request: Request, admin: User = Depends(require_admin
     return _user_out(db, user)
 
 
-@router.patch("/users/{user_id}", response_model=AdminUserOut, summary="Sửa vai trò/trạng thái")
+@router.patch("/users/{user_id}", response_model=AdminUserOut,
+              summary="Sửa vai trò/trạng thái/hạng/hạn mức riêng")
 def patch_user(user_id: int, payload: AdminUserPatch, request: Request,
                admin: User = Depends(require_admin),
                db: Session = Depends(get_db)) -> AdminUserOut:
@@ -157,9 +165,16 @@ def patch_user(user_id: int, payload: AdminUserPatch, request: Request,
         #  Chặn tự hạ quyền chính mình → tránh trường hợp không còn admin nào.
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             detail="Không thể tự bỏ quyền quản trị của chính mình.")
+    #  Kiểm hạng TRƯỚC khi sửa gì: hạng lạ mà đã kịp đổi trường khác thì request
+    #  hỏng vẫn để lại thay đổi dở dang.
+    if payload.plan is not None and payload.plan not in plans.PLANS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail=f"Hạng tài khoản không hợp lệ: {payload.plan}")
 
     before = {"role": user.role, "status": user.status,
-              "email_verified": user.email_verified_at is not None}
+              "email_verified": user.email_verified_at is not None,
+              "plan": user.plan, "chat_daily_quota": user.chat_daily_quota,
+              "analyze_daily_quota": user.analyze_daily_quota}
     if payload.role is not None:
         user.role = payload.role
     if payload.status is not None:
@@ -169,11 +184,21 @@ def patch_user(user_id: int, payload: AdminUserPatch, request: Request,
     if payload.email_verified is not None:
         user.email_verified_at = (datetime.now(timezone.utc)
                                   if payload.email_verified else None)
+    if payload.plan is not None:
+        user.plan = payload.plan
+    #  Hạn mức riêng: chỉ chạm tới trường nào client THẬT SỰ gửi. "Không gửi" là
+    #  giữ nguyên; gửi `null` là XÓA hạn mức riêng (rơi về hạng → mức chung).
+    #  Hai trường hợp này khác nhau mà cùng ra `None` nếu chỉ nhìn giá trị.
+    for truong in ("chat_daily_quota", "analyze_daily_quota"):
+        if truong in payload.model_fields_set:
+            setattr(user, truong, getattr(payload, truong))
     db.commit()
     db.refresh(user)
 
     after = {"role": user.role, "status": user.status,
-             "email_verified": user.email_verified_at is not None}
+             "email_verified": user.email_verified_at is not None,
+             "plan": user.plan, "chat_daily_quota": user.chat_daily_quota,
+             "analyze_daily_quota": user.analyze_daily_quota}
     audit.log(db, admin, "update_user", request=request, target_type="user", target_id=user_id,
               before=before, after=after, reason=payload.reason)
     return _user_out(db, user)

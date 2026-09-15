@@ -207,6 +207,58 @@ def test_qua_nhieu_tai_khoan_tren_mot_thiet_bi_thi_chan_dang_ky(client, monkeypa
     assert fingerprint.accounts_on_device is not None
 
 
+# ── Hạn mức ba tầng: riêng người → theo hạng → mức chung ─────────────────────
+
+def _gia_lap_cau_hinh(monkeypatch, *, hang: dict[str, int], chung: dict[str, int]):
+    """Chặn hẳn đường vào DB: get/quota trả theo bảng dựng sẵn.
+
+    `plans.effective` nhập `settings_store` BÊN TRONG hàm, nên chặn thuộc tính
+    trên chính module đó là đủ — không cần Postgres cho nhóm test này.
+    """
+    from app.core import settings_store
+
+    monkeypatch.setattr(settings_store, "get", lambda key: hang.get(key))
+    monkeypatch.setattr(settings_store, "quota", lambda key: chung.get(key, 0))
+
+
+@pytest.mark.parametrize("rieng,hang,plan,mong_doi", [
+    (20, {"plan_vip_chat_daily": 50}, "vip", 20),     # riêng người thắng tất cả
+    (None, {"plan_vip_chat_daily": 50}, "vip", 50),   # hạng thắng mức chung
+    (None, {}, "vip", 5),                             # hạng chưa đặt → mức chung
+    (None, {}, "free", 5),
+    (0, {"plan_free_chat_daily": 50}, "free", 0),     # 0 là "chặn", KHÔNG phải "chưa đặt"
+])
+def test_han_muc_ba_tang(monkeypatch, rieng, hang, plan, mong_doi):
+    from app.core import plans
+
+    _gia_lap_cau_hinh(monkeypatch, hang=hang, chung={"rag_daily_quota": 5})
+    user = SimpleNamespace(plan=plan, chat_daily_quota=rieng)
+    assert plans.effective(user, "chat") == mong_doi
+
+
+def test_hang_la_thi_coi_nhu_hang_dau(monkeypatch):
+    """Hạng gõ sai / dữ liệu cũ không được làm hỏng đường tính hạn mức."""
+    from app.core import plans
+
+    _gia_lap_cau_hinh(monkeypatch, hang={"plan_free_chat_daily": 7},
+                      chung={"rag_daily_quota": 5})
+    user = SimpleNamespace(plan="bac", chat_daily_quota=None)
+    assert plans.effective(user, "chat") == 7
+
+
+def test_loai_analyze_roi_ve_dung_khoa_chung(monkeypatch):
+    """Rổ phân tích phải rơi về `member_analyze_daily`, không phải mức của trợ lý."""
+    from app.core import plans, settings_store
+
+    da_hoi: list[str] = []
+    monkeypatch.setattr(settings_store, "get", lambda key: None)
+    monkeypatch.setattr(settings_store, "quota", lambda key: (da_hoi.append(key), 100)[1])
+
+    user = SimpleNamespace(plan="free", analyze_daily_quota=None)
+    assert plans.effective(user, "analyze") == 100
+    assert da_hoi == ["member_analyze_daily"]
+
+
 def test_upload_tu_choi_tep_gia_dang_anh(client):
     """Đổi Content-Type là nhét được tệp bất kỳ — phải kiểm byte đầu tệp."""
     r = client.post("/api/auth/register",

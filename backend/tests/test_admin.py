@@ -157,6 +157,120 @@ def test_khoa_cau_hinh_la_khong_ghi_duoc(admin_client):
     assert r.status_code == 400
 
 
+# ── Hạng & hạn mức riêng theo tài khoản ─────────────────────────────────────
+#
+#  Ba tầng: riêng người → theo hạng → mức chung. Cả nhóm test này đi qua
+#  `GET /api/chat/quota` (chỉ ĐỌC) chứ không qua `POST /api/chat`: rào hạn mức
+#  fail-closed nên môi trường test không có Redis sẽ trả 503 trước khi tới đâu.
+
+def _dang_nhap(client, email: str):
+    r = client.post("/api/auth/login", json={"email": email, "password": _PW})
+    assert r.status_code == 200, r.text
+    return r
+
+
+def _uid(db, email: str) -> int:
+    from app.models.user import User
+
+    return db.query(User).filter(User.email == email).one().id
+
+
+def _chuan_bi(admin_client, db, email: str = "dan@gmail.com") -> int:
+    """Tạo một tài khoản thường rồi trả về đăng nhập quyền quản trị."""
+    _thuong(admin_client)                    # đăng ký + đăng nhập tài khoản thường
+    uid = _uid(db, email)
+    _dang_nhap(admin_client, "sep@gmail.com")
+    return uid
+
+
+def test_han_muc_rieng_co_hieu_luc_voi_dung_tai_khoan_do(admin_client, db):
+    uid = _chuan_bi(admin_client, db)
+    #  Mức chung đặt KHÁC hẳn 20 để phép so dưới đây có nghĩa.
+    admin_client.put("/api/admin/settings", json={"values": {"rag_daily_quota": 3}})
+
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"chat_daily_quota": 20})
+    assert r.status_code == 200, r.text
+    assert r.json()["chat_quota_effective"] == 20
+    assert r.json()["chat_daily_quota"] == 20
+
+    #  Chính tài khoản đó đăng nhập → thấy 20, không phải 3 của mức chung.
+    _dang_nhap(admin_client, "dan@gmail.com")
+    q = admin_client.get("/api/chat/quota")
+    assert q.status_code == 200, q.text
+    assert q.json()["limit"] == 20
+
+
+def test_xoa_han_muc_rieng_thi_quay_ve_muc_chung(admin_client, db):
+    from app.core import settings_store
+
+    uid = _chuan_bi(admin_client, db)
+    admin_client.patch(f"/api/admin/users/{uid}", json={"chat_daily_quota": 20})
+
+    #  Gửi null = XÓA hạn mức riêng. Khác hẳn việc không gửi trường đó.
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"chat_daily_quota": None})
+    assert r.status_code == 200, r.text
+    assert r.json()["chat_daily_quota"] is None
+    assert r.json()["chat_quota_effective"] == settings_store.quota("rag_daily_quota")
+
+
+def test_khong_gui_truong_han_muc_thi_giu_nguyen(admin_client, db):
+    """Đổi mỗi trạng thái KHÔNG được lặng lẽ xóa hạn mức đã đặt."""
+    uid = _chuan_bi(admin_client, db)
+    admin_client.patch(f"/api/admin/users/{uid}", json={"chat_daily_quota": 20})
+
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"status": "active"})
+    assert r.status_code == 200, r.text
+    assert r.json()["chat_daily_quota"] == 20
+
+
+def test_hang_doi_han_muc_va_o_trong_duoc(admin_client, db):
+    """Hạng làm mức mặc định, và khóa hạng phải TRẢ VỀ MẶC ĐỊNH được.
+
+    Trước đây `settings_store.set_value` gọi `int(value)` nên gửi null/chuỗi
+    rỗng là 400 — không có cách nào bỏ đặt một khóa số.
+    """
+    from app.core import settings_store
+
+    uid = _chuan_bi(admin_client, db)
+
+    r = admin_client.put("/api/admin/settings", json={"values": {"plan_vip_chat_daily": 50}})
+    assert r.status_code == 200, r.text
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"plan": "vip"})
+    assert r.status_code == 200, r.text
+    assert r.json()["plan"] == "vip"
+    assert r.json()["chat_quota_effective"] == 50
+
+    #  Để trống ô → xóa giá trị đã lưu → hạn mức rơi về mức chung.
+    r = admin_client.put("/api/admin/settings", json={"values": {"plan_vip_chat_daily": None}})
+    assert r.status_code == 200, r.text
+    assert settings_store.get("plan_vip_chat_daily") is None
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"plan": "vip"})
+    assert r.json()["chat_quota_effective"] == settings_store.quota("rag_daily_quota")
+
+
+def test_hang_khong_hop_le_thi_tu_choi(admin_client, db):
+    uid = _chuan_bi(admin_client, db)
+    r = admin_client.patch(f"/api/admin/users/{uid}", json={"plan": "bac"})
+    assert r.status_code == 400
+    assert "hạng" in r.json()["detail"].lower()
+
+
+def test_doi_han_muc_de_lai_audit(admin_client, db):
+    from app.models.admin import AuditLog
+
+    uid = _chuan_bi(admin_client, db)
+    admin_client.patch(f"/api/admin/users/{uid}",
+                       json={"chat_daily_quota": 7, "plan": "vip",
+                             "reason": "khách trả phí"})
+
+    row = (db.query(AuditLog).filter(AuditLog.action == "update_user")
+           .order_by(AuditLog.id.desc()).first())
+    assert row is not None
+    assert row.after["chat_daily_quota"] == 7
+    assert row.after["plan"] == "vip"
+    assert row.before["chat_daily_quota"] is None
+
+
 # ── Xác thực 2 lớp ───────────────────────────────────────────────────────────
 
 def test_bat_buoc_2_lop_chan_admin_chua_bat(admin_client, monkeypatch):
