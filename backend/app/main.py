@@ -10,8 +10,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import (admin, admin_ops, auth, chat, market, notifications,
-                            portfolio, screener, stocks, watchlist)
+from app.api.routes import (admin, admin_ops, auth, auth_google, chat, market,
+                            notifications, portfolio, screener, stocks, watchlist)
 from app.core import applog, ratelimit, settings_store
 from app.core.config import DEV_JWT_SECRET, get_settings
 from app.db.session import init_db
@@ -149,6 +149,7 @@ async def rate_limit_and_headers(request: Request, call_next):
 app.include_router(stocks.router, prefix="/api")
 app.include_router(screener.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(auth_google.router, prefix="/api")
 app.include_router(watchlist.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")

@@ -17,6 +17,15 @@ x-app-env: &app-env
   APP_JWT_SECRET: ${APP_JWT_SECRET:-doi-bi-mat-nay-truoc-khi-len-that}
   # Chạy http://localhost nên cookie KHÔNG bật Secure. Đặt true khi có HTTPS.
   APP_COOKIE_SECURE: "false"
+  # Đăng nhập Google (OAuth2). Khai khóa trong .env gốc — xem docs/GOOGLE_OAUTH.md.
+  # Rỗng = tắt (nút "Tiếp tục với Google" hiện kèm dòng nhắc chưa cấu hình).
+  APP_GOOGLE_CLIENT_ID: ${APP_GOOGLE_CLIENT_ID:-}
+  APP_GOOGLE_CLIENT_SECRET: ${APP_GOOGLE_CLIENT_SECRET:-}
+  # URL công khai để dựng redirect URI Google gọi lại (đổi khi lên tên miền thật).
+  APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:-http://localhost:${WEB_PORT:-3010}}
+  # URL khu QUẢN TRỊ — dựng redirect URI Google RIÊNG cho trang đăng nhập admin.
+  # Khai thêm `{URL}/api/auth/google/callback` trong Google Console (đổi khi lên thật).
+  APP_ADMIN_BASE_URL: ${APP_ADMIN_BASE_URL:-http://localhost:${ADMIN_PORT:-3020}}
   # Key Gemini cho RAG — lấy ở https://aistudio.google.com/apikey
   APP_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
   # Model sinh câu trả lời — đổi bằng LLM_MODEL trong .env

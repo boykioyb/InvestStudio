@@ -13,6 +13,10 @@ export interface UserOut {
   totp_enabled?: boolean
   /** Nhận email khi mã theo dõi chạm ngưỡng. */
   alert_email: boolean
+  /** 'password' | 'google' — kiểu đăng nhập của tài khoản. */
+  auth_provider?: string
+  /** False với tài khoản Google chưa đặt mật khẩu → ẩn ô đổi mật khẩu. */
+  has_password?: boolean
   created_at: string
 }
 

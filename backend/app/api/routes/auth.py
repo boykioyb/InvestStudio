@@ -128,6 +128,12 @@ def get_challenge(fp_hash: str = Depends(get_device), db: Session = Depends(get_
     return {"required": can, **challenge.phat(settings.pow_difficulty)}
 
 
+@router.get("/oauth-config", summary="Nhà cung cấp đăng nhập ngoài đang bật")
+def oauth_config() -> dict[str, bool]:
+    """Frontend gọi để biết có hiện nút 'Đăng nhập với Google' hay không."""
+    return {"google": get_settings().google_oauth_enabled}
+
+
 @router.post("/login", response_model=UserOut, summary="Đăng nhập")
 def login(payload: LoginRequest, request: Request, response: Response,
           fp_hash: str = Depends(get_device),
@@ -135,6 +141,12 @@ def login(payload: LoginRequest, request: Request, response: Response,
     ratelimit.enforce(request, "login")  # chặn dò mật khẩu theo IP
     email = payload.email.lower().strip()
     user = db.scalar(select(User).where(User.email == email))
+    #  Tài khoản tạo bằng Google không có mật khẩu → chỉ dẫn đúng nút thay vì báo
+    #  "sai mật khẩu" gây bối rối. (App vốn đã lộ sự tồn tại email ở /register.)
+    if user is not None and user.auth_provider == "google" and not user.password_hash:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED,
+                            detail="Tài khoản này đăng nhập bằng Google. "
+                                   "Hãy bấm nút 'Đăng nhập với Google'.")
     #  Cùng một thông báo cho "sai email" và "sai mật khẩu" — không tiết lộ
     #  email nào đã tồn tại trong hệ thống.
     if user is None or not verify_password(payload.password, user.password_hash):

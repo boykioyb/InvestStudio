@@ -151,8 +151,21 @@ class Settings(BaseSettings):
     smtp_ssl: bool = False
     #  Địa chỉ trang web công khai — dùng dựng link trong email.
     public_base_url: str = "http://localhost:3010"
+    #  Địa chỉ khu QUẢN TRỊ (origin riêng, thật là admin.<domain>). Dùng dựng
+    #  redirect URI Google RIÊNG cho trang đăng nhập quản trị — cookie đặt đúng
+    #  origin admin, không phải chia sẻ với app công khai. Phải khai y hệt
+    #  `{admin_base_url}/api/auth/google/callback` trong Google Console.
+    admin_base_url: str = "http://localhost:3020"
     verify_token_minutes: int = 60 * 24      # thư xác minh sống 24 giờ
     reset_token_minutes: int = 30            # link đặt lại mật khẩu sống 30 phút
+
+    # ── Đăng nhập Google (OAuth2 — luồng authorization code phía server) ──────
+    #  Lấy ở Google Cloud Console → APIs & Services → Credentials → OAuth client
+    #  ID (loại "Web application"). RỖNG = tắt: nút "Đăng nhập với Google" không
+    #  hiện và endpoint /auth/google/* trả 503. Redirect URI phải khai đúng
+    #  `{public_base_url}/api/auth/google/callback` trong console.
+    google_client_id: str = ""
+    google_client_secret: str = ""
     #  Bắt buộc xác minh email trước khi dùng trợ lý. Tắt được khi chạy máy để
     #  khỏi phải dựng SMTP, nhưng ở môi trường thật thì đây là rào chính chống
     #  tạo tài khoản hàng loạt để nhân hạn mức.
@@ -167,6 +180,23 @@ class Settings(BaseSettings):
     upload_allowed_mimes: tuple[str, ...] = (
         "image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf",
     )
+
+
+    @property
+    def google_oauth_enabled(self) -> bool:
+        """Chỉ bật đăng nhập Google khi có ĐỦ cả client id lẫn secret."""
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def google_redirect_uri(self) -> str:
+        """URI Google gọi lại sau khi người dùng đồng ý — phải khai y hệt trong console."""
+        return f"{self.public_base_url.rstrip('/')}/api/auth/google/callback"
+
+    @property
+    def google_admin_redirect_uri(self) -> str:
+        """Redirect URI RIÊNG cho khu quản trị — Google gọi về đúng origin admin
+        để cookie đăng nhập đặt tại đó. Khai riêng một dòng trong Google Console."""
+        return f"{self.admin_base_url.rstrip('/')}/api/auth/google/callback"
 
 
 @lru_cache

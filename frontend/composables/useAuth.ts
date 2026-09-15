@@ -25,9 +25,19 @@ export function useAuth() {
     return fallback
   }
 
+  //  Ở SSR, cookie httpOnly của người dùng nằm trong request đến máy chủ Nuxt —
+  //  chuyển tiếp nó tới /me để backend nhận ra phiên. Nhờ vậy trang render ĐÚNG
+  //  trạng thái đăng nhập ngay từ khung hình đầu (không nháy chưa-đăng-nhập/field
+  //  rỗng rồi mới nhảy ra dữ liệu). Trên trình duyệt thì cookie tự đi kèm.
+  const reqCookie = import.meta.server ? useRequestHeaders(['cookie']) : undefined
+
   /** credentials:'include' để cookie đi kèm cả khi apiBase là origin khác. */
   function call<T>(path: string, options: Record<string, unknown> = {}): Promise<T> {
-    return $fetch<T>(`${apiBase}${path}`, { credentials: 'include', ...options })
+    return $fetch<T>(`${apiBase}${path}`, {
+      credentials: 'include',
+      ...(reqCookie ? { headers: reqCookie } : {}),
+      ...options
+    })
   }
 
   /** Nạp thông tin tài khoản từ cookie hiện có. Không có phiên thì user = null. */
@@ -44,6 +54,35 @@ export function useAuth() {
   /** Gọi fetchMe đúng một lần cho mỗi lần tải trang (dùng ở onMounted). */
   async function ensureLoaded(): Promise<void> {
     if (!ready.value) await fetchMe()
+  }
+
+  //  ── Đăng nhập ngoài (Google) ───────────────────────────────────────────
+  //  Nút chỉ hiện/hoạt động thật khi backend đã có client id + secret.
+  const googleEnabled = useState<boolean>('auth-google-enabled', () => false)
+
+  async function loadOauthConfig(): Promise<void> {
+    try {
+      const cfg = await call<{ google: boolean }>('/api/auth/oauth-config')
+      googleEnabled.value = !!cfg.google
+    } catch {
+      googleEnabled.value = false
+    }
+  }
+
+  /**
+   * Bắt đầu đăng nhập Google. Lấy URL từ backend (kèm cookie chống giả mạo) rồi
+   * ĐIỀU HƯỚNG cả trang sang Google — không dùng redirect phía backend vì proxy
+   * /api tự đi theo redirect nên sẽ nuốt mất.
+   */
+  async function startGoogle(next = '/'): Promise<void> {
+    error.value = ''
+    try {
+      const { url } = await call<{ url: string }>(
+        `/api/auth/google/start?next=${encodeURIComponent(next)}`)
+      window.location.href = url
+    } catch (err) {
+      error.value = messageOf(err, 'Chưa mở được đăng nhập Google. Thử lại sau.')
+    }
   }
 
   /** Trạng thái cho giao diện biết đang phải giải câu đố chống tự động. */
@@ -230,7 +269,8 @@ export function useAuth() {
     user.value = null
   }
 
-  return { user, ready, pending, error, solvingChallenge, isLoggedIn, fetchMe, ensureLoaded, register, login,
+  return { user, ready, pending, error, solvingChallenge, isLoggedIn, googleEnabled,
+           fetchMe, ensureLoaded, loadOauthConfig, startGoogle, register, login,
            changePassword, logout, verifyEmail, resendVerification, forgotPassword,
            resetPassword, deleteAccount, setAlertEmail }
 }

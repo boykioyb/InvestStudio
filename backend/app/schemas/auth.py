@@ -68,4 +68,8 @@ class UserOut(BaseModel):
     email_verified: bool = False
     totp_enabled: bool = False
     alert_email: bool = True
+    #  'password' | 'google' — để frontend biết tài khoản đăng nhập kiểu nào.
+    auth_provider: str = "password"
+    #  False với tài khoản Google chưa đặt mật khẩu → ẩn ô đổi mật khẩu.
+    has_password: bool = True
     created_at: datetime
