@@ -220,7 +220,6 @@ useHead({
           <label for="source">Nguồn dữ liệu</label>
           <select id="source" v-model="source">
             <option value="auto">Tự động</option>
-            <option value="vci">VCI (cơ bản)</option>
             <option value="cafef">CafeF (chỉ kỹ thuật)</option>
           </select>
         </div>

@@ -17,7 +17,7 @@
         </div>
         <span class="src">
           Cập nhật <b class="tnum">24/08/2026</b> · nguồn
-          <span class="badge">CafeF</span><span class="badge">VCI</span>
+          <span class="badge">CafeF</span>
         </span>
       </div>
 

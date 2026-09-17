@@ -41,6 +41,27 @@ function pickRange(next: RangeKey) {
   if (next !== range.value || !history.value) load(props.data.ticker, next)
 }
 
+/* ── Nhãn nguồn hiển thị ──────────────────────────────────────────────────
+   Chỉ để lộ nguồn dữ liệu công khai (CafeF...). Mọi nguồn nội bộ
+   (VCI/DNSE/KBS...) gộp thành một nhãn trung tính "Dữ liệu công khai",
+   không nêu tên. Backend vẫn trả nguồn thật trong data.sources. */
+const PUBLIC_SOURCES = new Set(['cafef', 'vnstock'])
+const displaySources = computed(() => {
+  const out: string[] = []
+  let hasInternal = false
+  for (const s of props.data.sources ?? []) {
+    const key = s.trim().toLowerCase()
+    if (!key) continue
+    if (PUBLIC_SOURCES.has(key)) {
+      if (!out.includes(s)) out.push(s)
+    } else {
+      hasInternal = true
+    }
+  }
+  if (hasInternal) out.push('Dữ liệu công khai')
+  return out
+})
+
 /* ── Vòng điểm số (chỉ trình bày) ──────────────────────────────────────── */
 const GAUGE_R = 52
 const GAUGE_C = 2 * Math.PI * GAUGE_R
@@ -157,8 +178,8 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
       <div class="meta-row srcs">
         <span class="hint">Nguồn</span>
         <span class="badges">
-          <span v-for="s in data.sources" :key="s" class="badge">{{ s }}</span>
-          <span v-if="!data.sources?.length" class="hint">—</span>
+          <span v-for="s in displaySources" :key="s" class="badge">{{ s }}</span>
+          <span v-if="!displaySources.length" class="hint">—</span>
         </span>
       </div>
       <p v-if="data.hint" class="msg warn tiny">{{ data.hint }}</p>
