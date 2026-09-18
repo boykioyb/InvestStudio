@@ -127,8 +127,9 @@ def _corporate_events(ticker: str) -> list[EventItem]:
 
 
 def fetch_news(ticker: str) -> NewsFeed:
-    """Tin công bố + sự kiện doanh nghiệp gần đây (lấy thẳng VCI, không qua vnstock)."""
-    from app.services.providers import google_news, vci_direct
+    """Tin công bố + sự kiện doanh nghiệp gần đây (lấy thẳng nguồn, không qua vnstock)."""
+    from app.services.providers import dnse, google_news, vci_direct
+    from app.services.providers.dnse import DnseError
     from app.services.providers.google_news import GoogleNewsError
     from app.services.providers.vci_direct import VciError
 
@@ -137,13 +138,16 @@ def fetch_news(ticker: str) -> NewsFeed:
     def safe(getter):
         try:
             return getter()
-        except (VciError, GoogleNewsError):
+        except (VciError, GoogleNewsError, DnseError):
             return None
 
-    #  Gộp 2 nguồn: VCI (tin công bố chính thức) + Google News (tin báo chí, tươi
-    #  hơn, có link bài gốc). VCI feed hay đóng băng nên Google News là cứu cánh.
-    raw_news = (safe(lambda: vci_direct.news(ticker, days=365, size=50)) or [])
+    #  Gộp 3 nguồn, xếp nguồn TƯƠI + có link bài gốc lên trước để khi trùng tiêu đề
+    #  thì bản giàu thông tin thắng khi lọc trùng: DNSE (tươi, có link) + Google News
+    #  (báo chí, có link) + VCI (công bố chính thức, chỉ tiêu đề, đóng băng ~2025-08).
+    #  Mỗi nguồn bọc trong safe() nên một nguồn lỗi/timeout không làm sập cả feed.
+    raw_news = (safe(lambda: dnse.news(ticker, limit=30)) or [])
     raw_news += (safe(lambda: google_news.news(ticker, size=15)) or [])
+    raw_news += (safe(lambda: vci_direct.news(ticker, days=365, size=50)) or [])
 
     news: list[NewsItem] = []
     seen: set[str] = set()
