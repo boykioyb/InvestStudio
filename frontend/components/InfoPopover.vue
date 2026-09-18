@@ -108,7 +108,11 @@ function lockPageScroll(on: boolean) {
   document.documentElement.style.overflow = on ? 'hidden' : ''
 }
 
+const { track } = useMetrics()
+
 function open() {
+  //  NSM-C: người dùng mở phần giải thích "vì sao điểm này" (đo lòng tin vào điểm).
+  track('why_open', { ref: props.label })
   sheet.value = window.innerWidth <= MOBILE_MAX
   placed.value = false
   boxStyle.value = {}

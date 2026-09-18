@@ -35,6 +35,7 @@ from app.schemas.chat import (
     ConversationRename,
     IndexStatus,
 )
+from app.services import analytics
 from app.services.rag import agent, guard, store
 from app.services.rag import attachments as attach_store
 from app.services.rag.gemini import GeminiError, QuotaError
@@ -215,6 +216,9 @@ def ask(payload: ChatRequest, request: Request, user: User = Depends(require_ver
 
     resp.conversation_id = conv.id if conv else None
     _save_turn(db, user, conv, ticker=ticker, question=question, resp=resp, attachments=refs)
+    #  Sự kiện SẢN PHẨM (NSM-B): người dùng vừa có một lượt tương tác với trợ lý.
+    #  Dùng session riêng (analytics tự quản) để không đụng tới commit của request.
+    analytics.log_event("assistant", user_id=user.id, fp_hash=fp_hash, ticker=ticker or "")
     return resp
 
 
@@ -313,6 +317,8 @@ def ask_stream(question: str = Query(..., min_length=3, max_length=1000),
         #  Lưu lượt hỏi–đáp sau khi stream xong (đủ câu trả lời).
         if final is not None:
             _save_turn(db, user, conv, ticker=tk, question=q, resp=final, attachments=refs)
+            #  Sự kiện SẢN PHẨM (NSM-B): một lượt tương tác trợ lý đã hoàn tất.
+            analytics.log_event("assistant", user_id=user.id, fp_hash=fp_hash, ticker=tk or "")
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers={
         "Cache-Control": "no-cache, no-transform",

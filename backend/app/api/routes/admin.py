@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.core import audit, budget, plans, settings_store, usage
+from app.services import analytics
 from app.db.session import get_db
 from app.models.admin import AuditLog
 from app.models.device import DeviceAccount
@@ -34,6 +35,17 @@ from app.schemas.admin import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+
+@router.get("/nsm", summary="North Star Metric — số liệu hành vi thật (product_events)")
+def nsm(days: int = Query(7, ge=1, le=90, description="Cửa sổ tính, số ngày"),
+        db: Session = Depends(get_db)) -> dict:
+    """Đọc 3 phương án NSM trên `days` ngày gần nhất.
+
+    Đây là "cách xem lại" cho ISSUE-03: bằng chứng thật từ bảng product_events,
+    không phải vanity metric. Định nghĩa từng chỉ số: docs/scrum/nsm.md.
+    """
+    return analytics.nsm_summary(days=days, db=db)
 
 
 def _user_out(db: Session, user: User) -> AdminUserOut:

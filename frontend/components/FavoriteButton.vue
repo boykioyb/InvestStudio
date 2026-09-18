@@ -8,10 +8,13 @@
  */
 import { Star } from 'lucide-vue-next'
 
-const props = defineProps<{ ticker: string; compact?: boolean }>()
+//  `trackAction`: nút này nằm cạnh một điểm số → theo dõi mã là "hành động sau
+//  khi xem điểm" (NSM-C). Chỉ bật ở trang phân tích, không bật trong bảng danh sách.
+const props = defineProps<{ ticker: string; compact?: boolean; trackAction?: boolean }>()
 
 const { isLoggedIn, ensureLoaded } = useAuth()
 const { has, load, loaded, add, removeByTicker } = useWatchlist()
+const { track } = useMetrics()
 const route = useRoute()
 const busy = ref(false)
 
@@ -31,8 +34,13 @@ async function toggle(): Promise<void> {
   }
   busy.value = true
   try {
-    if (active.value) await removeByTicker(code.value)
-    else await add({ ticker: code.value })
+    if (active.value) {
+      await removeByTicker(code.value)
+    } else {
+      await add({ ticker: code.value })
+      //  Chỉ tính khi THÊM (một hành động chủ động sau khi xem điểm), không tính khi bỏ.
+      if (props.trackAction) track('score_action', { ticker: code.value, ref: 'watch' })
+    }
   } finally {
     busy.value = false
   }

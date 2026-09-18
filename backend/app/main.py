@@ -11,7 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes import (admin, admin_ops, auth, auth_google, chat, market,
-                            notifications, portfolio, screener, stocks, watchlist)
+                            metrics, notifications, portfolio, screener, stocks,
+                            watchlist)
 from app.core import applog, ratelimit, settings_store
 from app.core.config import DEV_JWT_SECRET, get_settings
 from app.db.session import init_db
@@ -157,6 +158,7 @@ app.include_router(portfolio.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(admin_ops.router, prefix="/api")
+app.include_router(metrics.router, prefix="/api")
 
 
 def _check(name: str, probe, *, required: bool) -> tuple[DependencyHealth, bool]:

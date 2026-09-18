@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, sta
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import get_current_user_optional
-from app.core import plans, ratelimit, settings_store, usage
+from app.core import fingerprint, plans, ratelimit, settings_store, usage
 from app.core.config import get_settings
 from app.models.user import User
 from app.schemas.stock import (
@@ -34,8 +34,8 @@ from app.schemas.stock import (
     SymbolHit,
     TradingBoard,
 )
-from app.services import (alerts, analyzer, details, feed, history, market, position,
-                          scoring, symbols)
+from app.services import (alerts, analytics, analyzer, details, feed, history, market,
+                          position, scoring, symbols)
 from app.services.providers.base import ProviderError
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
@@ -169,6 +169,8 @@ def analyze_stock(
 
     key = _cache_key(symbol, pos, mgmt, cat, pe_sec, pb_fair, source)
     if not refresh and (hit := _cache.get(key)) is not None:
+        analytics.log_event("analyze", user_id=(user.id if user else None),
+                            fp_hash=fingerprint.device_fp(request), ticker=symbol)
         return hit
 
     with usage.track():
@@ -181,6 +183,11 @@ def analyze_stock(
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
         usage.record(None, "analyze", user_id=(user.id if user else None),
                      ip=ratelimit.client_ip(request), ticker=symbol)
+
+    #  Sự kiện SẢN PHẨM (NSM): người dùng vừa THẤY một điểm số. Tách khỏi usage
+    #  (đo chi phí) — xem app/services/analytics.py.
+    analytics.log_event("analyze", user_id=(user.id if user else None),
+                        fp_hash=fingerprint.device_fp(request), ticker=symbol)
 
     _cache[key] = result
     return result
@@ -214,6 +221,15 @@ def analyze_stock_stream(
     force = _may_refresh(refresh, user)
     _analyze_quota(request, user, refresh=force)
 
+    #  Vân tay tính TRƯỚC khi mở generator (đọc cookie của request), rồi dùng lại
+    #  trong closure — generator SSE chạy ngoài phạm vi request.
+    fp_hash = fingerprint.device_fp(request)
+    uid = user.id if user else None
+
+    def _log_seen() -> None:
+        #  Sự kiện SẢN PHẨM (NSM): người dùng vừa THẤY một điểm số (kể cả từ cache).
+        analytics.log_event("analyze", user_id=uid, fp_hash=fp_hash, ticker=symbol)
+
     def event_stream():
         if not symbol.isalnum():
             yield _sse("error", {"detail": "Mã cổ phiếu chỉ gồm chữ và số."})
@@ -223,6 +239,7 @@ def analyze_stock_stream(
         if not force and (hit := _cache.get(key)) is not None:
             yield _sse("progress", {"step": "cache", "label": "Dùng lại kết quả vừa phân tích",
                                     "percent": 100})
+            _log_seen()
             yield _sse("result", hit.model_dump(mode="json"))
             return
 
@@ -254,6 +271,7 @@ def analyze_stock_stream(
             return
 
         _cache[key] = outcome["data"]
+        _log_seen()
         yield _sse("result", outcome["data"].model_dump(mode="json"))
 
     return StreamingResponse(

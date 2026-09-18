@@ -90,6 +90,25 @@ def fingerprint(request: Request, device_id: str) -> str:
     return hashlib.sha256(parts.encode("utf-8")).hexdigest()
 
 
+def device_fp(request: Request) -> str:
+    """Vân tay thiết bị CHỈ-ĐỌC: dùng cookie `did` sẵn có, KHÔNG cấp cookie mới,
+    KHÔNG kiểm chặn.
+
+    Dùng cho số liệu sản phẩm (product_events): cần cùng một `fp_hash` với luồng
+    hạn mức để dedup người dùng ẩn danh cho khớp, nhưng không được đổi hành vi của
+    route công khai (không set-cookie, không 403). Thiết bị đã có `did` hợp lệ →
+    fp trùng đúng với `get_device`; thiết bị chưa có thì device_id rỗng (chấp nhận
+    được: người đăng nhập luôn dedup bằng user_id).
+    """
+    raw = request.cookies.get(DEVICE_COOKIE, "")
+    device_id = ""
+    if raw:
+        claims = decode_purpose_token(raw, _PURPOSE)
+        if claims and claims.get("sub"):
+            device_id = str(claims["sub"])
+    return fingerprint(request, device_id)
+
+
 def subnet_of(ip: str) -> str:
     """Dải /24 (IPv4) hoặc /48 (IPv6) — rổ đếm rộng cho cả một mạng.
 
