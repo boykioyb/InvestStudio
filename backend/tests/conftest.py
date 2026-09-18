@@ -15,6 +15,11 @@ _BASE = os.environ.get(
 _TEST_DB = "phantichma_test"
 os.environ["APP_DATABASE_URL"] = _BASE.rsplit("/", 1)[0] + "/" + _TEST_DB
 os.environ["APP_GEMINI_API_KEY"] = ""  # chắc chắn test không gọi Gemini thật
+#  Google OAuth phải TẮT theo mặc định trong test: các test luồng đăng nhập tự bật
+#  bằng monkeypatch.setattr trên settings (xem tests/test_auth_google.py::_enable).
+#  Xoá env kế thừa từ container để test "tắt mặc định / trả 503" không bị lộ khoá thật.
+os.environ.pop("APP_GOOGLE_CLIENT_ID", None)
+os.environ.pop("APP_GOOGLE_CLIENT_SECRET", None)
 #  Vô hiệu hóa giới hạn tần suất trong test (nhiều lần register/login liên tiếp,
 #  và cả bộ test bắn hơn 120 request/phút từ cùng một "IP").
 os.environ["APP_LOGIN_MAX_ATTEMPTS"] = "1000000"
