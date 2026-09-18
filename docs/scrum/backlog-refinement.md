@@ -98,17 +98,23 @@ Khung đánh giá lộ ra 4 mảng chưa được trả lời — **cần điề
 
 ---
 
-## 3. Bảng ưu tiên tổng hợp (sắp theo ICE)
+## 3. Thứ tự ưu tiên thực thi
 
-| # | Vấn đề | Loại | ICE | Trạng thái |
-|---|--------|------|-----|-----------|
-| ISSUE-03 | Chốt North Star Metric | Iterate | ~21 | TODO |
-| ISSUE-01 | "Vì sao điểm này" (riskiest assumption) | Iterate | ~15.8 | TODO |
-| ISSUE-02 | Thêm nguồn tin thứ 2 (DNSE) | Pivot | ~12.8 | TODO |
-| ISSUE-04 | Validate Problem + ICP | Investigate | cần data | TODO |
-| ISSUE-05 | Làm rõ khác biệt cạnh tranh | Investigate | cần data | TODO |
-| ISSUE-06 | Chốt kênh phân phối | Investigate | cần data | TODO |
-| ISSUE-07 | Test business model / pricing | Investigate | cần data | TODO |
+> Nguyên tắc xếp: rẻ + đòn bẩy cao + kiểm chứng được *riskiest assumption* → làm trước.
+> **Phát hiện chính:** `ISSUE-01` (vì sao điểm) và `ISSUE-L1` (disclaimer) là **cùng một mũi tên** — minh bạch điểm số vừa kiểm chứng giả định "user có tin điểm máy chấm" vừa giảm rủi ro pháp lý bị xem là tư vấn đầu tư. Làm 1 lần, gỡ cả hai.
+
+| Thứ tự | Vấn đề | Loại | ICE | Sprint | Vì sao xếp ở đây |
+|:---:|--------|------|-----|:---:|------------------|
+| **1** | ISSUE-03 · Chốt North Star Metric | Iterate | ~21 | **Sprint 1** | Rẻ nhất, mở khoá mọi đo lường sau — không có nó thì fix khác không biết đúng/sai |
+| **2** | ISSUE-01 (+ L1 disclaimer) · "Vì sao điểm này" | Iterate | ~15.8 | **Sprint 1** | Đòn bẩy kép: kiểm chứng riskiest assumption **và** giảm rủi ro pháp lý L1 |
+| **3** | ISSUE-04 · Validate Problem + ICP | Investigate | cần data | Sprint 2 | Tốn thời gian lịch (hẹn 20–30 người) → khởi động *song song* từ Sprint 1 |
+| **4** | ISSUE-02 · Thêm nguồn tin thứ 2 (DNSE) | Pivot | ~12.8 | Sprint 2 | Endpoint sẵn, sửa "tin toàn tin cũ" |
+| **5** | ISSUE-L4 → L3 → L2 → L1 · Pháp lý blocker | BLOCKER | — | Trước go-live | Chặn mở công khai/thu phí, KHÔNG chặn phát triển → làm khi đã chắc hướng (sau khi ISSUE-04 xác nhận vấn đề đủ đau) |
+| 6 | ISSUE-05/06/07 · Cạnh tranh / kênh / pricing | Investigate | cần data | Sprint 3+ | Điều tra sau khi Problem/ICP đã rõ |
+
+**Việc bắt tay đầu tiên:** `ISSUE-03` — chốt 1 North Star Metric trước, để `ISSUE-01` có thước đo hiệu quả.
+
+**Lưu ý về pháp lý:** phần *disclaimer* của L1 (chỉ viết text + hiển thị) rẻ → làm luôn cùng bước 2; phần *xin giấy phép / luật sư* để ở bước 5, tránh tốn tiền luật sư cho sản phẩm có thể sắp pivot.
 
 ---
 
