@@ -108,6 +108,7 @@ function submitLot() {
         <p class="act-label" :class="`lv-${review.action.level}`">{{ review.action.label }}</p>
         <p class="act-reason">{{ review.action.reason }}</p>
         <p v-if="review.action.detail" class="act-detail">{{ review.action.detail }}</p>
+        <ScoreDisclaimer compact class="act-disc" />
       </section>
 
       <section class="card">
@@ -308,6 +309,10 @@ function submitLot() {
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--muted);
+}
+
+.act-disc {
+  margin-top: 10px;
 }
 
 .tiles {

@@ -83,6 +83,8 @@ const { textClass, fillClass } = useLevel()
     </section>
 
     <p class="note-line">{{ decision.note }}</p>
+
+    <ScoreDisclaimer class="mt-disc" />
   </section>
 </template>
 
@@ -300,5 +302,9 @@ const { textClass, fillClass } = useLevel()
   padding-top: 10px;
   font-size: 11px;
   color: var(--muted);
+}
+
+.mt-disc {
+  margin-top: 10px;
 }
 </style>

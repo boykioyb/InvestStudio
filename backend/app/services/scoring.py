@@ -133,11 +133,13 @@ def _verdict(total: int) -> Verdict:
 
 #  Bậc xếp loại — khai một chỗ, dùng cho cả `_verdict` lẫn phần mô tả mô hình
 #  trả ra API, để trang "Cách chấm điểm" không thể nói khác máy chấm.
+#  Nhãn xếp loại MÔ TẢ tình trạng theo mô hình, KHÔNG ra lệnh mua/bán (legal L1):
+#  công cụ là thông tin/giáo dục, không phải khuyến nghị đầu tư.
 _GRADES: tuple[tuple[int, str, Level], ...] = (
-    (80, "Xuất sắc — ưu tiên giải ngân", "good"),
-    (65, "Tốt — có thể đầu tư, canh điểm mua", "good"),
-    (50, "Trung bình — theo dõi / thăm dò nhỏ", "warn"),
-    (0, "Yếu — nên tránh", "bad"),
+    (80, "Xuất sắc — nền tảng và kỹ thuật đều mạnh", "good"),
+    (65, "Tốt — điểm cao, ít điểm trừ", "good"),
+    (50, "Trung bình — còn nhiều yếu tố chưa vững", "warn"),
+    (0, "Yếu — rủi ro lấn át theo mô hình", "bad"),
 )
 
 
@@ -240,12 +242,12 @@ def _timing(m: Metrics) -> str:
     trend = criteria.TREND.evaluate(m.trend).level
     rsi = criteria.RSI.evaluate(m.rsi).level
     if trend == 2 and rsi == 2:
-        return "Điểm mua thuận lợi — xu hướng tăng, động lượng khỏe mà chưa quá mua."
+        return "Kỹ thuật thuận lợi — xu hướng tăng, động lượng khỏe mà chưa quá mua."
     if trend == 2:
-        return "Đang tăng nhưng nóng (RSI cao) — chờ nhịp chỉnh, tránh mua đuổi đỉnh."
+        return "Đang tăng nhưng RSI cao (vùng quá mua) — dễ có nhịp chỉnh."
     if trend == 1:
-        return "Giá đi ngang — đợi break khỏi nền tích lũy kèm khối lượng."
-    return "Xu hướng giảm — chưa nên mua, tránh 'bắt dao rơi'."
+        return "Giá đi ngang — chưa thoát khỏi nền tích lũy, khối lượng chưa bùng."
+    return "Xu hướng giảm — kỹ thuật đang yếu, dễ thành 'bắt dao rơi'."
 
 
 STOP_LOSS_PCT = 8.0  # kỷ luật cắt lỗ mặc định của mô hình (%)
@@ -295,16 +297,21 @@ _RISK_TEMPLATES: dict[str, Callable[[Metrics], str]] = {
 
 
 def _size_bracket(total: int) -> tuple[str, float, str]:
-    """(chuỗi hiển thị, % tối đa để tính lỗ, câu hành động)."""
+    """(chuỗi hiển thị, % tối đa để tính lỗ, câu MÔ TẢ).
+
+    Con số tỷ trọng là GỢI Ý KỶ LUẬT quản trị rủi ro cho khung "nếu bạn quyết định
+    mua" — không phải lệnh mua. Câu mô tả nói tình trạng theo mô hình, tránh mệnh
+    lệnh mua/bán (legal L1).
+    """
     if total >= 80:
         return ("15–20%", 20.0,
-                "Ứng viên mạnh — có thể giải ngân theo khung phù hợp nhất, canh nhịp chỉnh để vào giá tốt.")
+                "Điểm rất cao theo mô hình — nếu chọn mua, tỷ trọng nên giới hạn kèm kỷ luật cắt lỗ.")
     if total >= 65:
-        return "8–12%", 12.0, "Đủ tốt — vào lệnh thăm dò, gia tăng khi có thêm xác nhận."
+        return "8–12%", 12.0, "Điểm khá theo mô hình, vẫn còn điểm trừ cần tự cân nhắc."
     if total >= 50:
-        return ("≤ 5% (thăm dò)", 5.0,
-                "Chưa đủ hấp dẫn — đưa vào watchlist, chờ nền tảng hoặc định giá cải thiện.")
-    return "0% (loại)", 0.0, "Rủi ro lớn hơn cơ hội — nên tránh."
+        return ("≤ 5%", 5.0,
+                "Điểm trung bình — nhiều yếu tố chưa vững theo mô hình.")
+    return "0%", 0.0, "Điểm thấp — rủi ro lấn át cơ hội theo mô hình."
 
 
 def _worst_case(
@@ -343,8 +350,8 @@ def _worst_case(
     account_loss_pct = size_max_pct * STOP_LOSS_PCT / 100
 
     if size_max_pct <= 0:
-        narrative = ("Mô hình khuyên KHÔNG mua mã này, nên kịch bản xấu nhất là bạn bỏ qua kỷ luật "
-                     "và vẫn xuống tiền — khi đó mọi rủi ro bên dưới đều là của bạn.")
+        narrative = ("Mã này bị mô hình chấm 0% tỷ trọng gợi ý. Kịch bản xấu nhất là bạn bỏ qua kỷ "
+                     "luật và vẫn xuống tiền — khi đó mọi rủi ro bên dưới đều là của bạn.")
     elif stop_price is not None:
         narrative = (
             f"Bạn mua ở giá {price:g}, giá quay đầu và chạm cắt lỗ {STOP_LOSS_PCT:g}% tại "

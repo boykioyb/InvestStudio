@@ -1,8 +1,5 @@
 <script setup lang="ts">
-/**
- * Dải "kết quả mẫu" của trang chủ — VÍ DỤ MINH HOẠ tĩnh (mã FPT, số liệu chốt
- * ngày 24/08/2026) để người xem hình dung đầu ra. Không phải số liệu live.
- */
+// Dải "kết quả mẫu" trang chủ — ví dụ minh hoạ tĩnh (FPT), không phải số liệu live.
 </script>
 
 <template>
@@ -25,7 +22,7 @@
         <div class="kpi">
           <div class="k">Điểm tổng</div>
           <div class="v"><span class="big lv-good tnum">81</span><span class="unit tnum">/100</span></div>
-          <div class="sub lv-good strong">Xuất sắc — ưu tiên giải ngân</div>
+          <div class="sub lv-good strong">Xuất sắc — nền tảng và kỹ thuật đều mạnh</div>
         </div>
         <div class="kpi">
           <div class="k">Định giá</div>
