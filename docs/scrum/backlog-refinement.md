@@ -22,21 +22,21 @@
 - **Bước đánh giá liên quan:** Validation / Solution
 - **Triệu chứng:** Toàn bộ sản phẩm dựa trên giả định người dùng tin vào điểm số do hệ thống chấm. Nếu họ không tin → sản phẩm vô nghĩa. Đây là giả định nguy hiểm nhất và hiện **chưa có bằng chứng**.
 - **Cách cải thiện:** Thêm phần **"Vì sao điểm này"** (giải thích minh bạch từng yếu tố cấu thành điểm) ngay cạnh mỗi điểm số. Đo tỉ lệ user click mở phần giải thích.
-- **Loại:** Iterate · **ICE:** I=9, C=7, E=4 → **~15.8** · **Trạng thái:** TODO
+- **Loại:** Iterate · **ICE:** I=9, C=7, E=4 → **~15.8** · **Trạng thái:** ✅ DONE (Sprint 1, commit 054811d)
 - **Cách đo (bằng chứng thật):** % user mở "vì sao điểm này"; tỉ lệ user hành động sau khi xem điểm.
 
 ### ISSUE-02 · News feed toàn tin cũ (feed đứng yên từ ~2025-08)
 - **Bước đánh giá liên quan:** Solution (chất lượng dữ liệu)
 - **Triệu chứng:** "Tin toàn tin cũ" — nguyên nhân là **phía nguồn**: feed Vietcap bị đóng băng, KHÔNG phải bug cache/code.
 - **Cách cải thiện:** Đây là *pivot nhỏ về nguồn dữ liệu* — thêm **nguồn tin thứ 2** (endpoint tin tức DNSE đã sẵn sàng). Không cố sửa cache vì không phải nguyên nhân.
-- **Loại:** Pivot (nguồn) · **ICE:** I=8, C=8, E=5 → **~12.8** · **Trạng thái:** TODO
+- **Loại:** Pivot (nguồn) · **ICE:** I=8, C=8, E=5 → **~12.8** · **Trạng thái:** ✅ DONE (Sprint 2, commit 3eacd94 — nối DNSE, feed tươi <48h, 190 test pass)
 - **Cách đo:** độ tươi của tin (ngày đăng gần nhất < 48h); số tin mới/ngày.
 
 ### ISSUE-03 · Chưa có North Star Metric (NSM)
 - **Bước đánh giá liên quan:** Validation
 - **Triệu chứng:** Đang đo mơ hồ, dễ rơi vào "vanity metrics" (số liệu ảo: lượt xem, đăng ký) thay vì giá trị thật.
 - **Cách cải thiện:** Chốt **1 chỉ số** đại diện giá trị cốt lõi. Đề xuất: *"số cổ phiếu user thực sự phân tích / tuần"* hoặc *"số phiên có tương tác trợ lý / user hoạt động"*.
-- **Loại:** Iterate · **ICE:** I=7, C=6, E=2 → **~21** · **Trạng thái:** TODO
+- **Loại:** Iterate · **ICE:** I=7, C=6, E=2 → **~21** · **Trạng thái:** ✅ DONE (Sprint 1, commit 8f9ad4a — product_events + /api/admin/nsm, đo 3 phương án)
 - **Ghi chú:** ICE cao vì rẻ + mở khoá mọi quyết định đo lường sau này. Nên làm đầu tiên dù Impact vừa.
 
 ---
@@ -50,7 +50,7 @@
 - **Bước đánh giá liên quan:** Business Model / Pháp lý
 - **Triệu chứng:** "Chấm điểm cổ phiếu" + trợ lý gợi ý có thể bị xem là *tư vấn đầu tư chứng khoán* — hoạt động có điều kiện, cần giấy phép theo Luật Chứng khoán 2019.
 - **Cách cải thiện:** Định vị là **công cụ thông tin/giáo dục**, bỏ ngôn từ khuyến nghị ("nên mua"...), thêm **disclaimer** cạnh mỗi điểm số; luật sư xác nhận không cần giấy phép (hoặc xin).
-- **Loại:** BLOCKER · **Trạng thái:** BLOCKED · ref: legal L1
+- **Loại:** BLOCKER · **Trạng thái:** phần disclaimer + làm dịu ngôn từ ✅ DONE (commit 0123dc8); phần xác nhận giấy phép/luật sư vẫn 🔴 BLOCKED · ref: legal L1
 
 ### ISSUE-L4 · Token TCInvest (extension TCBS) 🔴
 - **Bước đánh giá liên quan:** Solution / Bảo mật / Pháp lý
