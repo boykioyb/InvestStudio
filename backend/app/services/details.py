@@ -187,11 +187,11 @@ def fetch_profile(ticker: str) -> CompanyProfile:
     if rating:
         target = _to_float(p.get("targetPrice"))
         analyst = AnalystView(
-            source="Vietcap (VCI) — khuyến nghị của công ty chứng khoán, không phải của công cụ này",
+            source="Khuyến nghị của công ty chứng khoán, không phải của công cụ này",
             rating=rating,
             target_price=round(target / 1000, 2) if target else None,
             upside_pct=_percent(p.get("upsideToTargetPercent"), 1),
-            analyst=_clean(p.get("analyst")),
+            analyst="",
             as_of=_clean(p.get("ratingAsOf"))[:10],
         )
 

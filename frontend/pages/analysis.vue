@@ -23,10 +23,7 @@ const source = ref<SourceOption>('auto')
 
 const examples = ['FPT', 'VCB', 'HPG', 'MWG', 'VNM']
 
-/**
- * Danh sách bước hiển thị. `at` chỉ dùng để tô mờ bước ĐÃ qua —
- * bước đang chạy và phần trăm đều lấy nguyên từ sự kiện máy chủ gửi về.
- */
+// Bước hiển thị; `at` chỉ để tô mờ bước đã qua, tiến độ thật lấy từ máy chủ.
 const STEPS = [
   { key: 'technical', at: 10, text: 'Lấy giá và chỉ báo kỹ thuật' },
   { key: 'company', at: 45, text: 'Đọc hồ sơ doanh nghiệp' },
@@ -80,9 +77,7 @@ async function runAnalysis(code: string) {
   await analyze(code, options.value)
 }
 
-//  Bấm "Phân tích" / gợi ý: ĐỔI URL để địa chỉ luôn khớp mã đang xem — watcher
-//  bên dưới sẽ kích hoạt phân tích. Cùng mã (chỉ đổi tùy chọn) thì chạy lại thẳng
-//  vì query không đổi nên navigate sẽ không tạo điều hướng mới.
+//  Đổi URL cho khớp mã (watcher bên dưới chạy phân tích); cùng mã thì chạy lại thẳng.
 function submit() {
   const code = ticker.value.trim().toUpperCase()
   if (!code) return
@@ -98,17 +93,13 @@ function pick(code: string) {
   submit()
 }
 
-//  Nguồn sự thật là ?symbol trên URL: đổi mã (từ trang khác, gõ tay, hay nút Phân
-//  tích) đều đi qua đây → phân tích đúng một lần.
+//  ?symbol trên URL là nguồn sự thật → mọi cách đổi mã đều phân tích đúng một lần.
 watch(() => route.query.symbol, (value) => {
   const code = String(value || '').trim().toUpperCase()
   if (code) void runAnalysis(code)
 })
 
-//  Khởi tạo:
-//   1) Có ?ma → phân tích ngay.
-//   2) Không có → đã đăng nhập & có mã theo dõi thì chuyển URL sang mã GẦN NHẤT.
-//   3) Chưa đăng nhập / chưa theo dõi → giữ màn trống.
+//  Khởi tạo: có ?symbol → phân tích ngay; nếu không, đã đăng nhập thì mở mã theo dõi gần nhất.
 onMounted(async () => {
   const code = String(route.query.symbol || '').trim().toUpperCase()
   if (code) {
