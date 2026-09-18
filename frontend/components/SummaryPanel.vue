@@ -41,10 +41,7 @@ function pickRange(next: RangeKey) {
   if (next !== range.value || !history.value) load(props.data.ticker, next)
 }
 
-/* ── Nhãn nguồn hiển thị ──────────────────────────────────────────────────
-   Chỉ để lộ nguồn dữ liệu công khai (CafeF...). Mọi nguồn nội bộ
-   (VCI/DNSE/KBS...) gộp thành một nhãn trung tính "Dữ liệu công khai",
-   không nêu tên. Backend vẫn trả nguồn thật trong data.sources. */
+// Chỉ hiện nguồn công khai (CafeF); gộp nguồn nội bộ thành 1 nhãn trung tính.
 const PUBLIC_SOURCES = new Set(['cafef', 'vnstock'])
 const displaySources = computed(() => {
   const out: string[] = []
@@ -74,6 +71,17 @@ const gaugeColor = computed(() => {
     : lv === 'warn' ? 'var(--warn)' : 'var(--muted)'
 })
 
+/* ── "Vì sao điểm này" ở cấp điểm TỔNG (ISSUE-01) ───────────────────────────
+   Chỉ RENDER dữ liệu backend đã trả (điểm từng nhóm) — không tính gì ở đây. Mở
+   ra thì báo sự kiện why_open để đo lòng tin vào điểm (NSM-C). */
+const { track } = useMetrics()
+const showWhy = ref(false)
+const groups = computed(() => props.data.score.categories)
+function toggleWhy(): void {
+  showWhy.value = !showWhy.value
+  if (showWhy.value) track('why_open', { ticker: props.data.ticker, ref: 'total' })
+}
+
 let raf = 0
 function animateTo(target: number): void {
   cancelAnimationFrame(raf)
@@ -91,7 +99,6 @@ function animateTo(target: number): void {
 }
 
 onMounted(() => animateTo(clamped.value))
-//  Đổi mã → điểm mới thì chạy lại hiệu ứng đếm.
 watch(clamped, (v) => animateTo(v))
 onBeforeUnmount(() => cancelAnimationFrame(raf))
 </script>
@@ -102,7 +109,7 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
       <div class="id">
         <h2 class="ticker" :class="textClass(data.score.verdict.level)">{{ data.ticker }}</h2>
         <p class="name" :title="data.name">{{ data.name }}</p>
-        <FavoriteButton :ticker="data.ticker" class="follow" />
+        <FavoriteButton :ticker="data.ticker" track-action class="follow" />
       </div>
       <div class="px">
         <div class="px-row">
@@ -136,10 +143,33 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
           {{ data.score.verdict.text }}
         </p>
         <p class="score-cap hint">điểm sức khỏe tổng hợp · 14 tiêu chí</p>
+        <button
+          type="button"
+          class="why-toggle"
+          :aria-expanded="showWhy"
+          @click="toggleWhy"
+        >
+          {{ showWhy ? 'Ẩn giải thích' : 'Vì sao ' + data.score.total + ' điểm?' }}
+        </button>
       </div>
     </div>
 
-    <!-- Chọn khung thời gian: nhìn xu hướng dài để đối chiếu với điểm kỹ thuật -->
+    <!-- Vì sao điểm này: điểm tổng = tổng điểm 4 nhóm, do máy chủ chấm (chỉ render). -->
+    <div v-if="showWhy" class="why">
+      <p class="why-lead">Điểm tổng là tổng điểm của 4 nhóm tiêu chí (máy chủ chấm):</p>
+      <ul class="why-groups">
+        <li v-for="g in groups" :key="g.name">
+          <span class="wg-name">{{ g.name }}</span>
+          <span class="wg-score tnum">{{ g.sum }}<span class="muted">/{{ g.max }}</span></span>
+        </li>
+      </ul>
+      <p class="why-foot hint">
+        Mở nút ⓘ ở từng tiêu chí (bảng "Chi tiết 14 tiêu chí") để xem vì sao từng điểm.
+      </p>
+    </div>
+
+    <ScoreDisclaimer compact />
+
     <div class="ranges" role="group" aria-label="Khung thời gian biểu đồ">
       <button
         v-for="r in PRICE_RANGES"
@@ -357,6 +387,72 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
 
 .score-cap {
   margin: 0;
+}
+
+.why-toggle {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.why-toggle:hover {
+  opacity: 0.85;
+}
+
+.why {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel2);
+  padding: 9px 11px;
+}
+
+.why-lead {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.why-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.why-groups li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.wg-name {
+  color: var(--muted);
+}
+
+.wg-score {
+  font-weight: 700;
+}
+
+.wg-score .muted {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.why-foot {
+  margin: 8px 0 0;
+  font-size: 10.5px;
 }
 
 /* Biểu đồ giãn lấp hết khoảng trống giữa điểm số và phần chú thích */
